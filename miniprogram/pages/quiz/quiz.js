@@ -16,6 +16,7 @@ var keysLib = require('../../components/letter-keyboard/keys');
 var time = require('../../utils/time');
 var WORDS = require('../../data/words');
 var books = require('../../utils/books');
+var tts = require('../../utils/tts');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -344,33 +345,21 @@ Page({
     this.playedCount[q.wordId] = n + 1;
 
     if (!this.speakWord(q.wordId)) {
-      wx.showToast({ title: '发音源未配置', icon: 'none' });
+      wx.showToast({ title: '发音需在小程序后台添加“同声传译”插件', icon: 'none' });
     }
     this.renderQuestion();
   },
 
   /**
-   * 发音
-   *
-   * ⚠️ 这里刻意不写死任何第三方 TTS 地址：小程序对 request 域名有白名单要求，
-   *    外部链接随时可能失效，写死会在真机上表现为"点了没声音"。
-   *    正式做法（二选一）：
-   *      ① 预生成音频放云存储/CDN，用 fileID 播放（推荐：音质稳定、可缓存）
-   *      ② 使用微信同声传译插件（需在小程序后台申请）
-   *    配置好之后，把 audioUrlFor 的返回值改成你自己的地址即可。
+   * 发音：走 utils/tts.js（微信同声传译插件）。听写题里它就是"考试材料"。
+   * 返回值表示发音请求是否成功发起（false 时调用方会提示）。
    */
   speakWord: function (word) {
-    var url = this.audioUrlFor(word);
-    if (!url) return false;
-    var ctx = wx.createInnerAudioContext();
-    ctx.src = url;
-    ctx.onError(function () { wx.showToast({ title: '读音加载失败', icon: 'none' }); });
-    ctx.play();
+    if (!tts.isAvailable()) return false;
+    tts.speak(word, function (ok) {
+      if (!ok) wx.showToast({ title: '朗读失败，请稍后再试', icon: 'none' });
+    });
     return true;
-  },
-
-  audioUrlFor: function (word) {
-    return '';
   },
 
   /* ---------------- 交卷判分 ---------------- */

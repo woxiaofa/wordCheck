@@ -39,12 +39,13 @@ page {
 .mt { margin-top: 24rpx; }
 .mt-s { margin-top: 12rpx; }
 
-/* 按钮 */
+/* 按钮。white-space:nowrap：按钮文案换行（"去抽查 · 10 题，交卷才判分"那种两行）非常难看，
+   文案统一控制在一行内，超长就改文案而不是让它折行 */
 .btn {
   display: flex; align-items: center; justify-content: center;
   height: 96rpx; border-radius: 24rpx; font-size: 32rpx; font-weight: 600;
   color: #ffffff; background: linear-gradient(135deg, #3ea6ff, #7c5cff);
-  border: none;
+  border: none; white-space: nowrap;
 }
 .btn::after { border: none; }
 .btn.ghost {

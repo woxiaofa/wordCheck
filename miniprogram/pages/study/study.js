@@ -17,6 +17,7 @@ var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var WORDS = require('../../data/words');
 var books = require('../../utils/books');
+var tts = require('../../utils/tts');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -359,30 +360,17 @@ Page({
   },
 
   /**
-   * 单词发音
-   *
-   * ⚠️ 这里刻意不写死任何第三方发音 URL：小程序对 request 域名有白名单要求，
-   *    而且外部 TTS 链接随时可能失效或变更，写死会在真机上表现为"点了没声音"。
-   *    正式做法有两种，二选一：
-   *      ① 预生成音频放云存储/CDN，用 fileID 播放（推荐：音质稳定、无外部依赖、可缓存）
-   *      ② 小程序端用微信同声传译插件（需在小程序后台申请插件）
-   *    配置好之后，把 audioUrl 换成你自己的地址即可。
+   * 单词发音：走 utils/tts.js（微信同声传译插件），学习卡上的 🔊 按钮就是它。
+   * 插件未在小程序后台添加时给一次性明确提示，而不是沉默失败。
    */
   speakWord: function (w) {
-    var url = this.audioUrlFor(w);
-    if (!url) {
-      wx.showToast({ title: '尚未配置发音源', icon: 'none' });
+    if (!tts.isAvailable()) {
+      wx.showToast({ title: '发音需在小程序后台添加“同声传译”插件', icon: 'none' });
       return;
     }
-    var ctx = wx.createInnerAudioContext();
-    ctx.src = url;
-    ctx.onError(function () { wx.showToast({ title: '读音加载失败', icon: 'none' }); });
-    ctx.play();
-  },
-
-  /** 发音地址解析：留空表示未配置。接入云存储后改成返回对应的 fileID。 */
-  audioUrlFor: function (w) {
-    return '';
+    tts.speak(w, function (ok) {
+      if (!ok) wx.showToast({ title: '朗读失败，请稍后再试', icon: 'none' });
+    });
   },
 
   onRestart: function () {

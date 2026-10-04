@@ -71,7 +71,8 @@
     </view>
 
     <button class="btn" bindtap="goStudy">{{mainBtnText}}</button>
-    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 10 题，交卷才判分</button>
+    <!-- 文案别超过一行：按钮里换行非常难看。"交卷才判分"的说明抽查页开场就有，这里不重复 -->
+    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 检验真实水平</button>
   </view>
 
   <view class="grid-3">
