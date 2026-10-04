@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>单词抽查 Demo</title>
+<style>
+  :root{
+    --bg:#0f1620; --card:#18222e; --card2:#1e2a38; --line:#2b3949;
+    --fg:#e8eef5; --dim:#8fa3b7; --accent:#3ea6ff; --accent2:#7c5cff;
+    --ok:#2fd07a; --warn:#ffb020; --bad:#ff5c72;
+    --shadow:0 8px 24px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    font-size:15px;line-height:1.5}
+  body{padding-bottom:86px; max-width:520px; margin:0 auto; min-height:100vh}
+  header{position:sticky;top:0;z-index:20;background:rgba(15,22,32,.92);backdrop-filter:blur(10px);
+    padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+  header .t1{font-size:17px;font-weight:700;letter-spacing:.3px}
+  header .t2{font-size:12px;color:var(--dim);margin-top:2px}
+  main{padding:14px 16px 0}
+  .screen{display:none;animation:fade .18s ease}
+  .screen.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .card.flat{box-shadow:none}
+  .muted{color:var(--dim);font-size:13px}
+  .row{display:flex;align-items:center;gap:12px}
+  .between{justify-content:space-between}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:var(--card2);border-radius:12px;padding:11px 12px}
+  .kpi b{display:block;font-size:20px;font-weight:700;line-height:1.25}
+  .kpi span{font-size:11.5px;color:var(--dim)}
+  .btn{appearance:none;border:none;border-radius:13px;padding:14px 16px;font-size:15px;font-weight:600;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;width:100%;
+    transition:transform .1s ease,filter .15s ease}
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.sm{padding:10px 12px;font-size:13.5px;border-radius:11px;width:auto}
+  .btn.ok{background:linear-gradient(135deg,#2fd07a,#22a862)}
+  .btn.warn{background:linear-gradient(135deg,#ffb020,#e08b00)}
+  .btn.bad{background:linear-gradient(135deg,#ff5c72,#e03a52)}
+  .btn:disabled{filter:grayscale(.7) brightness(.7);cursor:default}
+  /* 进度环 */
+  .ring-wrap{position:relative;width:118px;height:118px;flex:0 0 auto}
+  .ring-wrap svg{transform:rotate(-90deg)}
+  .ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring-txt b{font-size:22px;line-height:1}
+  .ring-txt span{font-size:11px;color:var(--dim);margin-top:3px}
+  .task-line{display:flex;justify-content:space-between;font-size:14px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .task-line:last-child{border-bottom:none}
+  .task-line b{font-variant-numeric:tabular-nums}
+  /* 学习卡：正面看单词，点/下滑看答案，上滑=想得很快直接过；8 秒不动自动揭晓 */
+  .flip{position:relative;min-height:288px;margin-bottom:14px;overflow:hidden;
+    touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;border-radius:18px}
+  .flip.dragging{cursor:grabbing}
+  .auto{position:absolute;left:0;top:0;z-index:8;height:3px;width:100%;transform-origin:0 50%;
+    transform:scaleX(0);background:linear-gradient(90deg,var(--accent),var(--accent2));display:none;border-radius:18px 18px 0 0}
+  .auto.on{display:block}
+  .ov{position:absolute;inset:0;z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:18px;font-weight:700;font-size:18px;pointer-events:none;padding:20px;text-align:center;line-height:1.5}
+  .ov.up{display:flex;background:rgba(47,208,122,.18);border:2px solid var(--ok);color:#8ff0bd}
+  .ov.down{display:flex;background:rgba(255,92,114,.18);border:2px solid var(--bad);color:#ffb3bd}
+  .ov small{display:block;font-weight:400;font-size:12.5px;opacity:.88;margin-top:8px}
+  .swipe-hint{transition:opacity .25s;font-size:12px;color:var(--dim);text-align:center;margin-top:auto}
+  .face{display:none;flex-direction:column;border:1px solid var(--line);border-radius:18px;padding:20px;
+    box-shadow:var(--shadow);background:var(--card);min-height:288px;position:relative}
+  .flip:not(.flipped) .front{display:flex}
+  .flip.flipped .front{display:none}
+  .flip.flipped .back{display:flex}
+  .flip.flash-ok{outline:2px solid var(--ok);outline-offset:2px}
+  .flip.flash-bad{outline:2px solid var(--bad);outline-offset:2px}
+  .face.back{gap:10px}
+  .word{font-size:34px;font-weight:700;letter-spacing:.5px;margin-top:auto;word-break:break-word}
+  .phon{color:var(--dim);font-size:14px;margin-top:4px}
+  .hint{margin-top:auto;font-size:13px;color:var(--accent);text-align:center}
+  .def{font-size:19px;font-weight:600;color:var(--accent)}
+  .ex{font-size:13.5px;line-height:1.6}
+  .ex em{color:var(--warn);font-style:normal;font-weight:700}
+  .tag{display:inline-block;font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:5px}
+  .speak{position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:50%;
+    background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer}
+  /* 抽查 */
+  .qmeta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim);margin-bottom:9px}
+  .qbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .qtitle{font-size:13px;color:var(--dim);margin-bottom:10px}
+  .qword{font-size:29px;font-weight:700;text-align:center;margin:8px 0 4px;word-break:break-word}
+  .qopt{background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px;
+    cursor:pointer;font-size:15px;transition:border-color .15s,background .15s}
+  .qopt.sel{border-color:var(--accent);background:rgba(62,166,255,.14)}
+  .qopt.right{border-color:var(--ok);background:rgba(47,208,122,.16)}
+  .qopt.wrong{border-color:var(--bad);background:rgba(255,92,114,.16)}
+  .slots{font-family:Consolas,"Courier New",monospace;font-size:27px;letter-spacing:5px;text-align:center;margin:14px 0;min-height:38px}
+  .slots i{color:var(--dim);font-style:normal}
+  .kb{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin-top:10px}
+  .kb button{aspect-ratio:1/1;border-radius:9px;background:var(--card2);border:1px solid var(--line);color:var(--fg);
+    font-size:15px;font-weight:600;cursor:pointer;padding:0}
+  .kb button:active{background:var(--accent);color:#fff}
+  .kb button.wide{grid-column:span 3;aspect-ratio:auto;font-size:13px}
+  .progress{height:5px;border-radius:99px;background:var(--line);overflow:hidden;margin-bottom:14px}
+  .progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .25s}
+  /* 热力图 */
+  .heat{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin-top:10px}
+  .heat i{aspect-ratio:1/1;border-radius:4px;background:var(--card2);border:1px solid var(--line)}
+  .legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);margin-top:9px}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  /* 错词 */
+  .wrongline{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .wrongline:last-child{border-bottom:none}
+  .wrongline .w{font-weight:700;font-size:15px}
+  .badge{font-size:11px;border-radius:999px;padding:2px 8px;font-weight:600}
+  .badge.hi{background:rgba(255,92,114,.18);color:#ff8a9b;border:1px solid rgba(255,92,114,.4)}
+  .badge.lo{background:rgba(255,176,32,.16);color:#ffc861;border:1px solid rgba(255,176,32,.35)}
+  /* 底部导航 */
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:30;max-width:520px;margin:0 auto;
+    background:rgba(20,28,38,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+  nav button{background:none;border:none;color:var(--dim);font-size:11.5px;padding:6px 2px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button b{font-size:19px;font-weight:400;line-height:1}
+  nav button.on{color:var(--accent)}
+  nav{grid-template-columns:repeat(5,1fr)}
+  /* 教练端 */
+  select{background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:10px;font-family:inherit}
+  input[type=range]{accent-color:#3ea6ff}
+  .dot{width:13px;height:13px;border-radius:3px;display:inline-block;cursor:pointer;border:1px solid var(--line);transition:transform .1s}
+  .dot:active{transform:scale(1.35)}
+  .stu{border:1px solid var(--line);border-radius:13px;padding:11px 12px;margin-bottom:9px;background:var(--card2)}
+  .stu .nm{font-weight:700}
+  .stu .dots{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+  .warn{color:var(--bad);font-weight:600}
+  .okc{color:var(--ok);font-weight:600}
+  .chip{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;margin:3px 4px 0 0;background:var(--card2)}
+  .chip b{color:var(--warn)}
+  .modal{position:fixed;inset:0;z-index:70;background:rgba(8,12,18,.72);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+  .modal .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;max-width:500px;width:100%;max-height:78vh;overflow:auto;box-shadow:var(--shadow)}
+  .modal pre{background:var(--card2);white-space:pre-wrap;font-size:12.5px;color:var(--fg)}
+  .toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:60;background:#243244;color:#fff;
+    border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-size:13.5px;box-shadow:var(--shadow);
+    transition:transform .25s ease;max-width:88%}
+  .toast.on{transform:translate(-50%,0)}
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+  .note{background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.35);border-radius:12px;padding:11px 13px;font-size:12.5px;color:#c9c2ff}
+  .demo-badge{position:fixed;left:12px;bottom:96px;z-index:40;font-size:10.5px;color:var(--dim);
+    background:rgba(24,34,46,.9);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+  .achievements{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .ach{border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:12px;background:var(--card2);opacity:.42}
+  .ach.on{opacity:1;border-color:var(--accent);background:rgba(62,166,255,.14)}
+  .ach b{display:block;font-size:13px}
+  .res{q:inherit}
+  .res-item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .res-item:last-child{border-bottom:none}
+  .res-item .u{color:var(--bad);text-decoration:line-through}
+  .res-item .c{color:var(--ok);font-weight:600}
+  canvas#reportCard{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+</style>
+</head>
+<body>
+<div id="coachWrap">
+<canvas id="confetti"></canvas>
+<header id="hdrStu">
+  <div class="row between" style="align-items:flex-start">
+    <div style="min-width:0">
+      <div class="t1" id="hTitle">今日任务</div>
+      <div class="t2" id="hSub">学员端 · 遗忘曲线复习 + 抽查督促 · 可离线体验</div>
+    </div>
+    <button class="btn ghost sm" id="roleSwitch" style="flex:0 0 auto;white-space:nowrap">切换到教练端 →</button>
+  </div>
+</header>
+
+<header id="hdrCoach" hidden>
+  <div class="row between" style="align-items:flex-start">
+    <div style="min-width:0">
+      <div class="t1" id="cTitle">教练端 · 班级管理</div>
+      <div class="t2" id="cSub">布置任务 · 看进度 · 催作业 · 把人工监督变成系统监督</div>
+    </div>
+    <button class="btn ghost sm" id="roleSwitch2" style="flex:0 0 auto;white-space:nowrap">← 切回学员端</button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 首页 / 今日任务 ============ -->
+  <section class="screen on" id="s-home">
+    <div class="card">
+      <div class="row" style="align-items:center;gap:18px">
+        <div class="ring-wrap">
+          <svg width="118" height="118">
+            <circle cx="59" cy="59" r="50" fill="none" stroke="#2b3949" stroke-width="10"></circle>
+            <circle id="ringArc" cx="59" cy="59" r="50" fill="none" stroke="url(#g1)" stroke-width="10"
+                    stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314"></circle>
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3ea6ff"></stop><stop offset="100%" stop-color="#7c5cff"></stop>
+            </linearGradient></defs>
+          </svg>
+          <div class="ring-txt"><b id="ringPct">0%</b><span id="ringCnt">0 / 0</span></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="task-line"><span>复习到期</span><b id="nDue">0</b></div>
+          <div class="task-line"><span>错词回流</span><b id="nWrong">0</b></div>
+          <div class="task-line"><span>新词</span><b id="nNew">0</b></div>
+          <div class="task-line"><span>抽查</span><b id="nQuiz">0 题</b></div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:14px" id="studyBtns">
+        <button class="btn" id="goStudy">开始学习</button>
+        <button class="btn ghost" id="goQuiz">去抽查</button>
+      </div>
+      <button class="btn ghost sm" id="fmtDemo" style="margin-top:10px;width:100%">模拟：跨过 10 分钟，让“忘记”的词现在到期</button>
+    </div>
+
+    <div class="card" id="stuTask"></div>
+
+    <div class="grid3" style="margin-bottom:14px">
+      <div class="kpi"><b id="kStreak">0</b><span>连续打卡</span></div>
+      <div class="kpi"><b id="kMastery">0%</b><span>掌握率</span></div>
+      <div class="kpi"><b id="kLearned">0</b><span>已学词数</span></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><b>近 30 天</b><span class="muted" id="heatSum">共完成 0 次</span></div>
+      <div class="heat" id="heat"></div>
+      <div class="legend">
+        <span>少</span><i style="background:#1e2a38"></i><i style="background:#1d4f74"></i>
+        <i style="background:#2b7fb8"></i><i style="background:#3ea6ff"></i><i style="background:#7c5cff"></i><span>多</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>成就</b>
+      <div class="achievements" id="achBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <div><b>周报卡片</b><div class="muted">给家长看的进度外显（付费触点）</div></div>
+        <button class="btn sm" id="toReport">生成</button>
+      </div>
+      <canvas id="reportCard" width="1000" height="1330" style="margin-top:12px"></canvas>
+      <button class="btn ghost sm" id="saveReport" style="margin-top:10px;width:100%">保存为图片</button>
+    </div>
+
+    <div class="card flat">
+      <div class="note">提醒推送的说明（Demo 内不实现）：微信订阅消息需用户主动授权，一次性订阅通常只能发一条，所以「每天自动催你背单词」在小程序里做不到。真人督促（教练/家长在群里催）反而更有效，也是本产品真正的付费点。</div>
+    </div>
+
+    <div class="card flat" style="margin-bottom:20px">
+      <div class="row between">
+        <span class="muted">Demo 数据存在本地浏览器</span>
+        <button class="btn ghost sm" id="resetDemo">重置演示数据</button>      </div>
+    </div>
+  </section>
+
+  <!-- ============ 学习 ============ -->
+  <section class="screen" id="s-study">
+    <div class="progress"><i id="stProgress"></i></div>
+    <div class="row between muted" style="margin-bottom:10px">
+      <span id="stMeta">—</span><span id="stCount">0 / 0</span>
+    </div>
+
+    <div class="flip" id="flip">
+      <div class="auto" id="autoBar"></div>
+      <div class="ov up" id="ovUp">✅ 想得很快<small>松手记为「想得很快」，直接下一个</small></div>
+      <div class="ov down" id="ovDown">🔁 没想起来<small>松手看答案</small></div>
+      <div class="face front">
+        <div class="speak" data-act="1" id="speakBtn">🔊</div>
+        <div class="word" id="stWord">—</div>
+        <div class="phon" id="stPhon"></div>
+        <div class="hint">先在心里回忆它的意思</div>
+        <div class="swipe-hint" id="swipeHint">点一下看答案 · 上滑=想得很快 · 下滑=没想起来</div>
+      </div>
+      <div class="face back">
+        <div class="def" id="stDef"></div>
+        <div class="muted" id="stStage"></div>
+        <div class="ex" id="stEx"></div>
+        <div><span class="tag" id="stTag"></span></div>
+        <div id="stFb" style="visibility:hidden;margin-top:auto">
+          <div class="muted" style="text-align:center;margin:2px 0 8px">刚才回忆得怎么样？</div>
+          <button class="btn bad" id="fbForgot" style="text-align:left;padding:10px 13px;font-size:14px">
+            <b>没想起来</b><span style="font-weight:400;opacity:.85;font-size:12px">　· 10 分钟后重来</span></button>
+          <button class="btn warn" id="fbVague" style="text-align:left;padding:10px 13px;font-size:14px;margin-top:7px">
+            <b>想起来了，但费劲</b><span style="font-weight:400;opacity:.85;font-size:12px">　· 间隔减半</span></button>
+          <button class="btn ok" id="fbKnown" style="text-align:left;padding:10px 13px;font-size:14px;margin-top:7px">
+            <b>想得很快</b><span style="font-weight:400;opacity:.85;font-size:12px">　· 跳到更长的间隔</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="muted" style="text-align:center;font-size:12.5px;margin-top:10px">
+      一轮 = 系统按遗忘曲线排给你的到期词 + 错词 + 新词。学完自动进下一个，不用你决定学几个。
+    </div>
+  </section>
+  <!-- ============ 学习结算 ============ -->
+  <section class="screen" id="s-result">
+    <div class="card" style="text-align:center">
+      <div style="font-size:44px" id="rsEmoji">🎉</div>
+      <div style="font-size:20px;font-weight:700;margin:6px 0 2px" id="rsTitle">这一轮完成</div>
+      <div class="muted" id="rsSub"></div>
+      <div class="grid2" style="margin-top:16px">
+        <div class="kpi"><b id="rsKnown">0</b><span>秒懂</span></div>
+        <div class="kpi"><b id="rsFuzzy">0</b><span>模糊</span></div>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <div class="kpi"><b id="rsForgot">0</b><span>忘记</span></div>
+        <div class="kpi"><b id="rsAcc">0%</b><span>一轮正确率</span></div>
+      </div>
+      <button class="btn" id="rsQuiz" style="margin-top:16px">去抽查这轮错词</button>
+      <button class="btn ghost" id="rsHome" style="margin-top:10px">先歇一下</button>
+    </div>
+  </section>
+
+  <!-- ============ 抽查 ============ -->
+  <section class="screen" id="s-quiz">
+    <div id="quizIntro">
+      <div class="card">
+        <div style="font-size:30px;text-align:center">📝</div>
+        <div style="text-align:center;font-size:18px;font-weight:700;margin:8px 0 4px">抽查模式</div>
+        <div class="muted" style="text-align:center">一次 10 题，<b style="color:var(--fg)">交卷后统一判分</b>。过程中不告诉对错——这是抽查和练习的本质区别。</div>
+        <div class="task-line" style="margin-top:14px"><span>选义（英译中）</span><b>3 题</b></div>
+        <div class="task-line"><span>拼写（中译英 · 自绘键盘）</span><b>5 题</b></div>
+        <div class="task-line"><span>听写（听音写词）</span><b>2 题</b></div>
+        <button class="btn" id="startQuiz" style="margin-top:15px">开始抽查</button>
+      </div>
+    </div>
+
+    <div id="quizRun" style="display:none">
+      <div class="progress"><i id="qzProgress"></i></div>
+      <div class="qmeta"><span id="qzMeta">第 1 / 10 题</span><span id="qzType"></span></div>
+      <div class="qbox" id="qzBox"></div>
+      <div class="row" style="gap:10px">
+        <button class="btn ghost" id="qzPrev">上一题</button>
+        <button class="btn" id="qzNext">下一题</button>
+      </div>
+      <div class="muted" style="text-align:center;margin-top:10px" id="qzTip">已作答的题可以回去改，交卷前不会判分</div>
+    </div>
+
+    <div id="quizResult" style="display:none">
+      <div class="card" style="text-align:center">
+        <div style="font-size:40px" id="qzEmoji">📋</div>
+        <div style="font-size:22px;font-weight:700;margin:6px 0" id="qzScore">0 / 10</div>
+        <div class="muted" id="qzComment"></div>
+      </div>
+      <div class="card" id="qzReport"></div>
+      <div class="card flat" id="qzToParent"></div>
+      <button class="btn" id="qzAgain">再来一组</button>
+      <button class="btn ghost" id="qzHome" style="margin-top:10px;margin-bottom:20px">回到今日任务</button>
+    </div>
+  </section>
+
+  <!-- ============ 数据 / 错词本 ============ -->
+  <section class="screen" id="s-stats">
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="kpi"><b id="dMastery">0%</b><span>掌握率（档位≥5）</span></div>
+      <div class="kpi"><b id="dWrong">0%</b><span>近 7 天抽查错词率</span></div>
+    </div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="kpi"><b id="dLearned">0</b><span>已学词</span></div>
+      <div class="kpi"><b id="dQuiz">0</b><span>累计抽查题数</span></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><b>错词本</b><span class="muted" id="wrongCnt">0 个</span></div>
+      <div class="muted" style="margin-top:4px">错词在次日、第 3 天、第 7 天强制复现，且换一种题型再考。</div>
+      <div id="wrongList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><b>全部单词</b><span class="muted" id="allCnt"></span></div>
+      <div id="allList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <b>复习间隔是怎么定的</b>
+      <div class="muted" style="margin-top:6px">
+        「档位」= 这词我记牢到什么程度；「间隔」= 下次什么时候再见。两者是分开的。
+      </div>
+      <div class="task-line" style="margin-top:10px"><span>想得很快</span><b>档位 +2</b></div>
+      <div class="task-line"><span>想起来了，但费劲</span><b>档位不变，间隔减半</b></div>
+      <div class="task-line"><span>连续两次“费劲”</span><b>按没想起来处理</b></div>
+      <div class="task-line"><span>没想起来</span><b>档位归零，10 分钟后重来</b></div>
+      <div class="muted" style="margin-top:10px">
+        为什么“费劲”只减半、不降档：承认这词没退步，只是这次状态不好。但连着两次都费劲，说明那个档位本来就虚高了，就退回去重学——否则后台会把它算成“已掌握”，而用户每次见它只有点印象，数据就在说谎。
+      </div>
+      <div class="muted" style="margin-top:8px">
+        各档位对应的间隔：10 分钟 / 1 天 / 2 天 / 4 天 / 7 天 / 15 天 / 30 天 / 60 天 / 120 天。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 教练端 ============ -->
+  <section class="screen" id="s-coach">
+    <div class="grid3" style="margin-bottom:14px">
+      <div class="kpi"><b id="cStudents">0</b><span>学员数</span></div>
+      <div class="kpi"><b id="cDone">0%</b><span>今日完成率</span></div>
+      <div class="kpi"><b id="cUnsigned">0</b><span>未布置任务</span></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><b>学员与今日进度</b><span class="muted" id="cClass">—</span></div>
+      <div class="muted" style="margin-top:4px">点进度条上的格子，可以看这个学员哪几天在学、哪几天断了（每一列 = 一天，从早到晚）。</div>
+      <div id="cStudentList" style="margin-top:12px"></div>
+      <button class="btn" id="btnNudgeAll" style="margin-top:14px">一键催学（生成群消息）</button>
+      <div class="muted" style="margin-top:6px">Demo 没法真发消息（订阅消息要用户主动授权、一次只能发一条），所以这里生成一段可直接粘到微信群的消息。</div>
+    </div>
+
+    <div class="card">
+      <b>布置任务</b>
+      <div class="muted" style="margin-top:4px">这是教练端唯一的核心动作。任务布置后，学员首页会出现「教练任务」卡片（Demo 里可以在教练端切换身份查看）。</div>
+      <div class="row between" style="margin-top:12px"><span class="muted">词源</span><select id="aTag" class="btn ghost sm" style="padding:8px 10px"></select></div>
+      <div class="row between" style="margin:8px 0"><span class="muted">题量</span>
+        <div class="row" style="gap:6px"><b id="aCountVal" style="min-width:34px;text-align:right">15</b><span class="muted">词</span></div>
+      </div>
+      <input type="range" id="aCount" min="5" max="30" step="5" value="15" style="width:100%">
+      <div class="row between" style="margin:12px 0 4px"><span class="muted">截止</span>
+        <div class="row" style="gap:6px">
+          <button class="btn ghost sm" data-deadline="1">今天</button>
+          <button class="btn ghost sm" data-deadline="2">2 天</button>
+          <button class="btn ghost sm" data-deadline="3">3 天</button>
+        </div>
+      </div>
+      <button class="btn" id="btnAssign" style="margin-top:12px">发布任务给全班</button>
+      <div class="muted" id="assignInfo" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><b>班级共性错词</b><span class="muted">全班汇总</span></div>
+      <div class="muted" style="margin-top:4px">这是"人"比 AI 有价值的地方：一个人错是偶然，全班都错就该集体讲一遍。点「加入任务」把词加进布置清单。</div>
+      <div id="cWeak" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <div><b>班级周报</b><div class="muted">给机构/家长看的汇总，可导出图片</div></div>
+        <button class="btn sm" id="btnClassReport">生成</button>
+      </div>
+      <canvas id="classReport" width="1000" height="1330" style="margin-top:12px"></canvas>
+      <button class="btn ghost sm" id="btnSaveClassReport" style="margin-top:10px;width:100%">保存为图片</button>
+    </div>
+
+    <div class="card flat" style="margin-bottom:20px">
+      <div class="note">教练端的价值不是"多一个后台"，而是<strong>把人工监督变成系统监督 + 人工兜底</strong>：系统自动判分、自动汇总、自动生成周报，教练只做两件事——讲全班都错的词、催没交作业的人。这两件事才是家长付钱买的东西。</div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-go="s-home"><b>◎</b>今日</button>
+  <button data-go="s-study"><b>▶</b>学习</button>
+  <button data-go="s-quiz"><b>✎</b>抽查</button>
+  <button data-go="s-stats"><b>▤</b>数据</button>
+  <button data-go="s-coach"><b>☰</b>教练</button>
+</nav>
+</div><!-- /coachWrap -->
+
+<div class="toast" id="toast"></div>
+<div class="demo-badge">词库：40 个示例词 · 数据存本地</div>
+
+<script>
+/* =========================================================================
+   单词抽查 Demo —— 单文件、零依赖、可离线
+   结构：① 词库  ② SRS 引擎  ③ 状态与存储  ④ 首页  ⑤ 学习  ⑥ 抽查  ⑦ 数据看板
+   ========================================================================= */
+
+/* ---------- ① 词库（自撰示例，未复制任何词典或题库内容） ---------- */
+const WORDS = [
+  {w:'abandon', p:'/əˈbændən/', pos:'v.', d:'放弃；抛弃', en:'He had to <em>abandon</em> the plan because of the storm.', cn:'因为暴风雨，他不得不放弃这个计划。', t:['中考','高考'], f:120, v:'-'},
+  {w:'absorb', p:'/əbˈsɔːrb/', pos:'v.', d:'吸收；使全神贯注', en:'Plants <em>absorb</em> water through their roots.', cn:'植物通过根部吸收水分。', t:['高考'], f:240, v:'-'},
+  {w:'access', p:'/ˈækses/', pos:'n.', d:'通道；使用权', en:'Students have free <em>access</em> to the library.', cn:'学生可以免费使用图书馆。', t:['高考'], f:180, v:'-'},
+  {w:'accurate', p:'/ˈækjərət/', pos:'adj.', d:'准确的', en:'Please give me an <em>accurate</em> answer.', cn:'请给我一个准确的答案。', t:['高考'], f:300, v:'-'},
+  {w:'achieve', p:'/əˈtʃiːv/', pos:'v.', d:'实现；达到', en:'She worked hard to <em>achieve</em> her goal.', cn:'她努力工作以实现自己的目标。', t:['中考','高考'], f:90, v:'-'},
+  {w:'adapt', p:'/əˈdæpt/', pos:'v.', d:'适应；改编', en:'It takes time to <em>adapt</em> to a new city.', cn:'适应一座新城市需要时间。', t:['高考'], f:260, v:'-'},
+  {w:'adequate', p:'/ˈædɪkwət/', pos:'adj.', d:'足够的；适当的', en:'The room is <em>adequate</em> for two people.', cn:'这个房间够两个人住。', t:['四级'], f:420, v:'-'},
+  {w:'adjust', p:'/əˈdʒʌst/', pos:'v.', d:'调整；适应', en:'You can <em>adjust</em> the seat height.', cn:'你可以调整座位高度。', t:['高考'], f:280, v:'-'},
+  {w:'admire', p:'/ədˈmaɪər/', pos:'v.', d:'钦佩；欣赏', en:'I <em>admire</em> her courage very much.', cn:'我非常钦佩她的勇气。', t:['中考'], f:310, v:'-'},
+  {w:'adopt', p:'/əˈdɑːpt/', pos:'v.', d:'采用；收养', en:'The school decided to <em>adopt</em> a new method.', cn:'学校决定采用一种新方法。', t:['高考'], f:250, v:'-'},
+  {w:'advantage', p:'/ədˈvæntɪdʒ/', pos:'n.', d:'优势；好处', en:'Being tall is an <em>advantage</em> in basketball.', cn:'个子高在篮球里是优势。', t:['中考','高考'], f:150, v:'-'},
+  {w:'anxious', p:'/ˈæŋkʃəs/', pos:'adj.', d:'焦虑的；渴望的', en:'She felt <em>anxious</em> before the exam.', cn:'考试前她感到很焦虑。', t:['高考'], f:330, v:'-'},
+  {w:'appreciate', p:'/əˈpriːʃieɪt/', pos:'v.', d:'感激；欣赏', en:'I really <em>appreciate</em> your help.', cn:'我非常感激你的帮助。', t:['高考'], f:290, v:'-'},
+  {w:'approach', p:'/əˈproʊtʃ/', pos:'n./v.', d:'方法；接近', en:'We need a new <em>approach</em> to this problem.', cn:'我们需要新方法来解决这个问题。', t:['高考'], f:200, v:'-'},
+  {w:'attitude', p:'/ˈætɪtuːd/', pos:'n.', d:'态度', en:'His <em>attitude</em> toward study has changed.', cn:'他的学习态度改变了。', t:['中考','高考'], f:170, v:'-'},
+  {w:'available', p:'/əˈveɪləbl/', pos:'adj.', d:'可获得的；有空的', en:'Are you <em>available</em> this afternoon?', cn:'你今天下午有空吗？', t:['高考'], f:220, v:'-'},
+  {w:'aware', p:'/əˈwer/', pos:'adj.', d:'意识到的', en:'She was not <em>aware</em> of the danger.', cn:'她没有意识到危险。', t:['高考'], f:270, v:'-'},
+  {w:'balance', p:'/ˈbæləns/', pos:'n./v.', d:'平衡；余额', en:'It is hard to <em>balance</em> study and rest.', cn:'很难平衡学习和休息。', t:['中考','高考'], f:230, v:'-'},
+  {w:'benefit', p:'/ˈbenɪfɪt/', pos:'n./v.', d:'好处；受益', en:'Exercise <em>benefits</em> your health.', cn:'锻炼有益于你的健康。', t:['高考'], f:190, v:'-'},
+  {w:'brilliant', p:'/ˈbrɪliənt/', pos:'adj.', d:'出色的；明亮的', en:'That was a <em>brilliant</em> idea.', cn:'那是个绝妙的主意。', t:['四级'], f:380, v:'-'},
+  {w:'campaign', p:'/kæmˈpeɪn/', pos:'n.', d:'活动；运动', en:'They started a <em>campaign</em> to save water.', cn:'他们发起了一场节水活动。', t:['四级'], f:410, v:'-'},
+  {w:'capable', p:'/ˈkeɪpəbl/', pos:'adj.', d:'有能力的', en:'She is <em>capable</em> of doing better.', cn:'她有能力做得更好。', t:['高考'], f:350, v:'-'},
+  {w:'challenge', p:'/ˈtʃælɪndʒ/', pos:'n./v.', d:'挑战；质疑', en:'Learning a language is a real <em>challenge</em>.', cn:'学一门语言是真正的挑战。', t:['中考','高考'], f:110, v:'-'},
+  {w:'combine', p:'/kəmˈbaɪn/', pos:'v.', d:'结合；联合', en:'We can <em>combine</em> work with pleasure.', cn:'我们可以把工作和娱乐结合起来。', t:['高考'], f:320, v:'-'},
+  {w:'concentrate', p:'/ˈkɑːnsntreɪt/', pos:'v.', d:'集中；专心', en:'It is hard to <em>concentrate</em> in a noisy room.', cn:'在嘈杂的房间里很难专心。', t:['高考'], f:340, v:'-'},
+  {w:'confident', p:'/ˈkɑːnfɪdənt/', pos:'adj.', d:'自信的', en:'He looks <em>confident</em> about the interview.', cn:'他对面试看起来很有信心。', t:['中考','高考'], f:160, v:'-'},
+  {w:'consider', p:'/kənˈsɪdər/', pos:'v.', d:'考虑；认为', en:'Please <em>consider</em> my suggestion.', cn:'请考虑我的建议。', t:['中考','高考'], f:130, v:'-'},
+  {w:'contribute', p:'/kənˈtrɪbjuːt/', pos:'v.', d:'贡献；促成', en:'Everyone can <em>contribute</em> to the project.', cn:'每个人都能为这个项目作出贡献。', t:['高考'], f:360, v:'-'},
+  {w:'convenient', p:'/kənˈviːniənt/', pos:'adj.', d:'方便的', en:'Online study is <em>convenient</em> for busy people.', cn:'对忙碌的人来说在线学习很方便。', t:['中考','高考'], f:210, v:'-'},
+  {w:'determine', p:'/dɪˈtɜːrmɪn/', pos:'v.', d:'决定；确定', en:'Your effort will <em>determine</em> the result.', cn:'你的努力将决定结果。', t:['四级'], f:390, v:'-'},
+  {w:'effective', p:'/ɪˈfektɪv/', pos:'adj.', d:'有效的', en:'This is an <em>effective</em> way to remember words.', cn:'这是记单词的有效方法。', t:['高考'], f:300, v:'-'},
+  {w:'fragile', p:'/ˈfrædʒl/', pos:'adj.', d:'易碎的；脆弱的', en:'Glass is <em>fragile</em>, so carry it carefully.', cn:'玻璃很易碎，要小心拿。', t:['四级'], f:430, v:'-'},
+  {w:'ignore', p:'/ɪɡˈnɔːr/', pos:'v.', d:'忽视；不理会', en:'Do not <em>ignore</em> the small mistakes.', cn:'不要忽视小错误。', t:['高考'], f:240, v:'-'},
+  {w:'impress', p:'/ɪmˈpres/', pos:'v.', d:'使印象深刻', en:'His speech <em>impressed</em> everyone.', cn:'他的演讲让所有人印象深刻。', t:['高考'], f:370, v:'-'},
+  {w:'persuade', p:'/pərˈsweɪd/', pos:'v.', d:'说服', en:'I tried to <em>persuade</em> him to join us.', cn:'我试图说服他加入我们。', t:['四级'], f:400, v:'-'},
+  {w:'pursue', p:'/pərˈsuː/', pos:'v.', d:'追求；从事', en:'She decided to <em>pursue</em> a career in medicine.', cn:'她决定从事医学事业。', t:['四级'], f:350, v:'-'},
+  {w:'reflect', p:'/rɪˈflekt/', pos:'v.', d:'反映；反思', en:'Grades do not always <em>reflect</em> ability.', cn:'分数并不总能反映能力。', t:['高考'], f:330, v:'-'},
+  {w:'reluctant', p:'/rɪˈlʌktənt/', pos:'adj.', d:'不情愿的', en:'He was <em>reluctant</em> to speak in public.', cn:'他不愿意当众讲话。', t:['四级'], f:440, v:'-'},
+  {w:'reliable', p:'/rɪˈlaɪəbl/', pos:'adj.', d:'可靠的', en:'We need a <em>reliable</em> plan.', cn:'我们需要一个可靠的计划。', t:['高考'], f:310, v:'-'},
+  {w:'suitable', p:'/ˈsuːtəbl/', pos:'adj.', d:'合适的', en:'This film is not <em>suitable</em> for children.', cn:'这部电影不适合孩子看。', t:['高考'], f:250, v:'-'}
+];
+const NWORDS = WORDS.length;
+
+/* ---------- ② SRS 引擎：档位 0..8 ----------
+   口径（与方案文档 8.2 一致）：
+   - 忘记 → 档位归 0，10 分钟后重考
+   - 模糊 → 档位不变，间隔 = 当前档位默认间隔 × 0.5（不是累乘上次实际间隔）
+   - 连续两次模糊 → 按忘记处理（回炉重学），防止“档位虚高还一直只算模糊”
+   - 秒懂 → 档位 +2（上限 8）                                        */
+const STAGE_MIN = [10, 24*60, 2*24*60, 4*24*60, 7*24*60, 15*24*60, 30*24*60, 60*24*60, 120*24*60]; // 分钟
+const STAGE_LABEL = ['10 分钟','1 天','2 天','4 天','7 天','15 天','30 天','60 天','120 天'];
+
+function nextIntervalMillis(stage, feedback){
+  const s = Math.max(0, Math.min(8, stage));
+  const base = STAGE_MIN[s];
+  if (feedback === 'forgot') return STAGE_MIN[0];
+  if (feedback === 'vague')  return Math.max(Math.round(base * 0.5), STAGE_MIN[0]);
+  return base; // known
+}
+
+/* 核心：根据反馈与当前状态算出新状态。规则与文档第八章一致。 */
+function applyFeedback(wid, feedback){
+  const st = state.words[wid] || {stage:0, last:null, next:0, correct:0, wrong:0, wrongType:null, seen:0};
+  const now = Date.now();
+  st.seen += 1;
+
+  if (feedback === 'forgot'){
+    st.stage = 0;
+    st.wrong += 1;
+    st.last = 'forgot';
+  } else if (feedback === 'vague'){
+    if (st.last === 'vague'){          // 连续两次“模糊”按“忘记”处理
+      st.stage = 0; st.wrong += 1; st.last = 'forgot';
+    } else {
+      st.last = 'vague';
+    }
+  } else {
+    st.stage = Math.min(st.stage + 2, 8);
+    st.correct += 1;
+    st.last = 'known';
+  }
+
+  // 逾期超过 7 天未复习 -> 记忆衰减
+  if (st.next && (now - st.next) > 7*24*60*60*1000 && st.stage > 0){
+    st.stage -= 1;
+  }
+  st.next = now + nextIntervalMillis(st.stage, feedback);
+  state.words[wid] = st;
+  state.logs.push({t:now, id:wid, fb:feedback});
+  if (state.logs.length > 800) state.logs = state.logs.slice(-800);
+  return st;
+}
+
+const dueWords    = () => WORDS.filter(x => state.words[x.w] && state.words[x.w].next <= Date.now());
+const wrongWords  = () => WORDS.filter(x => state.words[x.w] && state.words[x.w].wrong > 0 && state.words[x.w].last !== 'known');
+const learnedCount= () => Object.keys(state.words).length;
+const masteredRate= () => {
+  const n = learnedCount();
+  if (!n) return 0;
+  return Math.round(WORDS.filter(x => state.words[x.w] && state.words[x.w].stage >= 5).length / n * 100);
+};
+const newWordLimit = () => state.settings.newLimit;
+
+/* ---------- ③ 状态、存储、日期工具 ---------- */
+const DAY = 24*60*60*1000;
+const KEY = 'wordcoach_demo_v1';
+const SCHEMA = 2;
+let state;
+let coach = {pendingWords: []};   // 教练端临时状态：准备加进布置清单的班级共性错词
+let viewing = null;               // 教练端当前查看的学员
+/* 学习卡的自动揭晓计时状态：用 JS 计时而非 CSS 动画，拖动时可以精确暂停/续算 */
+const AUTO_REVEAL_MS = 8000;
+const CLEAN_STYLE = {transition:'', transform:'', opacity:'', height:''};
+let autoEnd = 0, autoLeft = 0, autoTimer = null, autoTick = null;
+
+const ymd = (d) => { const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
+const dayStart = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+const shuffle = (a) => { a = a.slice(); for (let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const clamp01 = (n) => Math.max(0, Math.min(1, n));
+const fmtD = (ts) => { const d = new Date(ts); const t = new Date(); const same = ymd(d) === ymd(t); return (d.getMonth()+1) + '/' + d.getDate() + (same ? '' : ''); };
+/* 班级：Demo 里用伪随机模拟另外 8 个学员（真机上换成服务端下发的学员列表） */
+function makeClassroom(){
+  const names = ['林小雨','陈嘉','王梓涵','刘一诺','赵天宇','周若曦','吴凯','郑思远'];
+  const seedBase = [0.88,0.62,0.45,0.95,0.34,0.72,0.55,0.80];
+  return {
+    name: '初三 3 班 · 单词抽查',
+    assignedCount: 0,
+    students: names.map((n, i) => ({
+      id: 's' + (i+1), name: n, self: false,
+      progress: Math.round(seedBase[i] * 100),
+      lastActive: seedBase[i] > 0.7 ? '今天' : (seedBase[i] > 0.45 ? '昨天' : '2 天前'),
+      streak: Math.max(0, Math.round(seedBase[i] * 9)),
+      weak: [['abandon','challenge'],['challenge','effective'],['ignite','fragile'],['abandon','reliable'],
+             ['anxious','reflect'],['effective','combine'],['fragile','ignore'],['reliable','attitude']][i],
+      notified: false
+    })),
+    assignments: []
+  };
+}
+/* 确定性抖动：同一个学员+同一天永远得到同一个值，避免每次刷新“记录”都在变 */
+function hash(x){ const s = String(x); let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; }
+
+function freshState(){
+  return {
+    ver: SCHEMA,
+    words:{}, logs:[], quizItems:[], sessions:[],
+    activity:{}, checkins:{}, ach:[],
+    settings:{newLimit:10, dailyTarget:20},
+    today:{date:ymd(Date.now()), done:0},
+    classroom: makeClassroom()      // 教练端数据（正式版应来自服务端，而非本地）
+  };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+/* 老存档升级：缺字段就补，避免打开旧数据直接白屏 */
+function migrate(s){
+  if (typeof s !== 'object' || !s) return null;
+  if (typeof s.ver !== 'number') s.ver = 1;
+  s.words = s.words || {}; s.logs = s.logs || []; s.quizItems = s.quizItems || [];
+  s.sessions = s.sessions || []; s.activity = s.activity || {}; s.checkins = s.checkins || {};
+  s.ach = s.ach || []; s.settings = s.settings || {newLimit:10, dailyTarget:20};
+  s.today = (s.today && s.today.date === ymd(Date.now())) ? s.today : {date:ymd(Date.now()), done:0};
+  if (s.ver < 2 || !s.classroom || !Array.isArray(s.classroom.students) || !s.classroom.students.length){
+    s.classroom = makeClassroom();
+  }
+  s.ver = SCHEMA;
+  return s;
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if (raw) return migrate(JSON.parse(raw));
+  }catch(e){}
+  return seed(); // 首次进入：铺一份演示数据，避免空壳
+}
+
+/* 演示数据：让首页/热力图/错词本立刻有内容可看 */
+function seed(){
+  const s = freshState();
+  const now = Date.now();
+  const trained = ['abandon','achieve','attitude','available','benefit','brilliant','challenge','combine',
+                   'concentrate','confident','consider','convenient','effective','ignore','reflect','reliable'];
+  // 已学词：档位错开，其中几个刻意留下错误记录进错词本
+  trained.forEach((w, i) => {
+    const stage = [1,2,3,4,5,6,3,2,1,4,5,3,2,1,3,4][i];
+    const wrong  = ['abandon','challenge','concentrate','ignore','reflect'].includes(w) ? (1 + (i % 2)) : 0;
+    const isDue  = ['abandon','challenge','effective','reliable','benefit'].includes(w);
+    s.words[w] = {
+      stage, last: wrong ? 'forgot' : 'known', seen: 2 + (i % 4),
+      correct: 2 + (i % 3), wrong,
+      wrongType: wrong ? ['拼写','选义','听写'][i % 3] : null,
+      next: isDue ? now - (1 + i) * 3600*1000 : now + (1 + i*3) * 24*60*60*1000
+    };
+  });
+  // 过去 29 天的活跃度与打卡（今天从 0 开始，留给用户自己学）
+  for (let back = 29; back >= 1; back--){
+    const d = new Date(dayStart(now) - back*DAY);
+    const r = Math.random();
+    const cnt = r > 0.86 ? 0 : (r > 0.6 ? 12 + Math.floor(Math.random()*8) : 20 + Math.floor(Math.random()*26));
+    s.activity[ymd(d)] = cnt;
+    if (cnt >= Math.round(s.settings.dailyTarget*0.8)) s.checkins[ymd(d)] = true;
+  }
+  s.ach = ['first_study','streak_7','words_10'];
+  s.ver = SCHEMA;
+  return s;
+}
+
+/* 打卡判定：完成量 >= 当日目标 80% */
+function markProgress(n){
+  const today = ymd(Date.now());
+  if (state.today.date !== today) state.today = {date:today, done:0};
+  state.today.done += n;
+  state.activity[today] = (state.activity[today] || 0) + n;
+  if (state.today.done >= Math.round(state.settings.dailyTarget*0.8)) state.checkins[today] = true;
+  checkAchievements();
+  save();
+}
+
+const ACH = [
+  {code:'first_study', name:'开始第一词', desc:'完成第一次学习'},
+  {code:'streak_3',    name:'坚持 3 天',  desc:'连续打卡 3 天'},
+  {code:'streak_7',    name:'坚持 7 天',  desc:'连续打卡 7 天'},
+  {code:'words_10',    name:'十个词',     desc:'已学 10 个词'},
+  {code:'words_30',    name:'三十个词',   desc:'已学 30 个词'},
+  {code:'perfect',     name:'满分抽查',   desc:'抽查 10 题全对'},
+  {code:'comeback',    name:'错词清零',   desc:'把错词本清空一次'}
+];
+function unlock(code){
+  if (!state.ach.includes(code)){ state.ach.push(code); toast('解锁成就：' + (ACH.find(a=>a.code===code)||{}).name); }
+}
+function checkAchievements(){
+  if (learnedCount() >= 1) unlock('first_study');
+  if (learnedCount() >= 10) unlock('words_10');
+  if (learnedCount() >= 30) unlock('words_30');
+  const st = streakDays();
+  if (st >= 3) unlock('streak_3');
+  if (st >= 7) unlock('streak_7');
+}
+function streakDays(){
+  let n = 0;
+  for (let back = 0; back < 400; back++){
+    const d = ymd(new Date(dayStart(Date.now()) - back*DAY));
+    if (state.checkins[d]) n++;
+    else if (back === 0) continue; // 今天还没打卡不算断
+    else break;
+  }
+  return n;
+}
+
+/* ---------- 通用 UI 工具 ---------- */
+const $ = (id) => document.getElementById(id);
+function toast(msg){
+  const el = $('toast'); el.textContent = msg; el.classList.add('on');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), 1900);
+}
+function show(id){
+  if (id !== 's-study') setStudying(false);   // 离开学习页就停掉自动揭晓计时
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === id));
+  window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+  const titles = {'s-home':['今日任务','学员端 · 遗忘曲线复习 + 抽查督促'],
+                's-study':['学习','先回忆，再翻面'],
+                's-result':['本轮结算',''],
+                's-quiz':['抽查','交卷后统一判分'],
+                's-stats':['数据与错词本','看板与你不会的词'],
+                's-coach':['教练端 · 班级管理','布置任务 · 看进度 · 催作业']};
+  const t = titles[id] || ['',''];
+  $('hTitle').textContent = t[0]; $('hSub').textContent = t[1];
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  const target = b.dataset.go;
+  if (target !== 's-coach' && !$('coachWrap').hidden) setRole('student');   // 点学员端 tab 自动切回学员身份
+  if (target === 's-quiz') prepQuizIntro();
+  show(target);
+}));
+
+/* 语音合成（听写用；不支持时降级为提示） */
+function say(text, rate){
+  try{
+    if (!window.speechSynthesis) return false;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = rate || 0.85;
+    window.speechSynthesis.speak(u);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* 撒花 */
+function confetti(){
+  const cv = $('confetti'), ctx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const cols = ['#3ea6ff','#7c5cff','#2fd07a','#ffb020','#ff5c72'];
+  const ps = Array.from({length:70}, () => ({
+    x: innerWidth/2 + (Math.random()-0.5)*140, y: innerHeight*0.32,
+    vx:(Math.random()-0.5)*9, vy: Math.random()*-11-3, s: 4+Math.random()*6,
+    c: cols[Math.floor(Math.random()*cols.length)], r: Math.random()*6, vr:(Math.random()-0.5)*0.4, life: 90
+  }));
+  let t = 0;
+  (function frame(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ps.forEach(p => { p.vy += 0.32; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life--; });
+    ps.forEach(p => { if (p.life <= 0) return;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle = p.c;
+      ctx.globalAlpha = Math.min(1, p.life/40); ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.62); ctx.restore();
+    });
+    if (++t < 130) requestAnimationFrame(frame); else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+
+/* ---------- ④ 首页 ---------- */
+function renderHome(){
+  const due = dueWords().length;
+  const wrong = wrongWords().length;
+  const totalToday = state.today.done + due + wrong;   // 今日“应完成”粗略口径
+  const target = Math.max(state.settings.dailyTarget, totalToday);
+  const pct = target ? Math.min(100, Math.round(state.today.done / target * 100)) : 0;
+
+  $('nDue').textContent = due;
+  $('nWrong').textContent = wrong;
+  $('nNew').textContent = due > 100 ? '暂停（先清复习）' : state.settings.newLimit;
+  $('nQuiz').textContent = Math.min(10, Math.max(4, wrong || 10)) + ' 题';
+  $('ringPct').textContent = pct + '%';
+  $('ringCnt').textContent = state.today.done + ' / ' + target;
+  $('ringArc').setAttribute('stroke-dashoffset', String(314 - 314*pct/100));
+
+  $('kStreak').textContent = streakDays();
+  $('kMastery').textContent = masteredRate() + '%';
+  $('kLearned').textContent = learnedCount() + ' / ' + NWORDS;
+  renderStuTask();
+
+  // 热力图
+  const heat = $('heat'); heat.innerHTML = '';
+  let sum = 0;
+  const levels = ['#1e2a38','#1d4f74','#2b7fb8','#3ea6ff','#7c5cff'];
+  for (let back = 29; back >= 0; back--){
+    const d = new Date(dayStart(Date.now()) - back*DAY);
+    const cnt = state.activity[ymd(d)] || 0;
+    sum += cnt;
+    const lv = cnt === 0 ? 0 : cnt < 15 ? 1 : cnt < 25 ? 2 : cnt < 40 ? 3 : 4;
+    const i = document.createElement('i');
+    i.style.background = levels[lv];
+    i.title = ymd(d) + '：' + cnt + ' 次';
+    heat.appendChild(i);
+  }
+  $('heatSum').textContent = '共完成 ' + sum + ' 次';
+
+  // 成就
+  const box = $('achBox'); box.innerHTML = '';
+  ACH.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'ach' + (state.ach.includes(a.code) ? ' on' : '');
+    el.innerHTML = '<b>' + a.name + '</b>' + a.desc;
+    box.appendChild(el);
+  });
+}
+
+/* ---------- ⑤ 学习流程 ---------- */
+let session = null;
+
+function buildQueue(){
+  // 组装顺序：到期复习 -> 错词回流 -> 新词（与文档 6.3 一致）
+  const due = dueWords();
+  const wrong = wrongWords().filter(x => !due.includes(x));
+  const fresh = shuffle(WORDS.filter(x => !state.words[x.w])).slice(0, due.length > 100 ? 0 : state.settings.newLimit);
+  return due.concat(wrong).concat(fresh);
+}
+
+function startStudy(){
+  const q = buildQueue();
+  if (!q.length){ toast('今天没有待学的词，去抽查试试'); return; }
+  session = {queue: q, idx: 0, res:{known:0, vague:0, forgot:0}, wrongList: []};
+  $('flip').classList.remove('flipped');
+  paintCard();
+  show('s-study');
+}
+function paintCard(){
+  const item = session.queue[session.idx], st = state.words[item.w];
+  $('stWord').textContent = item.w;
+  $('stPhon').textContent = item.p + '  ' + item.pos;
+  $('stDef').textContent = item.d;
+  $('stEx').innerHTML = item.en + '<br><span class="muted">' + item.cn + '</span>';
+  $('stTag').textContent = (item.t || []).join(' / ');
+  $('stStage').textContent = st ? ('当前档位 ' + st.stage + '（间隔 ' + STAGE_LABEL[st.stage] + '）'
+    + (st.wrong ? ' · 历史错误 ' + st.wrong + ' 次' : '')) : '新词（首次学习）';
+  $('stCount').textContent = (session.idx + 1) + ' / ' + session.queue.length;
+  $('stMeta').textContent = state.words[item.w] ? (state.words[item.w].next <= Date.now() ? '到期复习' : '巩固') : '新词';
+  if (item.t && item.t.length) $('stMeta').textContent += ' · ' + item.t.join('/');
+  $('stProgress').style.width = ((session.idx) / session.queue.length * 100) + '%';
+  resetFlip();   // 每个词都从“只看正面”开始：反馈按钮要在翻面之后才出现
+  const f = $('flip');
+  f.style.animation = 'fade .18s ease';
+  setTimeout(() => { f.style.animation = ''; }, 200);
+  setStudying(true);   // 8 秒后自动揭晓答案
+}
+/* 把卡片复位到“正面 + 反馈按钮隐藏”的状态 */
+function resetFlip(){
+  const f = $('flip');
+  f.classList.remove('flipped');
+  $('stFb').style.visibility = 'hidden';
+}
+/* 闪现一下底色，确认这一张被判成什么。用 outline 而不是元素本身，避免和拖动位移冲突 */
+let flashTimer = null;
+function flashCard(kind){
+  const f = $('flip');
+  clearTimeout(flashTimer);
+  f.classList.remove('flash-ok', 'flash-bad');
+  void f.offsetWidth;
+  f.classList.add(kind === 'known' ? 'flash-ok' : 'flash-bad');
+  flashTimer = setTimeout(() => f.classList.remove('flash-ok', 'flash-bad'), 320);
+}
+function applyRating(fb){
+  const item = session.queue[session.idx];
+  if (!item) return;
+  applyFeedback(item.w, fb);
+  noteAssignProgress(item.w);
+  session.res[fb === 'forgot' ? 'forgot' : fb === 'vague' ? 'vague' : 'known'] += 1;
+  if (fb !== 'known') session.wrongList.push(item.w);
+  markProgress(1);
+  flashCard(fb);
+  if (session.idx < session.queue.length - 1){
+    session.idx += 1;
+    paintCard();
+  } else {
+    setStudying(false);
+    finishStudy();
+  }
+}
+function submitFeedback(fb){
+  setStudying(false);
+  applyRating(fb);
+}
+function finishStudy(){
+  const r = session.res, total = session.queue.length;
+  $('rsKnown').textContent = r.known;
+  $('rsFuzzy').textContent = r.vague;
+  $('rsForgot').textContent = r.forgot;
+  $('rsAcc').textContent = Math.round(r.known / total * 100) + '%';
+  $('rsTitle').textContent = '这一轮完成 ' + total + ' 个词';
+  $('rsSub').textContent = session.wrongList.length ? ('有 ' + session.wrongList.length + ' 个词需要重点复习，已加入错词本') : '全部一次通过，很稳';
+  $('rsEmoji').textContent = r.forgot === 0 ? '🎉' : (r.forgot > total/2 ? '💪' : '👍');
+  if (r.forgot === 0) confetti();
+  $('rsQuiz').style.display = session.wrongList.length ? 'block' : 'none';
+  renderHome();
+  show('s-result');
+}
+
+/* ===== 学习页交互：借短视频的操作习惯，但每次滑动都必须产出一条评价 =====
+   点一下 / 下滑 = 看答案（不直接评价，等你看完答案再选）
+   上滑          = 「想得很快」，直接下一个
+   8 秒没动作    = 自动揭晓答案（不自动跳下一个：看到答案瞬间的反应才是算法要的数据） */
+function setStudying(on){
+  clearAuto();
+  if (!on) return;
+  const bar = $('autoBar');
+  autoEnd = Date.now() + AUTO_REVEAL_MS;
+  autoLeft = AUTO_REVEAL_MS;
+  bar.classList.add('on');
+  bar.style.transform = 'scaleX(1)';
+  autoTimer = setTimeout(() => { clearAuto(); if (!isFlipped()) flipCard(true); }, AUTO_REVEAL_MS);
+  autoTick = setInterval(() => {
+    const left = Math.max(0, autoEnd - Date.now());
+    bar.style.transform = 'scaleX(' + (left / AUTO_REVEAL_MS) + ')';
+  }, 100);
+}
+function clearAuto(){
+  clearTimeout(autoTimer); clearInterval(autoTick);
+  autoTimer = null; autoTick = null;
+  const bar = $('autoBar');
+  bar.classList.remove('on');
+  bar.style.transform = 'scaleX(0)';
+}
+function pauseAuto(){ if (autoTimer){ autoLeft = Math.max(0, autoEnd - Date.now()); clearTimeout(autoTimer); clearInterval(autoTick); autoTimer = null; autoTick = null; } }
+function resumeAuto(){
+  if ($('autoBar').classList.contains('on') && autoTimer) return;   // 还在跑
+  if (isFlipped()) return;
+  const bar = $('autoBar');
+  if (bar.classList.contains('on') && autoLeft > 0){                // 之前被拖动暂停过，续算剩余时间
+    bar.classList.add('on');
+    bar.style.transform = 'scaleX(' + (autoLeft / AUTO_REVEAL_MS) + ')';
+    autoEnd = Date.now() + autoLeft;
+    autoTimer = setTimeout(() => { clearAuto(); if (!isFlipped()) flipCard(true); }, autoLeft);
+    autoTick = setInterval(() => {
+      const left = Math.max(0, autoEnd - Date.now());
+      bar.style.transform = 'scaleX(' + (left / AUTO_REVEAL_MS) + ')';
+    }, 100);
+  }
+}
+const isFlipped = () => $('flip').classList.contains('flipped');
+
+function flipCard(scrollToAnswer){
+  const f = $('flip'), back = f.querySelector('.back');
+  const next = !f.classList.contains('flipped');
+  Object.assign(f.style, CLEAN_STYLE);
+  hideOverlay();                                        // 取消拖动遮罩，否则它会一直盖在答案上
+  if (next){
+    back.style.display = 'flex';
+    // 用 scrollHeight 量：反馈区是 visibility:hidden 的 flex 子项，offsetHeight 会量偏小
+    f.style.height = Math.max(288, back.scrollHeight + 12) + 'px';
+  }
+  f.classList.toggle('flipped', next);
+  $('stFb').style.visibility = next ? 'visible' : 'hidden';
+  $('swipeHint').style.display = next ? 'none' : '';
+  clearAuto();                                          // 已经揭晓，计时器下班
+  if (next && scrollToAnswer) f.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function showOverlay(dir){
+  $('ovUp').style.display = ''; $('ovDown').style.display = '';
+  $('ovUp').classList.toggle('up', dir !== 'down');
+  $('ovDown').classList.toggle('down', dir === 'down');
+}
+function hideOverlay(){ $('ovUp').classList.remove('up'); $('ovDown').classList.remove('down'); }
+
+/* 拖动：上滑=想得很快（直接过一个词）；下滑=看答案 */
+(function bindSwipe(){
+  const f = $('flip');
+  let dragging = false, moved = false, cancelled = false, y0 = 0, dx0 = 0;
+
+  f.addEventListener('pointerdown', e => {
+    if (e.target.closest('[data-act]') || e.target.closest('#stFb')) return;   // 按钮区不参与拖动
+    dragging = true; moved = false; cancelled = false; y0 = e.clientY; dx0 = e.clientX;
+    f.classList.add('dragging'); pauseAuto();
+    /* 关键：抓住指针。否则手指滑出卡片再松开，pointerup 会打到别的元素上，
+       结束逻辑不执行 → 遮罩不消失、卡片卡在拖动状态 */
+    try{ if (f.setPointerCapture) f.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  f.addEventListener('pointermove', e => {
+    if (!dragging || cancelled) return;
+    const dy = e.clientY - y0, dx = e.clientX - dx0;
+    if (!moved){
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ moved = true; }
+      else return;
+    }
+    if (e.cancelable) e.preventDefault();               // 已经判定为手势，阻止页面跟着滚
+    const damp = 380;
+    const y = Math.sign(dy) * Math.min(Math.abs(dy) * (1 - Math.abs(dy) / (damp * 4)), 150);
+    f.style.transform = 'translateY(' + y + 'px)';
+    f.style.opacity = String(Math.max(0.6, 1 - Math.abs(y) / 420));
+    showOverlay(dy < 0 ? 'up' : 'down');
+  });
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false; f.classList.remove('dragging');
+    if (cancelled){                                     // 浏览器把手势判成了滚动：安静复位，别乱结算
+      cancelled = false;
+      Object.assign(f.style, CLEAN_STYLE); hideOverlay(); resumeAuto();
+      return;
+    }
+    const dy = e.clientY - y0;
+    hideOverlay();
+    if (Math.abs(dy) > 70){
+      Object.assign(f.style, CLEAN_STYLE);
+      if (dy < 0){
+        submitFeedback('known');                  // 上滑 = 想得很快 → 直接过一个词
+      } else {
+        resumeAuto();                             // 下拉：已经揭晓了，计时器不会重启
+        flipCard(true);
+      }
+      return;
+    }
+    Object.assign(f.style, CLEAN_STYLE);
+    resumeAuto();
+  };
+  f.addEventListener('pointerup', endDrag);
+  f.addEventListener('pointercancel', e => {           // 浏览器把手势判成页面滚动时会走到这里
+    if (!dragging) return;
+    cancelled = true;
+    endDrag(e);
+  });
+  f.addEventListener('lostpointercapture', e => { if (dragging && !cancelled) endDrag(e); });   // 最后一道保险
+
+  f.addEventListener('click', e => {
+    if (e.target.closest('[data-act]') || e.target.closest('#stFb')) return;
+    if (moved) { moved = false; return; }          // 刚拖动过，不算点击
+    flipCard(false);
+  });
+})();
+
+$('speakBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const item = session && session.queue[session.idx];
+  if (item && !say(item.w, 0.9)) toast('此浏览器不支持语音合成');
+});
+function onFeedback(fb){
+  if (!isFlipped()) return;                      // 还没看答案，不算作答
+  submitFeedback(fb);
+}
+$('fbForgot').addEventListener('click', () => onFeedback('forgot'));
+$('fbVague').addEventListener('click', () => onFeedback('vague'));
+$('fbKnown').addEventListener('click', () => onFeedback('known'));
+$('rsHome').addEventListener('click', () => { renderHome(); show('s-home'); });
+$('rsQuiz').addEventListener('click', () => { prepQuizIntro(); show('s-quiz'); });
+$('goStudy').addEventListener('click', startStudy);
+
+/* ---------- ⑥ 抽查流程：交卷制 ---------- */
+let quiz = null;
+
+function norm(s){
+  return String(s || '').toLowerCase().replace(/[\s\-_.]/g, '')
+    .replace(/our/g,'or').replace(/ise/g,'ize').replace(/yse/g,'yze'); // 英美变体容错
+}
+
+function buildQuestions(n){
+  // 出题来源：错词本 > 到期复习词 > 已学词随机；不足时用未学词补齐
+  const wq = shuffle(wrongWords());
+  const due = shuffle(dueWords().filter(x => !wq.includes(x)));
+  const learned = shuffle(WORDS.filter(x => state.words[x.w] && !wq.includes(x) && !due.includes(x)));
+  const pool = wq.concat(due).concat(learned).concat(shuffle(WORDS));
+  const picked = [];
+  const used = new Set();
+  for (const x of pool){ if (!used.has(x.w)){ used.add(x.w); picked.push(x); } if (picked.length >= n) break; }
+
+  return picked.map((item, i) => {
+    // 题型：按文档 3 选义 / 5 拼写 / 2 听写 的配比，再按位置轮转
+    const type = i % 10 < 3 ? 'meaning' : (i % 10 < 8 ? 'spell' : 'listen');
+    const q = {word: item, type, answer: item.w, user: ''};
+    if (type === 'meaning'){
+      const samePos = shuffle(WORDS.filter(x => x.w !== item.w && x.pos === item.pos));
+      const others = shuffle(WORDS.filter(x => x.w !== item.w && x.pos !== item.pos));
+      const distract = samePos.concat(others).slice(0,3).map(x => x.d);
+      q.options = shuffle([item.d].concat(distract));
+      q.answer = item.d;
+    }
+    return q;
+  });
+}
+
+function prepQuizIntro(){ $('quizIntro').style.display = 'block'; $('quizRun').style.display = 'none'; $('quizResult').style.display = 'none'; }
+
+function startQuiz(){
+  const need = Math.min(10, WORDS.length);
+  quiz = {qs: buildQuestions(need), idx: 0, replay: {}, submitted: false, t0: Date.now()};
+  $('quizIntro').style.display = 'none'; $('quizRun').style.display = 'block'; $('quizResult').style.display = 'none';
+  paintQuestion();
+}
+function paintQuestion(){
+  const q = quiz.qs[quiz.idx], box = $('qzBox');
+  const label = {meaning:'选义（英译中）', spell:'拼写（中译英）', listen:'听写（听音写词）'}[q.type];
+  $('qzMeta').textContent = '第 ' + (quiz.idx + 1) + ' / ' + quiz.qs.length + ' 题';
+  $('qzType').textContent = label;
+  $('qzProgress').style.width = (quiz.idx / quiz.qs.length * 100) + '%';
+  $('qzPrev').disabled = quiz.idx === 0;
+  $('qzNext').textContent = quiz.idx === quiz.qs.length - 1 ? '交卷' : '下一题';
+  const answered = quiz.qs.filter(x => x.user !== '').length;
+  $('qzTip').textContent = answered >= quiz.qs.length ? '全部答完，可以交卷了' : ('已作答 ' + answered + ' / ' + quiz.qs.length + ' 题');
+
+  box.innerHTML = '';
+  if (q.type === 'meaning'){
+    box.innerHTML = '<div class="qtitle">这个单词的意思是？</div><div class="qword">' + q.word.w + '</div>'
+      + '<div style="text-align:center" class="muted">' + q.word.p + '</div><div style="margin-top:14px" id="opts"></div>';
+    const opts = $('opts');
+    q.options.forEach(o => {
+      const d = document.createElement('div');
+      d.className = 'qopt' + (q.user === o ? ' sel' : '');
+      d.textContent = o;
+      d.addEventListener('click', () => { q.user = o; paintQuestion(); });
+      opts.appendChild(d);
+    });
+  } else {
+    const isListen = q.type === 'listen';
+    box.innerHTML = '<div class="qtitle">' + (isListen ? '听发音，写出这个单词' : '根据中文释义写出单词') + '</div>'
+      + (isListen ? '<div style="text-align:center"><button class="btn sm" id="playBtn" style="min-width:150px">🔊 播放发音</button>'
+          + '<div class="muted" style="margin-top:6px" id="playInfo"></div></div>'
+        : '<div style="text-align:center;font-size:19px;font-weight:600;color:var(--accent)">' + q.word.d + '</div>')
+      + '<div class="slots" id="slots"></div>'
+      + '<div class="kb" id="kb"></div>';
+    if (isListen){
+      const used = quiz.replay[q.answer] || 0;
+      $('playInfo').textContent = used ? ('已播放 ' + used + ' / 3 次') : '最多可重放 3 次';
+      $('playBtn').disabled = used >= 3;
+      $('playBtn').addEventListener('click', () => {
+        if ((quiz.replay[q.answer] || 0) >= 3) return;
+        quiz.replay[q.answer] = (quiz.replay[q.answer] || 0) + 1;
+        if (!say(q.answer, 0.78)) toast('此浏览器不支持语音合成，已显示首字母提示');
+        paintQuestion();
+      });
+    }
+    paintSlots(q);
+    paintKeyboard(q);
+  }
+}
+function paintSlots(q){
+  const el = $('slots');
+  const first = q.answer[0], rest = q.answer.length - 1;
+  let html = first;
+  for (let i = 1; i < q.answer.length; i++) html += (q.user.length >= i ? (q.user[i] || '·') : '<i>_</i>');
+  el.innerHTML = html + '<span class="muted" style="font-size:12px;letter-spacing:0;margin-left:8px">共 ' + q.answer.length + ' 个字母</span>';
+}
+function paintKeyboard(q){
+  const kb = $('kb'); kb.innerHTML = '';
+  for (const ch of 'abcdefghijklmnopqrstuvwxyz'){
+    const b = document.createElement('button');
+    b.textContent = ch;
+    b.addEventListener('click', () => { if (q.user.length < 20){ q.user += ch; paintQuestion(); } });
+    kb.appendChild(b);
+  }
+  const del = document.createElement('button');
+  del.className = 'wide'; del.textContent = '⌫ 退格';
+  del.addEventListener('click', () => { q.user = q.user.slice(0, -1); paintQuestion(); });
+  kb.appendChild(del);
+  const clr = document.createElement('button');
+  clr.className = 'wide'; clr.textContent = '清空';
+  clr.addEventListener('click', () => { q.user = ''; paintQuestion(); });
+  kb.appendChild(clr);
+  const nx = document.createElement('button');
+  nx.className = 'wide'; nx.textContent = quiz.idx === quiz.qs.length - 1 ? '交卷' : '下一题';
+  nx.addEventListener('click', () => nextQuestion());
+  kb.appendChild(nx);
+}
+function nextQuestion(){
+  if (quiz.idx === quiz.qs.length - 1) submitQuiz();
+  else { quiz.idx += 1; paintQuestion(); }
+}
+$('qzPrev').addEventListener('click', () => { if (quiz.idx > 0){ quiz.idx -= 1; paintQuestion(); } });
+$('qzNext').addEventListener('click', () => nextQuestion());
+$('startQuiz').addEventListener('click', startQuiz);
+$('qzAgain').addEventListener('click', () => { startQuiz(); });
+$('qzHome').addEventListener('click', () => { renderHome(); show('s-home'); });
+$('goQuiz').addEventListener('click', () => { prepQuizIntro(); show('s-quiz'); });
+
+function submitQuiz(){
+  // 判分全部在这里做（相当于服务端判分，Demo 里放在交卷之后）
+  let correct = 0;
+  const detail = quiz.qs.map(q => {
+    const ok = q.type === 'meaning' ? (q.user === q.answer) : (norm(q.user) === norm(q.answer));
+    if (ok) correct++;
+    else {
+      // 错词自动进入次日强制复习：重置档位
+      applyFeedback(q.answer, 'forgot');
+      const st = state.words[q.answer];
+      if (st) st.wrongType = {meaning:'选义', spell:'拼写', listen:'听写'}[q.type];
+    }
+    state.quizItems.push({t:Date.now(), w:q.answer, type:q.type, ok, dur:0});
+    return {q, ok};
+  });
+  if (state.quizItems.length > 600) state.quizItems = state.quizItems.slice(-600);
+  state.sessions.push({t:Date.now(), total: quiz.qs.length, correct});
+  markProgress(0);
+  if (correct === quiz.qs.length) unlock('perfect');
+  if (wrongWords().length === 0) unlock('comeback');
+  save();
+
+  const total = quiz.qs.length;
+  $('qzScore').textContent = correct + ' / ' + total;
+  $('qzEmoji').textContent = correct === total ? '🏆' : correct >= total*0.7 ? '👍' : '💪';
+  $('qzComment').textContent = correct === total ? '全对，这次抽查可以给家长看了'
+    : correct >= total*0.7 ? '基本过关，但错词必须再过一遍' : '错得有点多，建议先回学习页巩固错词';
+
+  const rp = $('qzReport');
+  rp.innerHTML = '<b>逐题对照</b><div class="muted" style="margin:4px 0 8px">抽查的价值就在这张表：错在哪、错成什么样</div>'
+    + detail.map(({q, ok}) => {
+        const y = q.type === 'meaning' ? q.user || '（未答）' : q.user || '（未答）';
+        const c = q.type === 'meaning' ? q.answer : q.word.w;
+        const tn = {meaning:'选义', spell:'拼写', listen:'听写'}[q.type];
+        return '<div class="res-item"><span>' + (ok ? '✅' : '❌') + ' <b>' + q.word.w + '</b>'
+          + '<span class="muted"> · ' + tn + '</span></span>'
+          + '<span>' + (ok ? '<span class="c">正确</span>' : '<span class="u">' + y + '</span> → <span class="c">' + c + '</span>') + '</span></div>';
+      }).join('');
+
+  const wrongN = total - correct;
+  $('qzToParent').innerHTML = '<b>给家长看的一句话</b>'
+    + '<div class="muted" style="margin-top:6px">本次抽查 ' + total + ' 题，答对 ' + correct + ' 题'
+    + (wrongN ? '，<b style="color:var(--fg)">' + detail.filter(d=>!d.ok).map(d=>d.q.word.w).join('、') + '</b> 需要重点复习。' : '，全部答对。')
+    + '</div><div class="muted" style="margin-top:8px">连续打卡 ' + streakDays() + ' 天 · 掌握率 ' + masteredRate() + '%</div>';
+
+  if (correct === total) confetti();
+  renderHome(); renderStats();
+  $('quizRun').style.display = 'none'; $('quizResult').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+/* ---------- ⑦ 数据看板与错词本 ---------- */
+function renderStats(){
+  $('dMastery').textContent = masteredRate() + '%';
+  $('dLearned').textContent = learnedCount() + ' / ' + NWORDS;
+  $('dQuiz').textContent = state.quizItems.length;
+
+  const recent = state.quizItems.filter(x => Date.now() - x.t < 7*DAY);
+  const wrongN = recent.filter(x => !x.ok).length;
+  $('dWrong').textContent = recent.length ? Math.round(wrongN / recent.length * 100) + '%' : '—';
+
+  const ws = wrongWords().sort((a,b) => state.words[b.w].wrong - state.words[a.w].wrong);
+  $('wrongCnt').textContent = ws.length + ' 个';
+  const wl = $('wrongList');
+  if (!ws.length){
+    wl.innerHTML = '<div class="muted" style="padding:8px 0">错词本是空的。去抽查几组，错的词会自动进来，并在次日、第 3 天、第 7 天强制复现。</div>';
+  } else {
+    wl.innerHTML = ws.map(x => {
+      const st = state.words[x.w];
+      const hi = st.wrong >= 3;
+      return '<div class="wrongline"><div><div class="w">' + x.w + ' <span class="muted">' + x.p + '</span></div>'
+        + '<div class="muted">' + x.d + '</div></div>'
+        + '<div style="text-align:right"><span class="badge ' + (hi ? 'hi' : 'lo') + '">错 ' + st.wrong + ' 次</span>'
+        + '<div class="muted" style="margin-top:5px">' + (st.wrongType || '—') + '</div></div></div>';
+    }).join('');
+  }
+
+  const all = WORDS.slice().sort((a,b) => a.f - b.f).slice(0, 60);
+  $('allCnt').textContent = '共 ' + NWORDS + ' 词（按词频升序）';
+  $('allList').innerHTML = all.map(x => {
+    const st = state.words[x.w];
+    const tag = !st ? '<span class="muted">未学</span>'
+      : st.stage >= 5 ? '<span style="color:var(--ok)">已掌握</span>'
+      : st.next <= Date.now() ? '<span style="color:var(--warn)">待复习</span>'
+      : '<span class="muted">档位 ' + st.stage + '</span>';
+    return '<div class="wrongline"><div><b>' + x.w + '</b> <span class="muted">' + x.pos + ' ' + x.d + '</span></div><div>' + tag + '</div></div>';
+  }).join('');
+}
+
+/* ---------- 周报卡片（Canvas） ---------- */
+function drawReport(){
+  const cv = $('reportCard'), c = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const g = c.createLinearGradient(0,0,W,H); g.addColorStop(0,'#101a26'); g.addColorStop(1,'#16253a');
+  c.fillStyle = g; c.fillRect(0,0,W,H);
+  c.fillStyle = '#3ea6ff'; c.fillRect(0,0,W,14);
+
+  c.fillStyle = '#e8eef5'; c.font = 'bold 62px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  c.fillText('单词学习周报', 70, 150);
+  c.fillStyle = '#8fa3b7'; c.font = '34px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  c.fillText('本周抽查与复习进度', 70, 205);
+
+  const week = [];
+  for (let back = 6; back >= 0; back--) week.push(ymd(new Date(dayStart(Date.now()) - back*DAY)));
+  const weekDone = week.reduce((s,d) => s + (state.activity[d] || 0), 0);
+  const recent = state.quizItems.filter(x => Date.now() - x.t < 7*DAY);
+  const acc = recent.length ? Math.round(recent.filter(x=>x.ok).length / recent.length * 100) : 0;
+
+  const kpis = [
+    ['连续打卡', streakDays() + ' 天'],
+    ['本周学习', weekDone + ' 次'],
+    ['掌握率', masteredRate() + '%'],
+    ['抽查正确率', recent.length ? acc + '%' : '—']
+  ];
+  kpis.forEach((k, i) => {
+    const x = 70 + (i % 2) * 450, y = 300 + Math.floor(i / 2) * 190;
+    c.fillStyle = '#1b2836'; roundRect(c, x, y, 410, 155, 22); c.fill();
+    c.strokeStyle = '#2b3949'; c.lineWidth = 2; roundRect(c, x, y, 410, 155, 22); c.stroke();
+    c.fillStyle = '#8fa3b7'; c.font = '30px -apple-system,"PingFang SC",sans-serif';
+    c.fillText(k[0], x + 28, y + 56);
+    c.fillStyle = '#e8eef5'; c.font = 'bold 56px -apple-system,"PingFang SC",sans-serif';
+    c.fillText(k[1], x + 28, y + 128);
+  });
+
+  c.fillStyle = '#e8eef5'; c.font = 'bold 40px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('需要重点复习的词', 70, 790);
+
+  const ws = wrongWords().sort((a,b) => state.words[b.w].wrong - state.words[a.w]).slice(0, 9);
+  if (!ws.length){
+    c.fillStyle = '#2fd07a'; c.font = '34px -apple-system,"PingFang SC",sans-serif';
+    c.fillText('暂无错词，继续保持', 70, 850);
+  } else {
+    ws.forEach((x, i) => {
+      const y = 850 + i * 48;
+      c.fillStyle = '#ff8a9b'; c.font = 'bold 34px -apple-system,"PingFang SC",sans-serif';
+      c.fillText('· ' + x.w, 70, y);
+      c.fillStyle = '#8fa3b7'; c.font = '30px -apple-system,"PingFang SC",sans-serif';
+      c.fillText(x.d + '（错 ' + state.words[x.w].wrong + ' 次）', 330, y);
+    });
+  }
+
+  c.fillStyle = '#1b2836'; roundRect(c, 70, H - 230, W - 140, 130, 22); c.fill();
+  c.strokeStyle = '#3ea6ff'; c.lineWidth = 2; roundRect(c, 70, H - 230, W - 140, 130, 22); c.stroke();
+  c.fillStyle = '#3ea6ff'; c.font = 'bold 36px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('建议：每天 10 个新词 + 清空错词本，两周可见效果', 100, H - 148);
+
+  c.fillStyle = '#8fa3b7'; c.font = '26px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('单词抽查 Demo 生成 · ' + ymd(Date.now()), 70, H - 40);
+}
+function roundRect(c, x, y, w, h, r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+$('toReport').addEventListener('click', () => { drawReport(); toast('周报卡片已生成，可保存为图片转发'); });
+$('saveReport').addEventListener('click', () => {
+  const cv = $('reportCard');
+  const a = document.createElement('a');
+  a.download = '单词学习周报-' + ymd(Date.now()) + '.png';
+  a.href = cv.toDataURL('image/png');
+  a.click();
+});
+
+/* ---------- ⑦.5 学员端：教练任务卡片 ---------- */
+function assignmentsForMe(){
+  const cl = state.classroom;
+  if (!cl || !Array.isArray(cl.assignments)) return [];
+  return (cl.assignments || []).filter(a => a.target === 'me');
+}
+function renderStuTask(){
+  const box = $('stuTask'), list = assignmentsForMe();
+  if (!list.length){
+    box.innerHTML = '<div class="muted">还没有教练布置的任务。切到教练端布置一个，再切回来就能看到它出现在这里——这就是"任务被第三方安排"的压力来源。</div>'
+      + '<button class="btn ghost sm" id="protoCoach" style="margin-top:10px;width:100%">去教练端布置任务 →</button>';
+    $('protoCoach').addEventListener('click', () => setRole('coach'));
+    return;
+  }
+  const today = ymd(Date.now());
+  box.innerHTML = list.map(a => {
+    const total = Math.max(1, a.count);
+    const done = (a.doneWords || []).length;
+    const pct = Math.round(done / total * 100);
+    const dl = ymd(a.deadline) === today ? '<span class="warn">今天截止</span>' : '截止 ' + fmtD(a.deadline);
+    return '<div class="row between"><b>📋 教练任务</b><span class="muted">' + dl + '</span></div>'
+      + '<div class="muted" style="margin-top:4px">' + a.createdBy + ' 布置 · ' + total + ' 词'
+      + (a.tag !== '任意' ? ' · 词源 ' + a.tag : '') + '</div>'
+      + '<div class="progress" style="margin:12px 0 6px"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="row between"><span class="muted">已完成 ' + done + ' / ' + total + '</span>'
+      + '<span class="' + (done >= total ? 'okc' : 'warn') + '">' + pct + '%</span></div>'
+      + '<div class="muted" style="margin-top:8px">' + a.words.join(' · ') + '</div>'
+      + (done >= total
+          ? '<div class="okc" style="margin-top:10px">已按时完成，教练看得到这一条</div>'
+          : '<button class="btn" id="doAssign" style="margin-top:10px">开始完成这个任务</button>');
+  }).join('');
+  const btn = $('doAssign');
+  if (btn) btn.addEventListener('click', () => {
+    const a = assignmentsForMe().find(x => (x.doneWords || []).length < x.count);
+    if (!a) return;
+    const pool = a.words.map(w => WORDS.find(x => x.w === w)).filter(Boolean);
+    session = {queue: pool, idx: 0, res:{known:0,vague:0,forgot:0}, wrongList: [], assignId: a.id};
+    show('s-study'); paintCard();
+  });
+}
+/* 学习反馈时同步教练任务的完成度 */
+function noteAssignProgress(word){
+  const list = assignmentsForMe();
+  if (!list.length) return;
+  const a = list.find(x => x.words.indexOf(word) >= 0 && (x.doneWords || []).length < x.count);
+  if (!a) return;
+  a.doneWords = a.doneWords || [];
+  if (a.doneWords.indexOf(word) < 0) a.doneWords.push(word);
+}
+
+/* ---------- ⑦.6 教练端 ---------- */
+function weakRanking(){
+  const m = {};
+  state.classroom.students.forEach(s => (s.weak || []).forEach(w => { m[w] = (m[w] || 0) + 1; }));
+  const arr = Object.keys(m).map(w => ({w, n: m[w]})).sort((a,b) => b.n - a.n || a.w.localeCompare(b.w));
+  arr.forEach(x => { if (!x.def) { const o = WORDS.find(y => y.w === x.w); x.def = o ? o.d : ''; } });
+  return arr;
+}
+function renderAssignTags(){
+  const tags = ['任意'];
+  WORDS.forEach(w => (w.t || []).forEach(t => { if (tags.indexOf(t) < 0) tags.push(t); }));
+  const sel = $('aTag');
+  if (sel.dataset.filled === '1') return;
+  sel.innerHTML = tags.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+  sel.dataset.filled = '1';
+}
+function assignableWords(tag){
+  return WORDS.filter(w => tag === '任意' || (w.t || []).indexOf(tag) >= 0);
+}
+function renderCoach(){
+  const cl = state.classroom;
+  if (!cl){ cl = state.classroom = makeClassroom(); }
+  const stu = cl.students;
+  $('cClass').textContent = cl.name;
+  $('cStudents').textContent = stu.length + 1;   // 含“我”
+  const myProgress = Math.min(100, Math.round((state.today.done / 20) * 100));
+  const doneRate = Math.round(stu.reduce((s,x) => s + x.progress, 0) / (stu.length * 100) * 100);
+  $('cDone').textContent = doneRate + '%';
+  $('cUnsigned').textContent = (cl.assignedCount || 0) > 0 ? 0 : stu.length;
+  renderAssignTags();
+
+  /* 学员列表 */
+  const listEl = $('cStudentList');
+  listEl.innerHTML = stu.map(s => {
+    const dots = [];
+    for (let back = 13; back >= 0; back--){
+      const d = ymd(new Date(dayStart(Date.now()) - back*DAY));
+      const level = s.progress >= 60 ? 3 : s.progress >= 40 ? 2 : 1;
+      const off = hash(s.id + d) > (s.progress / 100) * 1.12;
+      const cnt = off ? 0 : Math.max(3, Math.round(level * 12 + hash(d + s.id) * 10));
+      const col = cnt === 0 ? '#2a3644' : cnt < 10 ? '#1d4f74' : cnt < 20 ? '#2b7fb8' : '#3ea6ff';
+      dots.push('<i class="dot" data-sid="' + s.id + '" data-day="' + d + '" data-cnt="' + cnt + '" style="background:' + col + '"></i>');
+    }
+    const overdue = s.progress < 60;
+    return '<div class="stu"><div class="row between"><div class="nm">' + s.name
+      + (overdue ? ' <span class="warn">需催</span>' : '') + '</div>'
+      + '<div class="' + (overdue ? 'warn' : 'okc') + '">' + s.progress + '%</div></div>'
+      + '<div class="muted" style="margin-top:3px">最近活跃 ' + s.lastActive + ' · 连续打卡 ' + s.streak + ' 天</div>'
+      + '<div class="dots">' + dots.join('') + '</div>'
+      + '<div class="muted" style="font-size:12px;margin-top:6px">共性错词：' + (s.weak || []).join('、') + '</div></div>';
+  }).join('')
+  + '<div class="stu" style="border-color:#3ea6ff"><div class="row between"><div class="nm">我（本机学员）</div>'
+  + '<div class="okc">' + myProgress + '%</div></div>'
+  + '<div class="muted" style="margin-top:3px">今日已学 ' + state.today.done + ' 次 · 已学词 ' + learnedCount() + ' 个 · 掌握率 ' + masteredRate() + '%</div>'
+  + '<div class="muted" style="font-size:12px;margin-top:6px">共性错词：' + (wrongWords().slice(0,2).map(x=>x.w).join('、') || '暂无') + '</div></div>';
+
+  /* 点格子看历史 */
+  listEl.querySelectorAll('.dot').forEach(d => d.addEventListener('click', () => {
+    const s = cl.students.find(x => x.id === d.dataset.sid);
+    toast(s.name + ' · ' + d.dataset.day + '：完成 ' + d.dataset.cnt + ' 次' + (+d.dataset.cnt === 0 ? '（当天空着，这就是要催的信号）' : ''));
+  }));
+
+  /* 班级共性错词 */
+  const rank = weakRanking();
+  $('cWeak').innerHTML = rank.length ? rank.map(x =>
+      '<div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line)">'
+      + '<div><b>' + x.w + '</b> <span class="muted">' + (x.def || '') + '</span></div>'
+      + '<div class="row" style="gap:8px"><span class="warn">' + x.n + ' 人错</span>'
+      + '<button class="btn ghost sm" data-weak="' + x.w + '" style="padding:6px 10px;font-size:12px">加入任务</button></div></div>'
+    ).join('') : '<div class="muted">暂无数据</div>';
+  $('cWeak').querySelectorAll('[data-weak]').forEach(b => b.addEventListener('click', () => {
+    const w = b.dataset.weak;
+    if (coach.pendingWords.indexOf(w) < 0) coach.pendingWords.push(w);
+    toast('已加入布置清单：' + coach.pendingWords.join('、'));
+    renderCoach();
+  }));
+
+  /* 布置清单预览 */
+  const tag = $('aTag').value || '任意';
+  const pick = assignableWords(tag).slice(0, +$('aCount').value);
+  const extra = coach.pendingWords.filter(w => pick.indexOf(w) < 0)
+    .map(w => WORDS.find(x => x.w === w)).filter(Boolean);
+  const finalList = pick.concat(extra).slice(0, +$('aCount').value);
+  const weakCnt = finalList.filter(w => coach.pendingWords.indexOf(w.w) >= 0).length;
+  $('assignInfo').innerHTML = '将布置：' + finalList.map(w => w.w).join('、')
+    + '<div class="chip" style="margin-top:8px">含班级共性错词 <b>' + weakCnt + '</b> 个</div>'
+    + (coach.pendingWords.length ? '<div class="muted" style="margin-top:6px">清单里另有 ' + coach.pendingWords.length + ' 个待排入的词（受题量上限限制未全部包含）</div>' : '');
+}
+function setRole(role){
+  const isCoach = role === 'coach';
+  $('coachWrap').hidden = !isCoach;
+  $('hdrStu').hidden = isCoach;
+  $('hdrCoach').hidden = !isCoach;
+  if (isCoach){ show('s-coach'); renderCoach(); }
+  else { renderHome(); renderStats(); show('s-home'); }
+}
+const currentDeadline = () => +((document.querySelector('[data-deadline].sel') || {dataset:{}}).dataset.deadline || 1);
+function doAssign(){
+  const tag = $('aTag').value || '任意';
+  const n = +$('aCount').value;
+  const pick = assignableWords(tag).slice(0, n);
+  const extra = coach.pendingWords.map(w => WORDS.find(x => x.w === w)).filter(Boolean);
+  const seen = {}; const finalList = [];
+  pick.concat(extra).forEach(w => { if (finalList.length < n && !seen[w.w]){ seen[w.w] = 1; finalList.push(w); } });
+  const days = currentDeadline();
+  const deadline = dayStart(Date.now()) + days*DAY + (23*60+59)*60*1000;
+  state.classroom.assignments.push({
+    id: 'a' + Date.now(), tag, count: finalList.length,
+    words: finalList.map(w => w.w), deadline, target: 'me',
+    createdBy: '王教练', createdAt: Date.now(), doneWords: []
+  });
+  state.classroom.assignedCount = (state.classroom.assignedCount || 0) + 1;
+  coach.pendingWords = [];
+  save(); renderCoach(); renderStuTask();
+  toast('已布置 ' + finalList.length + ' 词，截止 ' + fmtD(deadline) + '。切回学员端看首页');
+}
+function nudgeMessage(){
+  const cl = state.classroom;
+  const low = cl.students.filter(s => s.progress < 60).sort((a,b) => a.progress - b.progress);
+  if (!low.length) return cl.name + ' 今天全员达标 ✅';
+  const lines = low.map(s => '· ' + s.name + '：' + s.progress + '%（' + s.lastActive + '活跃，共性错词 ' + (s.weak||[]).join('、') + '）');
+  return '【' + cl.name + '】今日单词抽查提醒\n还没完成的：\n' + lines.join('\n')
+    + '\n\n请家长提醒孩子今晚完成抽查并提交，明早我会把错词表统一发出来。';
+}
+function showModal(title, bodyHtml, actions){
+  const wrap = document.createElement('div');
+  wrap.className = 'modal';
+  wrap.innerHTML = '<div class="panel"><b style="font-size:16px">' + title + '</b>' + bodyHtml
+    + '<div id="modalActions" style="margin-top:14px"></div></div>';
+  document.body.appendChild(wrap);
+  const act = wrap.querySelector('#modalActions');
+  (actions || []).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'btn' + (a.ghost ? ' ghost' : '');
+    b.textContent = a.label;
+    b.style.marginBottom = '8px';
+    b.addEventListener('click', () => { if (a.fn) a.fn(); wrap.remove(); });
+    act.appendChild(b);
+  });
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+}
+function copyText(t){
+  try{
+    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t); toast('已复制到剪贴板'); return; }
+  }catch(e){}
+  toast('已生成，可长按上方文字手动复制');
+}
+function drawClassReport(){
+  const cv = $('classReport'), c = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const g = c.createLinearGradient(0,0,W,H); g.addColorStop(0,'#101a26'); g.addColorStop(1,'#16253a');
+  c.fillStyle = g; c.fillRect(0,0,W,H);
+  c.fillStyle = '#2fd07a'; c.fillRect(0,0,W,14);
+  c.fillStyle = '#e8eef5'; c.font = 'bold 58px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('班级单词周报', 70, 140);
+  c.fillStyle = '#8fa3b7'; c.font = '32px -apple-system,"PingFang SC",sans-serif';
+  c.fillText(state.classroom.name + ' · 截至 ' + ymd(Date.now()), 70, 194);
+
+  const stu = state.classroom.students;
+  const rate = Math.round(stu.reduce((s,x) => s + x.progress, 0) / stu.length);
+  const due = stu.filter(s => s.progress < 60);
+  const kpis = [['学员数', stu.length + ''], ['平均完成率', rate + '%'], ['需催学员', due.length + ' 人'], ['布置任务', (state.classroom.assignedCount||0) + ' 次']];
+  kpis.forEach((k, i) => {
+    const x = 70 + (i % 2) * 450, y = 250 + Math.floor(i/2) * 180;
+    c.fillStyle = '#1b2836'; roundRect(c, x, y, 410, 148, 22); c.fill();
+    c.strokeStyle = '#2b3949'; c.lineWidth = 2; roundRect(c, x, y, 410, 148, 22); c.stroke();
+    c.fillStyle = '#8fa3b7'; c.font = '28px -apple-system,"PingFang SC",sans-serif'; c.fillText(k[0], x+28, y+52);
+    c.fillStyle = '#e8eef5'; c.font = 'bold 52px -apple-system,"PingFang SC",sans-serif'; c.fillText(k[1], x+28, y+120);
+  });
+
+  c.fillStyle = '#e8eef5'; c.font = 'bold 40px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('全班共性错词（建议集体讲一遍）', 70, 730);
+  const rank = weakRanking().slice(0, 6);
+  if (!rank.length){ c.fillStyle = '#2fd07a'; c.font = '32px -apple-system,"PingFang SC",sans-serif'; c.fillText('暂无数据', 70, 790); }
+  else rank.forEach((x, i) => {
+    const y = 785 + i * 45;
+    c.fillStyle = '#ffc861'; c.font = 'bold 32px -apple-system,"PingFang SC",sans-serif'; c.fillText(x.n + ' 人—— ' + x.w, 70, y);
+    c.fillStyle = '#8fa3b7'; c.font = '28px -apple-system,"PingFang SC",sans-serif'; c.fillText(x.def || '', 420, y);
+  });
+
+  c.fillStyle = '#e8eef5'; c.font = 'bold 38px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('需要催的学员', 70, 1120);
+  c.fillStyle = '#ff8a9b'; c.font = '30px -apple-system,"PingFang SC",sans-serif';
+  c.fillText(due.length ? due.map(s => s.name + ' ' + s.progress + '%').join('　') : '无，全员达标', 70, 1175);
+  c.fillStyle = '#8fa3b7'; c.font = '26px -apple-system,"PingFang SC",sans-serif';
+  c.fillText('单词抽查 Demo 生成 · ' + ymd(Date.now()), 70, H - 40);
+}
+/* 结构自检：这个页面出过两次结构性故障（容器漏闭合 → 整页被 hidden 包住；容器误加 hidden → 学员端不可见），
+   加一道保险，失败时直接把原因显示出来，而不是让使用者对着黑屏猜 */
+(function structureSelfCheck(){
+  const problems = [];
+  const wrap = $('coachWrap');
+  if (!wrap) problems.push('缺少 #coachWrap 容器');
+  else if (wrap.parentElement !== document.body) problems.push('#coachWrap 不是 body 的直接子元素（可能有标签漏闭合）');
+  ['s-home','s-study','s-result','s-quiz','s-stats','s-coach'].forEach(id => { if (!$(id)) problems.push('缺少屏幕容器 #' + id); });
+  if (wrap && wrap.hidden) problems.push('学员端容器处于隐藏状态');
+  if (problems.length){
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;inset:0;z-index:999;background:#141c26;color:#ffb020;padding:22px;font-size:13.5px;line-height:1.7;overflow:auto';
+    box.innerHTML = '<b style="color:#ff5c72">页面结构自检未通过</b><br>' + problems.join('<br>')
+      + '<br><br>请把这段文字发给我。可能是某个 &lt;div&gt; 漏了闭合标签。';
+    document.body.appendChild(box);
+  }
+})();
+
+/* 启动 */
+try{
+  state = load();
+save();
+$('coachWrap').hidden = false;    // 兜底：任何情况下都保证学员端可见（默认角色是学员）
+$('hdrStu').hidden = false;
+(function bindCoach(){
+  $('roleSwitch').addEventListener('click', () => setRole('coach'));
+  $('roleSwitch2').addEventListener('click', () => setRole('student'));
+  $('aCount').addEventListener('input', () => { $('aCountVal').textContent = $('aCount').value; renderCoach(); });
+  $('aTag').addEventListener('change', renderCoach);
+  document.querySelectorAll('[data-deadline]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-deadline]').forEach(x => { x.classList.remove('sel'); x.style.borderColor = ''; });
+    b.classList.add('sel'); b.style.borderColor = '#3ea6ff';
+  }));
+  $('btnAssign').addEventListener('click', doAssign);
+  $('btnNudgeAll').addEventListener('click', () => {
+    const msg = nudgeMessage();
+    showModal('一键催学', '<div class="muted" style="margin:6px 0">这段文字可以直接粘到家长群里。真机上应该接的是微信订阅消息，但订阅消息必须用户主动授权、一次只能发一条，所以「真人发群消息」反而是更可靠的方案。</div><pre>' + msg + '</pre>',
+      [{label:'复制这段文字', fn: () => copyText(msg)}, {label:'关闭', ghost:true}]);
+    state.classroom.students.forEach(s => { if (s.progress < 60) s.notified = true; });
+    save();
+  });
+  $('btnClassReport').addEventListener('click', () => { drawClassReport(); toast('班级周报已生成'); });
+  $('btnSaveClassReport').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.download = '班级周报-' + ymd(Date.now()) + '.png';
+    a.href = $('classReport').toDataURL('image/png');
+    a.click();
+  });
+  $('fmtDemo').addEventListener('click', () => {
+    let n = 0;
+    WORDS.forEach(w => { const st = state.words[w.w]; if (st && st.next > Date.now() && st.last === 'forgot'){ st.next = Date.now() - 1000; n++; } });
+    save(); renderHome();
+    toast(n ? ('已让 ' + n + ' 个“忘记”的词立刻到期') : '没有待提前的词（先在学习页点几次“忘记”）');
+  });
+})();
+
+$('resetDemo').addEventListener('click', () => {
+  localStorage.removeItem(KEY); state = seed(); save();
+  renderHome(); renderStats(); renderCoach(); renderStuTask();
+  toast('已重置为演示数据');
+});
+drawReport();
+renderHome();
+renderStats();
+renderStuTask();
+renderCoach();
+prepQuizIntro();
+}catch(err){
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:999;background:#141c26;color:#ff8a9b;padding:22px;font-size:13.5px;line-height:1.7;overflow:auto';
+  box.innerHTML = '<b>Demo 初始化失败</b><br>' + String(err && err.message ? err.message : err)
+    + '<br><br><span style="color:#8fa3b7">把这段发给我，我直接改。</span>';
+  document.body.appendChild(box);
+}
+</script>
+</body>
+</html>

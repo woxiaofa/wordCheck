@@ -1,0 +1,6 @@
+<!-- 开发期诊断组件（占位）：probe
+     保留它是因为删除后开发工具的项目索引仍引用该文件，编译报 ENOENT、
+     整个小程序渲染空白。等其余功能验证通过后再按 README 的顺序移除。 -->
+<view style="padding:20rpx;border:2rpx dashed #ffb020;border-radius:12rpx;color:#ffb020;font-size:24rpx">
+  诊断组件占位：probe
+</view>

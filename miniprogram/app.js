@@ -1,0 +1,41 @@
+/**
+ * 小程序入口
+ *
+ * 云开发初始化必须在小程序启动时完成，且要用 try/catch 包住：
+ * 在开发者工具里没开通云环境时，构造 App 期间抛异常会导致整个小程序白屏，
+ * 而白屏的报错信息往往只有一句"App 构造失败"，很难定位。
+ */
+
+var cloud = require('./utils/cloud');
+
+App({
+  globalData: {
+    /** 登录后的用户对象（含 _id、member_until 等），未登录为 null */
+    user: null,
+    /** 云端返回的今日任务快照缓存，避免切页面重复请求 */
+    todayTask: null
+  },
+
+  onLaunch: function () {
+    // 提前拿一次今日日期，供日志与埋点使用（统一走 UTC+8 工具，不要直接 new Date）
+    var time = require('./utils/time');
+    this.globalData.launchDate = time.getLocalDate();
+
+    var ok = cloud.initCloud();
+    if (!ok) {
+      // 不抛异常，只记录；页面层会在调用云函数时给出可读提示
+      console.warn('[app] 云开发初始化失败：请检查 miniprogram/utils/cloud.js 里的 ENV_ID，' +
+        '以及在开发者工具中是否已开通云开发环境。');
+    }
+  },
+
+  onShow: function () {
+    // 跨天检测：从后台切回时如果已换天，清掉今日任务缓存，强制重新组装
+    var time = require('./utils/time');
+    var today = time.getLocalDate();
+    if (this.globalData.launchDate && this.globalData.launchDate !== today) {
+      this.globalData.todayTask = null;
+    }
+    this.globalData.launchDate = today;
+  }
+});

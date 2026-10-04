@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/study/study",
+    "pages/quiz/quiz",
+    "pages/stats/stats",
+    "pages/test-card/test-card"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0f1620",
+    "navigationBarTitleText": "单词抽查",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0f1620",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

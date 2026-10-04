@@ -1,0 +1,76 @@
+<!-- 学习卡
+     交互（v3：只保留"上滑"一个手势，去掉下滑与全部拖动状态）：
+       正面         只显示单词，底部一行"点一下看答案"
+       点一下       直接显示答案 + 三个反馈按钮
+       超时(8秒)    直接显示答案 + 两个反馈按钮（不给"想得很快"，理由见下）
+       上滑         直接记为「想得很快」并下一个词（不看答案的快速道）
+       点反馈按钮   记下评价并下一个词
+     换词时一律收起答案、回到只显示单词的状态。
+
+     ⚠️ 关于超时后为什么没有"想得很快"：
+       已经超过 8 秒，再给一个"想得很快"是自相矛盾的按钮
+       （用户要么没想起来，要么想起来了但慢）。
+       而用户主动点开答案时三个按钮都在 —— 因为他可能是想确认一下，
+       不是想不起来，这时"确实很快"是合理自评。
+
+     ⚠️ 结构约定（都是踩过坑留下的）：
+       ① 根节点只允许一个 style 属性，且值为静态字符串（无插值）；
+       ② 不用 overflow:hidden / will-change / transform 动画；
+       ③ 布局只用普通流式，不用 flex；
+       ④ 不用 wx:else，两个分支各用独立的 wx:if；
+       ⑤ 根节点必须有 min-height，否则内容为空时组件会塌成 0 高。 -->
+<view class="card" data-flip
+      bindtap="onCardTap" bindtouchstart="onTouchStart" bindtouchmove="onTouchMove"
+      bindtouchend="onTouchEnd" bindtouchcancel="onTouchCancel"
+      style="position:relative;box-sizing:border-box;min-height:420rpx;padding:36rpx 32rpx;background:#18222e;border:1rpx solid #2b3949;border-left:8rpx solid #3ea6ff;border-radius:32rpx;color:#e8eef5">
+  <view class="auto-bar" style="position:absolute;left:0;top:0;height:6rpx;background:#3ea6ff;width:{{autoProgress}}%;opacity:{{autoOn ? 1 : 0}}"></view>
+
+  <!-- 拖动方向提示（只有上滑一种） -->
+  <view wx:if="{{showUp}}" style="position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(47,208,122,.2);border:4rpx solid #2fd07a;border-radius:32rpx;display:flex;align-items:center;justify-content:center;color:#8ff0bd;font-size:36rpx;font-weight:700">✅ 想得很快</view>
+
+  <!-- 示范卡：首次使用时教手势 -->
+  <view wx:if="{{demo}}" style="margin-bottom:28rpx;padding:26rpx 24rpx;border:2rpx dashed #7c5cff;border-radius:20rpx;background:#241f3d">
+    <view style="font-size:34rpx;font-weight:700;color:#ffffff">先试一下手势</view>
+    <view style="margin-top:12rpx;font-size:28rpx;color:#d6cfff;line-height:1.7">
+      手指按住卡片，<text style="color:#ffffff;font-weight:700;text-decoration:underline">往上滑</text>——这是主要操作
+    </view>
+  </view>
+
+  <!-- 只显示单词 -->
+  <view wx:if="{{!revealed}}">
+    <view data-act catchtap="onSpeak" style="position:absolute;right:24rpx;top:24rpx;width:80rpx;height:80rpx;line-height:80rpx;text-align:center;border-radius:50%;background:#1e2a38;border:1rpx solid #2b3949;font-size:36rpx">🔊</view>
+
+    <view wx:if="{{!demo}}">
+      <view style="margin-top:96rpx;font-size:68rpx;font-weight:700;color:#e8eef5;word-break:break-all">{{word.word}}</view>
+      <view style="margin-top:12rpx;font-size:28rpx;color:#8fa3b7">{{word.phonetic}}　{{word.pos}}</view>
+    </view>
+
+    <view style="margin-top:96rpx;text-align:center;font-size:28rpx;color:#3ea6ff">先在心里回忆它的意思，点一下看答案</view>
+    <view wx:if="{{showHint}}" style="margin-top:14rpx;text-align:center;font-size:24rpx;color:#8fa3b7">上滑 = 想得很快，直接过</view>
+  </view>
+
+  <!-- 答案 + 反馈按钮 -->
+  <view wx:if="{{revealed}}">
+    <view wx:if="{{!demo}}" style="font-size:54rpx;font-weight:700;color:#e8eef5">{{word.word}}</view>
+    <view style="margin-top:20rpx;font-size:40rpx;font-weight:600;color:#3ea6ff">{{word.def_cn}}</view>
+    <view style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{stageText}}</view>
+    <view style="margin-top:20rpx;font-size:30rpx;color:#e8eef5">{{word.example_en}}</view>
+    <view style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{word.example_cn}}</view>
+
+    <view style="margin-top:32rpx">
+      <view style="text-align:center;font-size:24rpx;color:#8fa3b7;margin-bottom:16rpx">{{promptText}}</view>
+
+      <!-- 文案用"认识 / 不认识"这类学习者自己的说法，比"想得很快 / 没想起来"更贴近判断习惯；
+           括注里写清它会造成什么后果，避免用户凭感觉乱点。 -->
+      <view wx:if="{{showKnownBtn}}" data-fb="known" bindtap="onFeedback" style="margin-bottom:14rpx;padding:24rpx 26rpx;border-radius:22rpx;background:#22a862;color:#ffffff;font-size:30rpx;font-weight:600">认识　<text style="font-size:24rpx;font-weight:400;opacity:.9">（想得很快）</text></view>
+      <view data-fb="vague" bindtap="onFeedback" style="margin-bottom:14rpx;padding:24rpx 26rpx;border-radius:22rpx;background:#e08b00;color:#ffffff;font-size:30rpx;font-weight:600">想了很久　<text style="font-size:24rpx;font-weight:400;opacity:.9">（想起来了，但费劲）</text></view>
+      <view data-fb="forgot" bindtap="onFeedback" style="padding:24rpx 26rpx;border-radius:22rpx;background:#e03a52;color:#ffffff;font-size:30rpx;font-weight:600">不认识　<text style="font-size:24rpx;font-weight:400;opacity:.9">（完全没想起来）</text></view>
+
+      <!-- 后果提示：把"你这一个选择会换来什么"直接写出来 -->
+      <view style="margin-top:18rpx;text-align:center;font-size:22rpx;color:#8fa3b7;line-height:1.7">
+        认识 → 隔得更久再见{{cappedHint}}<br />
+        想了很久 → 明天再来　·　不认识 → 10 分钟后重来
+      </view>
+    </view>
+  </view>
+</view>

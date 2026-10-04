@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>背单词教练小程序：可行性与产品方案</title>
+<style>
+  @page { size: A4; margin: 2cm 2.2cm; }
+  body { font-family: "微软雅黑", "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 10.5pt; line-height: 1.6; color: #1a1a1a; max-width: 900px; margin: 0 auto; padding: 24px 32px; }
+  h1.doctitle { font-size: 22pt; color: #0f3d66; text-align: center; margin: 20px 0 12px; }
+  .meta { font-size: 9.5pt; color: #666; border-left: 3px solid #145a91; padding: 6px 10px; background: #f5f8fb; margin-bottom: 22px; }
+  h1 { font-size: 16.5pt; color: #0f3d66; border-bottom: 1.5px solid #cfdeeb; padding-bottom: 4px; margin-top: 26px; page-break-before: always; }
+  h1.first { page-break-before: avoid; }
+  h2 { font-size: 13.5pt; color: #145a91; margin-top: 18px; margin-bottom: 6px; }
+  h3 { font-size: 11.5pt; color: #1f6fad; margin-top: 14px; margin-bottom: 4px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 22px; padding: 0; }
+  li { margin: 3px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 14px; font-size: 9.5pt; }
+  th { background: #145a91; color: #fff; text-align: left; padding: 5px 7px; border: 1px solid #b9cde0; font-weight: 600; }
+  td { border: 1px solid #b9cde0; padding: 5px 7px; vertical-align: top; line-height: 1.45; }
+  tr:nth-child(even) td { background: #eaf1f8; }
+  pre { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; line-height: 1.35; background: #f6f8fa; border: 1px solid #dde5ec; border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; background: #f2f5f8; padding: 0 3px; }
+  blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #cfdeeb; color: #555; font-size: 9.5pt; background: #fafcfe; }
+  strong { color: #0f3d66; }
+  .tip { background: #fff8e6; border: 1px solid #f0d89a; padding: 8px 12px; font-size: 10pt; margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1 class="doctitle first">背单词教练小程序：可行性与产品方案</h1>
+
+<div class="meta">
+文档版本：v1.0　　文档性质：可行性分析 + 产品需求（合一）<br>
+适用范围：决策层快速拍板 + 工程师据以开工。本文件不含任何未标注来源的市场数据。
+</div>
+
+<h1 class="first">一、结论先行</h1>
+
+<h2>1.1 三句话结论</h2>
+<ol>
+  <li><strong>能做，但不该做成"又一个背单词 App"。</strong>背单词工具本身是红海：免费竞品功能完整、词书齐全、用户迁移成本几乎为零。单纯做一个"界面更好看的词表 + 复习计划"，大概率死于无人使用。</li>
+  <li><strong>真正可能成立的是"抽查与督促"这件事本身。</strong>你在招聘平台看到的"背单词教练 / 单词速记 / 抽查督促"岗位，说明市场上有人愿意为"有人盯着我（或我的孩子）背完"付钱。这件事的价值不在词库，而在<strong>闭环</strong>：布置任务 → 用户执行 → 被抽查 → 结果被第三方看见 → 产生压力。</li>
+  <li><strong>因此建议的形态是"免费工具 + 付费监督服务"，而不是"付费工具"。</strong>工具负责零成本获客和留存，付费点放在"抽查报告、真人教练、家长可见进度"上。这样即使工具部分被免费竞品打平，赚钱的那一环仍然存在。</li>
+</ol>
+
+<h2>1.2 最便宜的可证伪实验（先做这个，再决定写不写代码）</h2>
+<p><strong>不要一上来就开发。</strong>花 1 周时间用手工方式验证需求真假：在微信群/朋友圈找 5–10 位 K12 家长，用现成词表 + 每晚固定时间在群里发 10 个词的默写题并逐个批改，收 9.9 元/周（或免费试用一周后报价）。</p>
+<p>判据：</p>
+<ul>
+  <li>若 <strong>≥3 位家长愿意付费或持续交作业超过 7 天</strong> → 需求真实，值得投入开发，且你已经知道家长到底为什么付钱（是"批改"还是"有人催"）。</li>
+  <li>若家长只在你免费时才交作业、一提钱就消失 → 说明需求是"免费的焦虑缓解"，此时应该转向 B 端（卖给已经收费的单词速记机构/教练做工具），而不是做 C 端 App。</li>
+  <li>若家长连免费都不交作业 → 需求不成立或你的触达渠道不对，停止。</li>
+</ul>
+<p>这个实验的成本约等于你的时间，却能把后面最贵的风险（做出来没人用）提前暴露。</p>
+
+<h2>1.3 本节置信度</h2>
+<p>结论部分基于产品逻辑推演与你的需求信号，<strong>不是市场测量结果</strong>。已验证：仅"招聘平台存在相关岗位"这一事实由你提供。</p>
+
+<h1>二、本文档的读法与置信度标记</h1>
+<p>为避免把推测当事实，本文档每个章节末尾标注置信度：</p>
+<ul>
+  <li><strong>【已验证】</strong>：可在本机或公开渠道直接确认的事实。</li>
+  <li><strong>【用户观察】</strong>：由你提供的一手观察，未经我独立核实。</li>
+  <li><strong>【待验证假设】</strong>：合理但未证实的推断，使用前需先核实。全文所有未经核实的数字都会带此标记。</li>
+</ul>
+<div class="tip">
+<p>关于本次编写的一个<strong>重要限制，必须说明</strong>：本次编写环境无法联网核查竞品定价与市场数据（搜索引擎结果页返回的是无意义内容，检索接口不可用）。因此本文档<strong>刻意不写</strong>任何竞品价格、市场规模、增长率、留存率的具体数值。取而代之的是一份"你需要去核实什么、去哪核实、核实结果如何影响决策"的清单（见第三章）。这是文档的诚实边界，不是遗漏。</p>
+</div>
+
+<h1>三、需求信号与待验证清单</h1>
+
+<h2>3.1 我们手上唯一的原始信号</h2>
+<p>【用户观察】招聘平台上存在"背单词教练 / 单词速记 / 抽查督促"类岗位。</p>
+<p>这个信号的价值在于它的<strong>方向性</strong>：企业不会长期为一个没有付费方愿意买单的岗位发工资。但它不足以支撑决策，因为它不能回答三个关键问题：</p>
+<ol>
+  <li>这些岗位是<strong>B 端机构内部岗</strong>（机构收家长的钱、雇人执行），还是<strong>C 端自由教练</strong>（个人接单）？</li>
+  <li>付费方是<strong>家长</strong>还是<strong>成人学习者本人</strong>？</li>
+  <li>这个市场是在<strong>增长</strong>还是在被免费 App + AI 替代而<strong>萎缩</strong>？</li>
+</ol>
+<p><strong>不同答案会导向完全不同的产品：</strong>若是机构内部岗 → 做 B 端管理工具（帮一个教练同时盯 50 个学生）；若是自由教练接单 → 做教练的个人接单与交付工具；若是家长直购 → 做 C 端家长端产品。</p>
+
+<h2>3.2 待验证清单（建议 1–2 天内完成，成本极低）</h2>
+<table>
+  <thead><tr><th>核实项</th><th>去哪查</th><th>结论如何影响决策</th></tr></thead>
+  <tbody>
+  <tr><td>B 端 vs C 端</td><td>招聘 JD 原文（读职责描述里是否提到"带班""学员群""机构名"）、面试或电话询 HR 时的三句话</td><td>决定做 B 端工具还是 C 端产品，这是最上游的分叉</td></tr>
+  <tr><td>真实报价</td><td>直接问一个正在做这行的教练/机构：接多少个学生、每人每月多少钱、每周投入多少小时</td><td>决定毛利模型是否成立；这是竞品定价最可靠的来源，比任何榜单都准</td></tr>
+  <tr><td>竞品功能与定价</td><td>各大应用商店的背单词 App、微信里搜索"背单词"小程序、竞品付费页</td><td>判断你的差异化点是否已被覆盖；重点看它们<strong>有没有"抽查"和"成果外显给第三方"</strong></td></tr>
+  <tr><td>需求是否增长</td><td>招聘岗位数量随时间变化、家长社群的讨论热度</td><td>决定投入规模：增长 → 可以做产品；萎缩 → 只做服务不投入研发</td></tr>
+  <tr><td>平台约束</td><td>微信官方文档：小程序类目资质、订阅消息规则、虚拟支付限制</td><td>直接决定"提醒推送"和"收费"能不能按设想实现（见第十二章）</td></tr>
+  </tbody>
+</table>
+<p>【待验证假设】以上各项在本文档中均按"未知"处理，未代入任何具体数值。</p>
+
+<h2>3.3 本节置信度</h2>
+<p>【待验证假设】除 3.1 的需求信号外，全部内容为待核实项。</p>
+
+<h1>四、用户与场景</h1>
+
+<h2>4.1 三类人群与付费动机</h2>
+<table>
+  <thead><tr><th>人群</th><th>谁付钱</th><th>动机强度</th><th>核心痛点</th><th>优先级</th></tr></thead>
+  <tbody>
+  <tr><td>K12 家长（小学高年级至高中）</td><td>家长</td><td>强（焦虑驱动、愿意为"确定感"付费）</td><td>孩子不主动、自己不会教/没时间盯、看不到进度</td><td>P0</td></tr>
+  <tr><td>考研 / 四六级 / 专升本学生</td><td>本人</td><td>中（有明确目标，但自驱易断）</td><td>缺监督、错词反复忘、计划执行不下去</td><td>P1</td></tr>
+  <tr><td>成人英语补基础</td><td>本人</td><td>弱偏中（付费能力有，优先级低）</td><td>时间碎片、无考试压力、容易放弃</td><td>P2</td></tr>
+  </tbody>
+</table>
+<p><strong>关键洞察：</strong>K12 场景里"用的人"和"付钱的人"不是同一个人。这带来两个产品要求：① 学生端体验必须轻、快、不讨厌（否则学生抗拒 → 家长放弃）；② 家长端必须能"看到东西"（否则家长感觉钱白花）。<strong>任何只做学生端、不把成果外显给家长的设计，在这个市场上都收不到钱。</strong></p>
+
+<h2>4.2 典型场景</h2>
+<table>
+  <thead><tr><th>场景</th><th>时长</th><th>用户状态</th><th>产品该做什么</th></tr></thead>
+  <tbody>
+  <tr><td>通勤/课间碎片</td><td>3–10 分钟</td><td>单手操作、随时被打断</td><td>只推"复习到期词"，单手可完成，中断可续</td></tr>
+  <tr><td>睡前固定时段</td><td>15–25 分钟</td><td>安静、可专注</td><td>推新词 + 完整复习，允许"多学一点"的弹性</td></tr>
+  <tr><td>教练/家长抽查</td><td>5 分钟</td><td>第三方视角、要结论不要过程</td><td>生成"能不能过"的结论页 + 错词清单</td></tr>
+  <tr><td>考前突击</td><td>30–60 分钟</td><td>高压、要即时回报</td><td>按高频词优先排序、进度条可视化、允许暂停 SRS 规则</td></tr>
+  </tbody>
+</table>
+
+<h2>4.3 场景设计里最容易犯的错</h2>
+<p><strong>把"提醒"当成"督促"。</strong>真正的督促包含三要素：明确的截止时间、被第三方检查、检查结果有后果。只发一条"该背单词了"的推送，三要素一个都不占，效果约等于零。产品设计必须围绕这三要素构建，这也是第九章"数据看板"里"可转发周报"存在的原因——它负责"被第三方检查"。</p>
+
+<h2>4.4 本节置信度</h2>
+<p>【待验证假设】人群划分与动机强弱来自常识推演；K12 家长的付费意愿强弱必须在 3.2 的核实中确认。</p>
+
+<h1>五、竞品形态与差异化</h1>
+
+<h2>5.1 竞品不是"另一个背单词 App"，而是四类形态</h2>
+<table>
+  <thead><tr><th>形态</th><th>拿走了什么价值</th><th>留下的空档</th></tr></thead>
+  <tbody>
+  <tr><td>大型背单词 App（含 AI 规划类）</td><td>词库全、算法成熟、体验好、多为免费</td><td>完全不知道用户"是否真的会拼写"；没有任何社交压力；成果不外显</td></tr>
+  <tr><td>微信小程序类背单词小工具</td><td>免安装、易分享</td><td>功能浅、无沉淀数据、普遍无抽查闭环</td></tr>
+  <tr><td>真人陪学/督学服务</td><td>真人盯、有温度、可定制</td><td>贵、不可规模化、质量依赖个人、交付过程无沉淀</td></tr>
+  <tr><td>线下单词速记班</td><td>强约束、有同伴环境、家长熟悉</td><td>贵、受时间地点限制、效果难持续</td></tr>
+  </tbody>
+</table>
+<p><strong>空档在于交集：</strong>"有抽查闭环 + 成果可外显 + 价格接近免费工具"三者同时满足的产品很少。免费 App 不做抽查（因为抽查需要判定对错，成本更高且体验更"重"）；真人服务有抽查但贵且不标准化。</p>
+
+<h2>5.2 差异化只押三个点</h2>
+<ol>
+  <li><strong>真·抽查，不是"自测"。</strong>关键差异在"交卷制"：一次 10 题全部答完才出结果（见 7.1）。即时判分是练习，交卷判分是考试，考试才有压力。</li>
+  <li><strong>错词精准回流。</strong>错过的词在次日、第 3 天、第 7 天强制再出现，并且<strong>出题方式换一种</strong>（选义错过的，下次用拼写考）。这是留存和口碑的来源："它真的记得我不会什么。"</li>
+  <li><strong>成果外显。</strong>一张可以直接转发给家长的周报卡：本周学了几个词、掌握率、错词 TOP10、连续打卡天数。这张卡是付费转化的核心触点。</li>
+</ol>
+
+<h2>5.3 明确不做</h2>
+<p>不拼词书数量（打不过免费竞品）、不做词根词缀课程（内容成本高且偏离核心）、不做学习社区（冷启动期社区即死水）、不做多语言（先把英语做透）。</p>
+
+<h2>5.4 本节置信度</h2>
+<p>【待验证假设】竞品功能判断基于行业常识，未在本次编写中联网核实。上架前务必实际体验 3 个主要竞品并核对 5.1 的空档是否依然存在。</p>
+
+<h1>六、产品模块一：背单词 + 遗忘曲线复习计划</h1>
+
+<h2>6.1 设计原则</h2>
+<ul>
+  <li><strong>先体验，后注册。</strong>首次打开直接进入学习，学完 3 个词再引导登录。注册墙是这类产品最大的漏斗杀手。</li>
+  <li><strong>永远给一个"今天能完成"的任务量。</strong>宁可少给新词，也不让今日任务变成 200 个词。用户看到"今天 200 词"的第一反应是关闭，而不是开始。</li>
+  <li><strong>单手可操作。</strong>主要操作按钮放在屏幕下半部拇指区，这是碎片场景的硬要求。</li>
+</ul>
+
+<h2>6.2 页面结构（学生端）</h2>
+<table>
+  <thead><tr><th>页面</th><th>内容</th><th>关键交互</th></tr></thead>
+  <tbody>
+  <tr><td>今日任务（首页）</td><td>圆形进度环（已完成/总数）、三个入口：复习（N）、新词（N）、抽查（N 题）</td><td>点击直接开始，无二级菜单</td></tr>
+  <tr><td>学习卡片（复习/新词通用）</td><td>单词 + 音标 + 发音按钮；中文释义默认隐藏</td><td>点击卡片翻面显示释义与例句；三档反馈按钮：忘记/模糊/秒懂</td></tr>
+  <tr><td>学习结算页</td><td>本次学了几个、正确率、错词预览</td><td>"再来 10 个"（可选）、"去抽查"（引导闭环）</td></tr>
+  <tr><td>词表页</td><td>已学/未学/需复习三种状态分组</td><td>支持按标签（中考/高考/四级）筛选</td></tr>
+  <tr><td>词详情页</td><td>全部释义、例句、词频、历史错误次数</td><td>"加入今日任务"、"标记为已掌握"</td></tr>
+  </tbody>
+</table>
+
+<h2>6.3 每日任务组装规则（核心逻辑）</h2>
+<p>任务是"组装"出来的，不是"排好"的。每天首次进入时按以下顺序组装：</p>
+<ol>
+  <li><strong>到期复习词</strong>（按 SRS 到期时间升序，第八章）——最高优先级，必须先满足。</li>
+  <li><strong>错词回流</strong>（昨天及更早错过、且今天到期的词）——同等优先级。</li>
+  <li><strong>新词</strong>——填充剩余额度。</li>
+</ol>
+<p>配额规则：</p>
+<ul>
+  <li>复习额度不设硬上限（到期了就该复习），但<strong>当到期复习量超过 100 时，暂停推送新词</strong>，并在首页提示"先清复习，新词明天再来"。这条规则保护的是体验下限。</li>
+  <li>新词默认 10 个/天，用户可在设置中调为 5/15/20/30。</li>
+  <li>用户可手动"加练"，加练不改变 SRS 状态，只记入行为日志（避免用户靠加练刷掌握率）。</li>
+</ul>
+
+<h2>6.4 三档反馈的含义</h2>
+<table>
+  <thead><tr><th>反馈</th><th>含义</th><th>对 SRS 的影响</th><th>次日后果</th></tr></thead>
+  <tbody>
+  <tr><td>忘记</td><td>完全想不起来</td><td>重置到第 0 档（当天内再考一次）</td><td>明天必考，且换题型</td></tr>
+  <tr><td>模糊</td><td>想起来了但很费劲</td><td>档位不变，间隔按当前档位减半</td><td>当天不再考，但会提前回来</td></tr>
+  <tr><td>秒懂</td><td>立刻反应出来</td><td>直接升到下一档（可跳档）</td><td>按新间隔安排</td></tr>
+  </tbody>
+</table>
+<p><strong>为什么用三档而不是"对/错"两档：</strong>两档会让"蒙对"和"真的会"混在一起，导致间隔被错误地拉长，用户三天后全部忘光，体验崩塌。三档给用户一个诚实的表达方式，代价只是多一个按钮。</p>
+
+<h2>6.5 发音与例句</h2>
+<ul>
+  <li>发音：优先使用本地 TTS（系统语音合成），零成本、无版权风险；音质不满意时再考虑引入音频资源（注意版权与流量成本）。</li>
+  <li>例句：每个词至少 1 条英文例句 + 中文翻译。<strong>例句质量比词书规模更影响口碑</strong>，因为例句是用户唯一会真正读的内容。</li>
+  <li>例句中目标词必须高亮，方便快速定位。</li>
+</ul>
+
+<h2>6.6 本节置信度</h2>
+<p>【待验证假设】配额数值（10 词/天、100 词阈值）为经验值，上线后需按真实完成率调整。</p>
+
+<h1>七、产品模块二：抽查与自测</h1>
+<p>这是本产品的差异化核心，也是投入产出比最高的模块，建议原型阶段就把它做完整。</p>
+
+<h2>7.1 两种模式，服务两种心理</h2>
+<table>
+  <thead><tr><th>模式</th><th>触发方式</th><th>判分方式</th><th>心理作用</th></tr></thead>
+  <tbody>
+  <tr><td>练习模式</td><td>用户主动进入</td><td>即时判分、可看提示</td><td>学习，无压力</td></tr>
+  <tr><td>抽查模式（重点）</td><td>家长/教练发起，或用户自己发起"考试"</td><td><strong>交卷后统一判分</strong>，过程中无任何对错反馈</td><td>考试感、紧张感、结果可给别人看</td></tr>
+  </tbody>
+</table>
+<p><strong>交卷制是灵魂。</strong>如果过程中就告诉用户对了还是错了，用户会立刻回头改答案、并把它当成练习，压力消失，抽查的督促价值也随之消失。</p>
+
+<h2>7.2 三种题型的出题与判定</h2>
+<p><strong>题型 A：选义（英译中）</strong></p>
+<ul>
+  <li>展示单词，4 个中文释义选项。</li>
+  <li>干扰项生成规则：优先从"用户已学过的、同词性的词"中抽取，其次从"同词表的相似词（编辑距离小）"抽取。<strong>干扰项质量决定题目难度</strong>，随机抽词会让题目变得毫无意义。</li>
+  <li>适用：新词首次抽查（难度最低）。</li>
+</ul>
+<p><strong>题型 B：拼写（中译英）</strong></p>
+<ul>
+  <li>给出中文释义 + 首字母 + 字母数占位（如 <code>e _ _ _ _ _ _</code>），用户输入完整单词。</li>
+  <li><strong>输入问题的处理（关键实现细节）：</strong>手机原生输入法会联想、会纠错、会自动首字母大写，这会让"拼写题"失去意义。建议实现一个<strong>应用内自绘字母键盘</strong>（26 键 + 退格 + 提交），彻底规避联想与纠错。这是本模块唯一的"必须自研"的 UI 组件。</li>
+  <li>容错规则：忽略首尾空格与大小写；连字符与空格不参与判定（<code>ice cream</code> = <code>icecream</code>）；对存在英美拼写变体的词（如 <code>color/colour</code>）在词表里预置 <code>variant</code> 字段，任一写法均判对。</li>
+  <li>适用：已学过 2 次以上的词。</li>
+</ul>
+<p><strong>题型 C：听写（听音写词）</strong></p>
+<ul>
+  <li>TTS 播放发音，用户用同一个自绘键盘输入。</li>
+  <li>重放限制：最多 3 次（超过则记为"提示使用"）。次数不限制的话，用户会无限重放直到听出来，题目就退化成"听力练习"。</li>
+  <li>适用：已学过 3 次以上、且历史无听写错误的词。</li>
+</ul>
+
+<h2>7.3 一次抽查的结构</h2>
+<ul>
+  <li>默认 <strong>10 题</strong>，题型混合比例约 选义 3 / 拼写 5 / 听写 2，按词的历史正确率动态调整（正确率高的词更多用拼写和听写）。</li>
+  <li>出题来源优先级：错词本 &gt; 到期复习词 &gt; 已学词随机。</li>
+  <li><strong>时间限制：</strong>建议不放硬性倒计时（会造成焦虑和作弊式乱猜），而是独立记录"本题用时"（如超过 15 秒记为"犹豫"，计入报告）。</li>
+  <li>提交后：给出总分、错题逐条对照（你的答案 vs 正确答案）、并<strong>自动把错词加入次日强制复习</strong>。</li>
+</ul>
+
+<h2>7.4 抽查结果页（付费转化触点）</h2>
+<p>结果页需要同时满足两类读者：</p>
+<ul>
+  <li>给学生的：做对了几题、哪几个词错了、错在哪（拼错了还是意思记反了）。</li>
+  <li>给家长/教练的：一句话结论（"本次抽查 10 题，答对 7 题，<code>abandon/fragile/pursue</code> 三个词需要重点复习"）+ 一张可转发卡片。</li>
+</ul>
+
+<h2>7.5 本节置信度</h2>
+<p>【待验证假设】题型配比与 3 次重放限制为经验值；自绘键盘的必要性基于常见的移动端输入法行为推断，建议在真机上先做 5 人可用性测试确认。</p>
+
+<h1>八、遗忘曲线（SRS）规则</h1>
+
+<h2>8.1 间隔序列</h2>
+<p>采用简化版 SM-2 思路（不引入难度因子等复杂参数，参数越少越可调试）：</p>
+<pre>档位:    0      1     2     3     4      5      6      7      8
+间隔:  10分钟   1天   2天   4天   7天   15天   30天   60天   120天</pre>
+
+<h2>8.2 状态流转规则</h2>
+<table>
+  <thead><tr><th>用户反馈</th><th>档位变化</th><th>下次复习时间</th><th>备注</th></tr></thead>
+  <tbody>
+  <tr><td>忘记</td><td>→ 回到档 0</td><td>10 分钟后（当天）</td><td>当天若再答对，次日恢复为档 1</td></tr>
+  <tr><td>模糊</td><td>档位不变（不降级）</td><td><strong>当前档位对应的默认间隔 × 0.5</strong>（不低于 10 分钟）</td><td>连续两次“模糊”则视为“忘记”</td></tr>
+  <tr><td>秒懂</td><td>→ 档位 +2（上限档 8）</td><td>按新档位间隔</td><td>跳档上限为 2，避免一次侥幸导致间隔暴涨</td></tr>
+  <tr><td>逾期未复习</td><td>档位不变</td><td>立即到期（优先级最高）</td><td>逾期超过 7 天且期间未复习，档位 -1（记忆衰减）</td></tr>
+  </tbody>
+</table>
+
+<h3>“模糊”为什么这样定（容易看错，单独说明）</h3>
+<p>“档位”代表记得多牢，“间隔”代表下次什么时候再见，两者是不同的东西。“模糊”同时改了两件事的一半：<strong>档位不动</strong>（这词没退步，不罚它），但<strong>这次不等满一整个默认间隔</strong>（你自己都说记得费劲了，那就早点回来）。</p>
+<p>以档位 5（默认 15 天）为例：15 天后答“模糊”→ 档位仍是 5，下次改为 <strong>7.5 天后</strong>，而不是 15 天。</p>
+<p>“连续两次模糊视为忘记”防的是<strong>诚实被惩罚</strong>：若每次“模糊”都保档位、只减半，会出现“间隔一直在缩短、档位却一直是 5”的情况——后台看它算已掌握（档位≥5），用户每次见它却只有点印象，数据在说谎。第二次仍然模糊，说明档位 5 这个评价本身虚高了，于是按忘记处理、回炉重学。一句话：<strong>模糊 = 这次状态不好，减半再来；模糊两次 = 上次那个档位是虚高的，退回去重学。</strong></p>
+<p><strong>定档规则（实现口径，必须按这个来）：</strong>减半的基准是<strong>当前档位的默认间隔</strong>，不是“上次实际排的间隔”。即 <code>下次间隔 = 档位默认间隔 × 0.5</code>，而不是累乘。好处有二：不需要额外存历史间隔字段；不会出现 15 → 7.5 → 3.75 → 1.8 这种螺旋式递减的怪异间隔。<strong>代价是“模糊”连续发生的时间下限由“两次即重置”这条规则托底，而不是靠间隔自己衰减。</strong></p>
+
+<h2>8.3 与每日任务的联动</h2>
+<ul>
+  <li>学习结算后立即写回每个词的 <code>next_review_at</code>。</li>
+  <li>首页的"复习（N）"计数 = 当前时刻所有 <code>next_review_at &lt;= now</code> 的词数 + 错词回流量。</li>
+  <li>当日任务一旦生成就<strong>冻结快照</strong>（写入 <code>daily_tasks</code>），避免用户中途改设置导致任务列表跳动。</li>
+</ul>
+
+<h2>8.4 为什么不用复杂算法</h2>
+<p>FSRS 等现代算法效果更好，但：① 需要大量用户数据才能调准；② 冷启动阶段参数不准会给出诡异间隔，反而伤害体验；③ 复杂算法的调试成本对一个 3 周 MVP 不划算。<strong>先用固定序列把闭环跑通，有数据后再升级算法。</strong>数据结构设计时预留 <code>difficulty</code>、<code>stability</code> 字段以便后续迁移。</p>
+
+<h2>8.5 本节置信度</h2>
+<p>【待验证假设】间隔序列来自通用经验值（类似 Anki/SM-2 家族的常见配置），需在真实用户使用 2–4 周后按遗忘数据调整。</p>
+
+<h1>九、产品模块三：学习数据看板</h1>
+
+<h2>9.1 指标定义（必须写死，否则"掌握率"会变成玄学）</h2>
+<table>
+  <thead><tr><th>指标</th><th>定义</th><th>为什么这样定义</th></tr></thead>
+  <tbody>
+  <tr><td>连续打卡天数</td><td>当日完成任务量 ≥ 当日配额的 80% 即计为打卡；中断一天即归零</td><td>80% 阈值避免"学了 1 个词也算打卡"的自欺</td></tr>
+  <tr><td>掌握率</td><td><code>档位 ≥ 5 的词数 / 已学词数</code>（即间隔已拉到 15 天以上）</td><td>用 SRS 档位定义掌握，比"测试得分"稳定，且随记忆自然变化</td></tr>
+  <tr><td>当日完成度</td><td>已完成任务数 / 当日任务总数</td><td>首页进度环的唯一数据来源</td></tr>
+  <tr><td>30 天活跃热力图</td><td>每天一个格子，颜色深浅按当日完成任务数</td><td>视觉上产生"不想断"的压力，成本极低效果好</td></tr>
+  <tr><td>错词率</td><td>近 7 天抽查中错误题数 / 总题数</td><td>抽查质量的衡量</td></tr>
+  </tbody>
+</table>
+
+<h2>9.2 错词本（留存关键模块）</h2>
+<p>这是用户最愿意看、也最愿意付费的功能。每条错词记录应包含：</p>
+<ul>
+  <li>单词、释义、错误次数、最近一次错误时间、错误题型（拼错 / 意思记反 / 没听出来）。</li>
+  <li>一键操作："加入今日任务""标记已掌握""移除"。</li>
+  <li>分组视图：按"错误次数 ≥3（高危）""1–2 次（观察）"自动分组。<strong>高危组是抽查题的首选来源。</strong></li>
+</ul>
+
+<h2>9.3 可转发周报卡（付费转化核心）</h2>
+<p>一张竖版卡片，包含：连续打卡天数、本周新学词数、掌握率、抽查正确率、错词 TOP10（这是家长唯一真正想看的内容）、一句鼓励语。</p>
+<ul>
+  <li>技术上用小程序 Canvas 绘制并生成图片，用户可保存/转发到微信。</li>
+  <li>这张卡同时承担三个功能：家长查看进度、家长间口碑传播、付费转化的说服材料。</li>
+</ul>
+
+<h2>9.4 本节置信度</h2>
+<p>【已验证】指标定义为本方案自定规范，内部自洽；【待验证假设】"家长最想看错词 TOP10"为推断，需在真实家长访谈中确认。</p>
+
+<h1>十、产品模块四：激励玩法与提醒推送</h1>
+
+<h2>10.1 三层激励</h2>
+<table>
+  <thead><tr><th>层级</th><th>机制</th><th>设计要点</th></tr></thead>
+  <tbody>
+  <tr><td>即时</td><td>答对音效/微动画、学习结算页的完成动画</td><td>每次学习 2 秒内给到正反馈，这是最有效的激励</td></tr>
+  <tr><td>短期</td><td>每日打卡、连续天数、里程碑成就（7 天/30 天/100 天/首个 100 词）</td><td>成就必须是"可达成的"，不要设计需要半年的成就</td></tr>
+  <tr><td>社交</td><td>班级榜 / 好友榜</td><td><strong>冷启动期全站排行榜是负激励</strong>（用户永远排不到前面）。只做熟人榜（同学、家人），或干脆先不做</td></tr>
+  </tbody>
+</table>
+
+<h2>10.2 提醒推送：必须写清的现实约束</h2>
+<p><strong>这是最容易被低估的技术约束，直接影响产品预期：</strong></p>
+<ul>
+  <li>微信小程序的订阅消息需要<strong>用户主动订阅</strong>，且一次性订阅通常只能推送一条，长期订阅受类目限制且推送频率有额度上限（具体额度以当时的微信官方文档为准）。</li>
+  <li>结论：<strong>"每天自动催你背单词"在小程序里做不到。</strong>产品上只能组合使用：① 订阅消息（在用户完成学习时请求订阅，下次到点提醒）；② 服务号模板消息（需额外主体）；③ 站内待办与桌面角标替代；④ 由教练/家长在群内人工提醒（真人督促反而更有效，且是付费点）。</li>
+</ul>
+<p><strong>必须在产品方案里就承认这一点</strong>，否则开发到一半才发现推送不可行，交互方案要全部返工。</p>
+
+<h2>10.3 打卡的"后果"设计</h2>
+<p>打卡本身没有约束力，除非它有后果。可选做法（按强度递增）：</p>
+<ul>
+  <li>连续天数归零（弱，但成本最低）。</li>
+  <li>断卡后需要"补卡"才能继续（中，需谨慎设计以免变成骚扰）。</li>
+  <li>每周自动生成进度周报发给家长/教练（强，且这是天然付费点）。</li>
+</ul>
+<p>推荐从第一条起步，把第三条做成付费功能。</p>
+
+<h2>10.4 本节置信度</h2>
+<p>【待验证假设】订阅消息的具体规则与额度必须在上线前核对微信官方最新文档；【已验证】"每日自动推送不可行"这一结论方向在订阅消息机制下成立。</p>
+
+<h1>十一、教练/班级端：二期范围与本期边界</h1>
+
+<h2>11.1 本期（MVP）不做，但数据结构必须预留</h2>
+<p>如果 MVP 完全不考虑班级/教练，二期会面临大规模改表。因此本期只需要：</p>
+<ul>
+  <li>所有学习相关表都带 <code>class_id</code>（可空）和 <code>assigned_by</code>（可空）字段。</li>
+  <li>用户表预留 <code>role</code> 字段（<code>student</code> / <code>coach</code> / <code>parent</code>）。</li>
+  <li>不做任何教练端 UI。</li>
+</ul>
+<p>这样二期的"布置任务"只是往 <code>daily_tasks</code> 写入带 <code>assigned_by</code> 的记录，不需要迁移数据。</p>
+
+<h2>11.2 二期功能（供后续评估，本文档不展开实现）</h2>
+<table>
+  <thead><tr><th>功能</th><th>价值</th><th>复杂度</th></tr></thead>
+  <tbody>
+  <tr><td>布置任务（指定词表 + 截止时间 + 题量）</td><td>教练核心动作</td><td>中</td></tr>
+  <tr><td>学员列表与完成情况</td><td>一个教练同时管 30–50 人</td><td>中</td></tr>
+  <tr><td>批量催学</td><td>替代人工逐个私聊</td><td>低</td></tr>
+  <tr><td>周报导出与自动发送</td><td>交付感、续费理由</td><td>中</td></tr>
+  <tr><td>按抽成结算</td><td>若走教练撮合模式则必需</td><td>高（涉及资金与合规）</td></tr>
+  </tbody>
+</table>
+
+<h2>11.3 本节置信度</h2>
+<p>【已验证】字段预留方案与技术判断一致；【待验证假设】二期功能的优先级取决于第三章 B 端/C 端结论。</p>
+
+<h1>十二、技术选型与平台约束</h1>
+
+<h2>12.1 形态选择</h2>
+<table>
+  <thead><tr><th>方案</th><th>优点</th><th>缺点</th><th>建议</th></tr></thead>
+  <tbody>
+  <tr><td>纯 H5（先做这个验证）</td><td>无开发者工具即可验证、迭代最快、可直接分享链接</td><td>缺少小程序原生能力（订阅消息、分享卡片）</td><td><strong>推荐作为第一步</strong>，1 周内可验证核心体验</td></tr>
+  <tr><td>微信小程序原生开发</td><td>体验最贴近用户预期、能用到订阅消息与分享</td><td>迭代慢，需要开发者工具与账号</td><td>验证 H5 后迁移</td></tr>
+  <tr><td>跨端框架（Taro / uni-app）</td><td>一套代码出 H5 + 小程序 + App</td><td>引入构建复杂度，部分原生能力仍需适配</td><td>若确定要小程序，推荐这条</td></tr>
+  </tbody>
+</table>
+<p><strong>推荐路径：</strong>先用 H5 把"学习 + 抽查 + 错词 + 看板"四个闭环验证一遍（不需要微信账号，最快），确认体验成立后再用 Taro 迁移到小程序。你的选择"先要一份文档"是当前最优的节奏——下一步才是这个 H5。</p>
+
+<h2>12.2 后端选择</h2>
+<table>
+  <thead><tr><th>方案</th><th>适合</th><th>说明</th></tr></thead>
+  <tbody>
+  <tr><td>微信云开发（云函数 + 云数据库 + 云存储）</td><td>小程序形态首选</td><td>无服务器运维、与 <code>wx.login</code> 天然打通、免费额度足够 MVP</td></tr>
+  <tr><td>自建后端（Node/Python + 云数据库）</td><td>需要 H5 与小程序共用、或需要复杂查询</td><td>灵活但要处理运维、域名备案、HTTPS</td></tr>
+  <tr><td>纯本地存储</td><td>单机 demo</td><td><strong>不能用于正式产品</strong>：换设备即丢数据，家长端无法查看</td></tr>
+  </tbody>
+</table>
+
+<h2>12.3 小程序硬约束清单（每项都需上线前核实）</h2>
+<table>
+  <thead><tr><th>约束</th><th>影响</th><th>应对</th></tr></thead>
+  <tbody>
+  <tr><td>教育类目资质与备案</td><td>可能无法选择教育类目，或被要求提供资质</td><td>提前确认可选类目（如"工具"），或走企业主体</td></tr>
+  <tr><td>虚拟支付限制（尤其 iOS）</td><td>直接在小程序内卖虚拟服务可能受限</td><td>付费点设计为"实物/服务交付"或引导到公众号/线下，务必先核实</td></tr>
+  <tr><td>订阅消息规则与额度</td><td>"提醒推送"能力受限</td><td>见 10.2</td></tr>
+  <tr><td>包体积上限</td><td>词库无法全部打包进小程序</td><td>词库放云存储/CDN，按需加载；本地只缓存当前词表</td></tr>
+  <tr><td>用户登录</td><td>需静默获取 openid，且不能强制授权手机号</td><td>首次体验免登录，进度先存本地，登录后合并</td></tr>
+  <tr><td>未成年人信息保护</td><td>涉及儿童个人信息时合规要求更严</td><td>数据最小化采集、家长授权、不采集与学习无关的信息</td></tr>
+  </tbody>
+</table>
+
+<h2>12.4 本节置信度</h2>
+<p>【待验证假设】所有平台规则类条目必须在实现前对照微信官方最新文档核实，规则会变化，本文档不承诺其时效性。</p>
+
+<h1>十三、数据模型与接口骨架</h1>
+
+<h2>13.1 核心表</h2>
+<pre>users(id, openid, role, nickname, avatar, created_at, class_id)
+word_books(id, name, tag, word_count, owner_id, is_public)
+words(id, book_id, word, phonetic, freq, variant, tags)
+word_senses(id, word_id, pos, def_cn)
+word_examples(id, word_id, example_en, example_cn)
+user_word_state(id, user_id, word_id, stage, last_feedback,
+                next_review_at, correct_count, wrong_count,
+                last_wrong_type, created_at, updated_at)
+review_logs(id, user_id, word_id, feedback, mode, duration_ms, created_at)
+daily_tasks(id, user_id, task_date, snapshot_json, new_count, review_count,
+            quiz_count, assigned_by, class_id, completed_at)
+quiz_sessions(id, user_id, source, total, correct, duration_ms,
+             created_at, shared_at)
+quiz_items(id, session_id, word_id, question_type, user_answer,
+           correct_answer, is_correct, duration_ms)
+checkin_records(user_id, checkin_date, completed_count, total_count, is_valid)
+achievements(id, user_id, code, unlocked_at)</pre>
+<p>设计说明：</p>
+<ul>
+  <li><strong><code>user_word_state</code> 是全局最热的表</strong>，索引必须是 <code>(user_id, next_review_at)</code>，否则"今日到期词"查询会随数据增长迅速变慢。</li>
+  <li><code>daily_tasks.snapshot_json</code> 存当日任务快照，保证任务列表在一个自然日内不跳动。</li>
+  <li><code>quiz_items</code> 存下每一次作答的 <code>question_type</code> 与 <code>duration_ms</code>，这是后续做题目难度调优与"犹豫度"分析的唯一数据来源，<strong>必须从第一天就采集</strong>（事后补数据是不可能的）。</li>
+  <li><code>words.variant</code> 存英美拼写变体，供拼写题容错。</li>
+</ul>
+
+<h2>13.2 关键接口</h2>
+<table>
+  <thead><tr><th>接口</th><th>入参</th><th>返回</th><th>要点</th></tr></thead>
+  <tbody>
+  <tr><td>GET /task/today</td><td>user_id, date</td><td>任务快照 + 到期词列表</td><td>幂等：同一天多次调用返回同一快照</td></tr>
+  <tr><td>POST /review/submit</td><td>user_id, word_id, feedback, mode, duration_ms</td><td>该词新状态 + 下次复习时间</td><td>必须幂等（网络重试不得重复计数）</td></tr>
+  <tr><td>GET /quiz/generate</td><td>user_id, count, source</td><td>题目列表（<strong>不含答案</strong>）</td><td>答案不能下发给客户端（否则可被查看/作弊），提交后在服务端判分</td></tr>
+  <tr><td>POST /quiz/submit</td><td>session_id, answers[]</td><td>总分 + 逐题对错 + 错词</td><td>服务端判分；错词自动写入次日任务</td></tr>
+  <tr><td>GET /report/weekly</td><td>user_id, week</td><td>周报数据 + 卡片渲染参数</td><td>卡片图片在客户端 Canvas 生成</td></tr>
+  <tr><td>GET /words</td><td>book_id, filter, page</td><td>词列表</td><td>按标签与状态筛选，支持分页</td></tr>
+  </tbody>
+</table>
+<p><strong>两条必须遵守的安全/正确性规则：</strong></p>
+<ol>
+  <li>抽查答案不下发客户端，判定在服务端。否则用户看一眼返回包就能全对，"抽查"彻底失效。</li>
+  <li>所有提交类接口必须幂等。碎片场景下网络重试是常态，重复计数会让 SRS 状态错乱。</li>
+</ol>
+
+<h2>13.3 示例词库字段规范（本期用约 100 词）</h2>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+  <tbody>
+  <tr><td>word</td><td>string</td><td>单词，小写</td></tr>
+  <tr><td>phonetic</td><td>string</td><td>国际音标</td></tr>
+  <tr><td>pos</td><td>string</td><td>词性，如 <code>v.</code> / <code>n.</code> / <code>adj.</code></td></tr>
+  <tr><td>def_cn</td><td>string</td><td>中文释义（首选义）</td></tr>
+  <tr><td>example_en</td><td>string</td><td>英文例句（含目标词）</td></tr>
+  <tr><td>example_cn</td><td>string</td><td>例句中文翻译</td></tr>
+  <tr><td>tags</td><td>string[]</td><td>如 <code>["中考","高考"]</code></td></tr>
+  <tr><td>freq</td><td>int</td><td>词频优先级，越小越优先抽题</td></tr>
+  <tr><td>variant</td><td>string</td><td>英美变体（可空）</td></tr>
+  </tbody>
+</table>
+<p><strong>内容来源说明：</strong>本期示例词库为<strong>自撰</strong>（单词与释义取自通行教材常用词，例句为本方案自写，避免直接复制任何词典或题库的内容）。上线前若需扩大词库，必须解决授权问题——词表本身通常不受版权保护，但<strong>释义文字与例句是受保护的作品</strong>，不能直接抓取商业词典或竞品内容。这是法律风险，不是技术问题。</p>
+
+<h2>13.4 本节置信度</h2>
+<p>【已验证】表与接口设计内部自洽；【待验证假设】字段是否充分取决于二期教练端需求，若确定走 B 端，<code>class_id</code> 相关字段需提前细化。</p>
+
+<h1>十四、商业化路径与单位经济</h1>
+
+<h2>14.1 三条路径</h2>
+<table>
+  <thead><tr><th>路径</th><th>收入来源</th><th>优点</th><th>主要风险</th></tr></thead>
+  <tbody>
+  <tr><td>A：工具免费 + 教练服务收费</td><td>抽查服务费（按次/包月）</td><td>付费意愿最容易验证，起步不需要大研发</td><td>重人力、毛利低、质量依赖个人</td></tr>
+  <tr><td>B：工具订阅制</td><td>解锁高级功能（无限抽查、详细看板、去广告）</td><td>毛利高、可规模化</td><td><strong>转化率是最大未知数</strong>；免费竞品会持续挤压付费点</td></tr>
+  <tr><td>C：混合</td><td>免费工具获客 → 抽查报告与高级看板收费 → 真人教练抽成</td><td>兼顾规模与早期现金流</td><td>产品复杂度最高，早期不要同时做三件事</td></tr>
+  </tbody>
+</table>
+<p><strong>推荐：A 先行，B 跟进，C 作为终局。</strong>理由：A 能在 1 周内用人工方式验证付费意愿（见 1.2），代价最低；B 需要产品先有规模才能谈转化率；C 需要 A 和 B 都跑通。</p>
+
+<h2>14.2 单位经济演算示例</h2>
+<p><strong>重要声明：以下所有数字均为"演算示例"，不是市场调研数据，不可作为决策依据。</strong>待第三章的核实工作完成后，用真实数据替换。</p>
+<p>假设（示例值）：</p>
+<ul>
+  <li>学员付费：99 元/月（示例值，需核实）</li>
+  <li>教练时薪成本：40 元/小时（示例值，需核实）</li>
+  <li>每个学员每周抽查 3 次，每次 10 题，教练批改与讲解 15 分钟/次 → 0.75 小时/周 ≈ 3.25 小时/月</li>
+  <li>单学员教练成本 ≈ 3.25 × 40 = 130 元/月</li>
+</ul>
+<p>在这个示例下，<strong>99 元的客单价无法覆盖 130 元的人力成本，路径 A 单独成立不了。</strong>这个演算的价值正在于此：它逼出了关键问题——</p>
+<p><strong>必须用产品把教练人力成本降下来。</strong>具体手段：抽查由系统自动判分（不需要人批改，人只处理错词讲解）、周报自动生成、批量催学。若能将人力投入从 3.25 小时/月压到 1 小时/月（成本 40 元），则 99 元客单价下有约 59 元毛利（该数字同样为示例演算）。</p>
+<p><strong>这正是本方案全部产品设计的立足点：产品存在的意义是把"人工监督"变成"系统监督 + 人工兜底"。</strong>如果只是做个背单词 App 再雇人盯，那必然会被人力成本吃掉全部毛利。</p>
+
+<h2>14.3 本节置信度</h2>
+<p>【待验证假设】所有数值均为示意；结论（必须压低人力成本）是定性推论，不依赖具体数值成立。</p>
+
+<h1>十五、合规、审核与风险</h1>
+
+<h2>15.1 合规要点</h2>
+<ul>
+  <li><strong>未成年人个人信息保护</strong>：仅在必要范围内采集（学习数据），不采集与学习无关的权限（通讯录、位置等）；如面向儿童，需家长授权并做数据最小化。</li>
+  <li><strong>支付与预付费</strong>：若做预付费包月，需注意消费者权益与小程序的虚拟支付限制（见 12.3）。<strong>不要一上来做长期预付卡</strong>，风险与合规成本都高。</li>
+  <li><strong>内容版权</strong>：词表通常无版权，但释义文字、例句、发音音频有版权。这是最容易踩的坑，务必使用自撰内容或明确授权的资源。</li>
+  <li><strong>教培政策敏感性</strong>：面向 K12 的学科类培训受政策约束，且政策可能变化。<strong>建议以"学习工具 + 学习陪伴"定位，避免以"学科培训"名义收费</strong>，并在上线前核实当时的政策口径（本文档不承诺政策时效性）。</li>
+</ul>
+
+<h2>15.2 风险表</h2>
+<table>
+  <thead><tr><th>风险</th><th>概率</th><th>影响</th><th>缓解措施</th></tr></thead>
+  <tbody>
+  <tr><td>留存不足（做了没人用）</td><td>高</td><td>致命</td><td>开发前先做 1.2 的手工验证实验</td></tr>
+  <tr><td>免费竞品同质化</td><td>高</td><td>高</td><td>差异化押在抽查闭环与成果外显，不押词库</td></tr>
+  <tr><td>平台审核驳回（类目/资质）</td><td>中</td><td>高</td><td>提前核实类目要求，准备企业主体与备用方案</td></tr>
+  <tr><td>订阅消息能力不足</td><td>高</td><td>中</td><td>见 10.2，交互方案不依赖推送</td></tr>
+  <tr><td>人力成本吃掉毛利</td><td>中</td><td>高</td><td>系统自动判分优先，人力只做兜底（见 14.2）</td></tr>
+  <tr><td>内容版权纠纷</td><td>低</td><td>高</td><td>只使用自撰或已授权内容</td></tr>
+  <tr><td>未成年人相关合规问题</td><td>中</td><td>高</td><td>数据最小化、家长授权、不设社交 UGC</td></tr>
+  <tr><td>政策变化（教培监管）</td><td>中</td><td>高</td><td>定位为工具与陪伴，不做学科培训</td></tr>
+  </tbody>
+</table>
+
+<h2>15.3 本节置信度</h2>
+<p>【待验证假设】政策与平台规则类内容必须在上线前核实。</p>
+
+<h1>十六、验证实验与里程碑</h1>
+
+<h2>16.1 三阶段验证路线</h2>
+<table>
+  <thead><tr><th>阶段</th><th>目标</th><th>时长</th><th>产出</th><th>通过判据</th></tr></thead>
+  <tbody>
+  <tr><td>阶段 0：人工验证</td><td>需求真假与付费意愿</td><td>1 周</td><td>微信群手工抽查记录、家长反馈</td><td>≥3 人付费或持续交作业 ≥7 天</td></tr>
+  <tr><td>阶段 1：H5 原型</td><td>体验是否成立（学习 + 抽查 + 错词 + 看板四闭环）</td><td>2 周</td><td>可在手机浏览器使用的完整闭环</td><td>内测 10 人，次日留存 ≥50%（示例目标值，需按真实基线调整）</td></tr>
+  <tr><td>阶段 2：小程序上线</td><td>平台能力与真实留存</td><td>2 周</td><td>小程序 + 合规材料</td><td>审核通过，7 日留存达到自定目标</td></tr>
+  </tbody>
+</table>
+
+<h2>16.2 MVP 工作量估算</h2>
+<ul>
+  <li><strong>1 人全职</strong>：约 3 周（学习模块 1 周 + 抽查模块 1 周 + 看板与激励 1 周，小程序迁移另计 1 周）。</li>
+  <li><strong>2 人（前端 + 后端）</strong>：约 8–12 个工作日。</li>
+  <li>如果先做 H5 验证，可以在 1 周内得到一个"能给别人看"的东西——<strong>这是当前最应该先花的一周。</strong></li>
+</ul>
+
+<h2>16.3 优先级排序（若只能做一件事）</h2>
+<p><strong>抽查模块 &gt; 错词本 &gt; 学习模块 &gt; 看板 &gt; 激励玩法。</strong></p>
+<p>理由：抽查是差异化所在；错词本是抽查的数据基础且是留存最强功能；学习模块虽然是主体但最容易被免费竞品替代；激励玩法在没有用户时完全没有意义。</p>
+
+<h2>16.4 本节置信度</h2>
+<p>【待验证假设】留存目标值与工时估算为经验值。</p>
+
+<h1>十七、附录 A：示例词表（约 100 词，占位规范）</h1>
+<p>以下词表用于本期打通流程，字段与 13.3 一致。<strong>内容为自撰示例，未复制任何词典或题库。</strong>（完整 100 词以随附数据文件为准，此处给出前 20 条样例与规范。）</p>
+<table>
+  <thead><tr><th>word</th><th>phonetic</th><th>pos</th><th>def_cn</th><th>example_en</th><th>example_cn</th><th>tags</th><th>freq</th></tr></thead>
+  <tbody>
+  <tr><td>abandon</td><td>/əˈbændən/</td><td>v.</td><td>放弃；抛弃</td><td>He had to abandon the plan because of the storm.</td><td>因为暴风雨，他不得不放弃这个计划。</td><td>中考,高考</td><td>120</td></tr>
+  <tr><td>absorb</td><td>/əbˈsɔːrb/</td><td>v.</td><td>吸收；使全神贯注</td><td>Plants absorb water through their roots.</td><td>植物通过根部吸收水分。</td><td>高考</td><td>240</td></tr>
+  <tr><td>access</td><td>/ˈækses/</td><td>n.</td><td>通道；使用权</td><td>Students have free access to the library.</td><td>学生可以免费使用图书馆。</td><td>高考</td><td>180</td></tr>
+  <tr><td>accurate</td><td>/ˈækjərət/</td><td>adj.</td><td>准确的</td><td>Please give me an accurate answer.</td><td>请给我一个准确的答案。</td><td>高考</td><td>300</td></tr>
+  <tr><td>achieve</td><td>/əˈtʃiːv/</td><td>v.</td><td>实现；达到</td><td>She worked hard to achieve her goal.</td><td>她努力工作以实现自己的目标。</td><td>中考,高考</td><td>90</td></tr>
+  <tr><td>adapt</td><td>/əˈdæpt/</td><td>v.</td><td>适应；改编</td><td>It takes time to adapt to a new city.</td><td>适应一座新城市需要时间。</td><td>高考</td><td>260</td></tr>
+  <tr><td>adequate</td><td>/ˈædɪkwət/</td><td>adj.</td><td>足够的；适当的</td><td>The room is adequate for two people.</td><td>这个房间够两个人住。</td><td>四级</td><td>420</td></tr>
+  <tr><td>adjust</td><td>/əˈdʒʌst/</td><td>v.</td><td>调整；适应</td><td>You can adjust the seat height.</td><td>你可以调整座位高度。</td><td>高考</td><td>280</td></tr>
+  <tr><td>admire</td><td>/ədˈmaɪər/</td><td>v.</td><td>钦佩；欣赏</td><td>I admire her courage very much.</td><td>我非常钦佩她的勇气。</td><td>中考</td><td>310</td></tr>
+  <tr><td>adopt</td><td>/əˈdɑːpt/</td><td>v.</td><td>采用；收养</td><td>The school decided to adopt a new method.</td><td>学校决定采用一种新方法。</td><td>高考</td><td>250</td></tr>
+  <tr><td>advantage</td><td>/ədˈvæntɪdʒ/</td><td>n.</td><td>优势；好处</td><td>Being tall is an advantage in basketball.</td><td>个子高在篮球里是优势。</td><td>中考,高考</td><td>150</td></tr>
+  <tr><td>anxious</td><td>/ˈæŋkʃəs/</td><td>adj.</td><td>焦虑的；渴望的</td><td>She felt anxious before the exam.</td><td>考试前她感到很焦虑。</td><td>高考</td><td>330</td></tr>
+  <tr><td>appreciate</td><td>/əˈpriːʃieɪt/</td><td>v.</td><td>感激；欣赏</td><td>I really appreciate your help.</td><td>我非常感激你的帮助。</td><td>高考</td><td>290</td></tr>
+  <tr><td>approach</td><td>/əˈproʊtʃ/</td><td>n./v.</td><td>方法；接近</td><td>We need a new approach to this problem.</td><td>我们需要新方法来解决这个问题。</td><td>高考</td><td>200</td></tr>
+  <tr><td>attitude</td><td>/ˈætɪtuːd/</td><td>n.</td><td>态度</td><td>His attitude toward study has changed.</td><td>他的学习态度改变了。</td><td>中考,高考</td><td>170</td></tr>
+  <tr><td>available</td><td>/əˈveɪləbl/</td><td>adj.</td><td>可获得的；有空的</td><td>Are you available this afternoon?</td><td>你今天下午有空吗？</td><td>高考</td><td>220</td></tr>
+  <tr><td>aware</td><td>/əˈwer/</td><td>adj.</td><td>意识到的</td><td>She was not aware of the danger.</td><td>她没有意识到危险。</td><td>高考</td><td>270</td></tr>
+  <tr><td>balance</td><td>/ˈbæləns/</td><td>n./v.</td><td>平衡；余额</td><td>It is hard to balance study and rest.</td><td>很难平衡学习和休息。</td><td>中考,高考</td><td>230</td></tr>
+  <tr><td>benefit</td><td>/ˈbenɪfɪt/</td><td>n./v.</td><td>好处；受益</td><td>Exercise benefits your health.</td><td>锻炼有益于你的健康。</td><td>高考</td><td>190</td></tr>
+  <tr><td>brilliant</td><td>/ˈbrɪliənt/</td><td>adj.</td><td>出色的；明亮的</td><td>That was a brilliant idea.</td><td>那是个绝妙的主意。</td><td>四级</td><td>380</td></tr>
+  </tbody>
+</table>
+
+<h1>十八、附录 B：SRS 伪代码</h1>
+<pre>function onFeedback(user, word, feedback):
+    state = loadState(user, word)
+
+    if feedback == "forgot":
+        state.stage = 0
+        state.nextReviewAt = now + 10min
+        state.wrongCount += 1
+        enqueueToday(word)              # 当天再考一次
+    elif feedback == "vague":
+        state.stage = state.stage       # 档位不变（不降级）
+        # 基准是“当前档位的默认间隔”，不是“上次实际间隔”：不累乘、不需要历史字段
+        state.nextReviewAt = now + max(interval(state.stage) * 0.5, 10min)
+        if lastFeedback == "vague":
+            return onFeedback(user, word, "forgot")   # 连续两次模糊视为忘记（回炉重学）
+    elif feedback == "known":
+        state.stage = min(state.stage + 2, 8)
+        state.nextReviewAt = now + interval(state.stage)
+
+    if overdueDays(state) &gt; 7 and state.stage &gt; 0:
+        state.stage -= 1                # 长时间未复习，记忆衰减
+    save(state)
+    return state.nextReviewAt
+
+function buildDailyTask(user, date):
+    if existsTask(user, date):          # 幂等：同一天返回同一份快照
+        return loadTask(user, date)
+
+    due    = queryDueWords(user)                     # next_review_at &lt;= today
+    wrong  = queryWrongWords(user)                   # 错词回流
+    limit  = user.newWordLimit                       # 默认 10
+    if len(due) &gt; 100:
+        newCount = 0                                 # 保护体验：复习积压则不给新词
+    else:
+        newCount = min(limit, remainingBudget(user))
+
+    task = { due: due, wrong: wrong, new: pickNewWords(user, newCount) }
+    saveTask(user, date, task)
+    return task</pre>
+
+<h1>十九、附录 C：待核实事项汇总（按优先级）</h1>
+<table>
+  <thead><tr><th>序号</th><th>待核实事项</th><th>方式</th><th>影响</th></tr></thead>
+  <tbody>
+  <tr><td>1</td><td>岗位是 B 端机构岗还是 C 端自由教练</td><td>读 JD 原文 / 直接询问</td><td>决定做 B 端工具还是 C 端产品</td></tr>
+  <tr><td>2</td><td>真实客单价与教练工时</td><td>询问 1–2 位从业者</td><td>决定毛利模型是否成立</td></tr>
+  <tr><td>3</td><td>小程序教育类目资质要求</td><td>微信官方文档 / 提交试用</td><td>决定能否上线与主体类型</td></tr>
+  <tr><td>4</td><td>订阅消息规则与推送额度</td><td>微信官方文档</td><td>决定提醒方案（见 10.2）</td></tr>
+  <tr><td>5</td><td>虚拟支付在小程序内的限制</td><td>微信官方文档</td><td>决定收费方式</td></tr>
+  <tr><td>6</td><td>主要竞品是否已有抽查闭环与成果外显</td><td>实际体验 3 款竞品</td><td>决定差异化是否还成立</td></tr>
+  <tr><td>7</td><td>家长是否真的关心"错词 TOP10"</td><td>访谈 3–5 位家长</td><td>决定周报卡的内容设计</td></tr>
+  <tr><td>8</td><td>教师/家长对 AI 自动判分的接受度</td><td>访谈</td><td>决定是否需要人工复核环节</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

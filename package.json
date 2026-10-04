@@ -1,0 +1,16 @@
+{
+  "name": "word-coach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "单词抽查小程序（微信云开发 + 原生小程序）",
+  "scripts": {
+    "test": "node tests/srs.test.js && node tests/time.test.js && node tests/quiz.test.js && node tests/word-card.test.js && node tests/word-card-init.test.js && node tests/study-page.test.js && node tests/study-flow.test.js",
+    "shared:sync": "node scripts/sync-shared.js",
+    "shared:check": "node scripts/sync-shared.js --check",
+    "verify": "node scripts/verify-project.js && node scripts/check-bindings.js",
+    "check": "node scripts/verify-project.js && node scripts/check-bindings.js && node tests/srs.test.js && node tests/time.test.js && node tests/quiz.test.js && node tests/word-card.test.js && node tests/word-card-init.test.js && node tests/study-page.test.js && node tests/study-flow.test.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

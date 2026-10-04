@@ -1,0 +1,23 @@
+<!-- 自绘 26 键字母键盘
+     为什么必须自研：系统输入法会联想、纠错、自动首字母大写，
+     用它来做拼写题等于把题目难度交给输入法 —— 用户打出前三个字母就被补全了。 -->
+<view class="kb">
+  <view class="kb-row" wx:for="{{rows}}" wx:for-item="row" wx:for-index="ri" wx:key="ri">
+    <view
+      class="kb-key"
+      wx:for="{{row.keys}}"
+      wx:for-item="k"
+      wx:key="letter"
+      data-letter="{{k.letter}}"
+      bindtap="onLetter"
+    >{{k.letter}}</view>
+    <view
+      class="kb-key action {{a.cls}}"
+      wx:for="{{row.actions}}"
+      wx:for-item="a"
+      wx:key="key"
+      data-action="{{a.key}}"
+      bindtap="onAction"
+    >{{a.key === 'confirm' ? confirmLabel : a.label}}</view>
+  </view>
+</view>

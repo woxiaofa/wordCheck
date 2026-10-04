@@ -1,0 +1,82 @@
+/* 抽查页样式 */
+
+.center { text-align: center; }
+.big-emoji { font-size: 84rpx; line-height: 1.2; }
+.score { font-size: 60rpx; font-weight: 700; margin-top: 12rpx; }
+.mt-s { margin-top: 16rpx; }
+.gap { gap: 20rpx; }
+
+.qmeta { margin: 16rpx 0; font-size: 26rpx; color: #8fa3b7; }
+
+.qbox {
+  background: #18222e;
+  border: 1rpx solid #2b3949;
+  border-radius: 28rpx;
+  padding: 32rpx 28rpx;
+  margin-bottom: 24rpx;
+}
+.qword {
+  font-size: 64rpx;
+  font-weight: 700;
+  text-align: center;
+  margin: 16rpx 0 8rpx;
+  word-break: break-all;
+}
+.qstem {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #3ea6ff;
+  text-align: center;
+  margin: 24rpx 0;
+}
+
+/* 选项 */
+.qopt {
+  margin-top: 16rpx;
+  padding: 24rpx 26rpx;
+  background: #1e2a38;
+  border: 2rpx solid #2b3949;
+  border-radius: 20rpx;
+  font-size: 30rpx;
+}
+.qopt.sel {
+  border-color: #3ea6ff;
+  background: rgba(62, 166, 255, .14);
+}
+
+/* 拼写占位 */
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6rpx;
+  margin: 32rpx 0 8rpx;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 48rpx;
+  letter-spacing: 4rpx;
+}
+.slot-fill { color: #e8eef5; }
+.slot-empty { color: #4d6175; }
+.slots-hint {
+  margin-left: 16rpx;
+  font-family: -apple-system, sans-serif;
+  font-size: 24rpx;
+  letter-spacing: 0;
+  color: #8fa3b7;
+}
+
+/* 结果 */
+.detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #2b3949;
+}
+.detail:last-child { border-bottom: none; }
+.detail-left { display: flex; align-items: center; gap: 12rpx; }
+.detail-word { font-size: 30rpx; font-weight: 600; }
+.detail-right { font-size: 26rpx; }
+.strike { color: #ff8a9b; text-decoration: line-through; }
+.ok { color: #2fd07a; }

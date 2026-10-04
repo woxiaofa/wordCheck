@@ -1,0 +1,127 @@
+<view class="page">
+
+  <!-- ============ 开始前 ============ -->
+  <block wx:if="{{state === 'intro'}}">
+    <view class="card center">
+      <view class="big-emoji">📝</view>
+      <view class="t1">抽查模式</view>
+      <view class="muted mt-s">
+        一次 10 题，<text class="accent">交卷后统一判分</text>。过程中不告诉对错——
+        这是抽查和练习的本质区别。
+      </view>
+    </view>
+    <view class="card">
+      <view class="line"><text>选义（英译中）</text><text class="muted">3 题</text></view>
+      <view class="line"><text>拼写（中译英 · 自绘键盘）</text><text class="muted">5 题</text></view>
+      <view class="line"><text>听写（听音写词）</text><text class="muted">2 题</text></view>
+      <view class="line"><text>时间限制</text><text class="muted">不倒计时，只记录用时</text></view>
+      <button class="btn mt" bindtap="onStart">开始抽查</button>
+      <view class="muted mt-s">答错的词会在 10 分钟后重新进入你的复习队列。</view>
+    </view>
+  </block>
+
+  <!-- ============ 答题中 ============ -->
+  <block wx:elif="{{state === 'run'}}">
+    <view class="progress"><view class="progress-inner" style="width:{{progressPct}}%"></view></view>
+    <view class="row-between qmeta">
+      <text>第 {{index + 1}} / {{questions.length}} 题</text>
+      <text class="accent">{{typeLabel}}</text>
+    </view>
+
+    <!-- 选义 -->
+    <view class="qbox" wx:if="{{cur.type === 'meaning'}}">
+      <view class="muted">这个单词的意思是？</view>
+      <view class="qword">{{cur.stem}}</view>
+      <view class="muted center">{{cur.phonetic}}</view>
+      <view
+        wx:for="{{cur.options}}"
+        wx:for-item="opt"
+        wx:key="*this"
+        class="qopt {{answers[index] === opt ? 'sel' : ''}}"
+        data-opt="{{opt}}"
+        bindtap="onPickOption"
+      >{{opt}}</view>
+    </view>
+
+    <!-- 拼写 / 听写 -->
+    <view class="qbox" wx:else>
+      <block wx:if="{{cur.type === 'spell'}}">
+        <view class="muted">根据中文释义写出单词</view>
+        <view class="qstem">{{cur.stem}}</view>
+      </block>
+      <block wx:else>
+        <view class="muted">听发音，写出这个单词</view>
+        <view class="center mt">
+          <button class="btn sm" bindtap="onPlay" disabled="{{played >= 3}}" style="width:60%">
+            🔊 播放发音
+          </button>
+          <view class="muted mt-s">{{playHint}}</view>
+        </view>
+      </block>
+
+      <view class="slots">
+        <block wx:for="{{cur.slots}}" wx:for-item="s" wx:key="i">
+          <text class="{{s.show ? 'slot-fill' : 'slot-empty'}}">{{s.show ? s.ch : (s.dot ? '·' : '_')}}</text>
+        </block>
+        <text class="slots-hint">{{cur.length}} 个字母</text>
+      </view>
+    </view>
+
+    <view class="row gap" wx:if="{{cur.type === 'meaning'}}">
+      <button class="btn ghost" bindtap="onPrev" disabled="{{index === 0}}">上一题</button>
+      <button class="btn" bindtap="onNext">{{isLast ? '交卷' : '下一题'}}</button>
+    </view>
+    <view class="muted center mt-s">
+      已作答 {{answeredCount}} / {{questions.length}} 题 · 交卷前不会判分，答案可以回去改
+    </view>
+
+    <letter-keyboard
+      wx:if="{{cur.type !== 'meaning'}}"
+      class="mt"
+      length="{{cur.length}}"
+      value="{{answers[index]}}"
+      confirm-label="{{isLast ? '交卷' : '下一题'}}"
+      bind:input="onKeyInput"
+      bind:confirm="onKeyConfirm"
+    />
+  </block>
+
+  <!-- ============ 交卷结果 ============ -->
+  <block wx:else>
+    <view class="card center">
+      <view class="big-emoji">{{emoji}}</view>
+      <view class="score">{{correct}} / {{total}}</view>
+      <view class="muted mt-s">{{comment}}</view>
+    </view>
+
+    <view class="card">
+      <text class="card-title">逐题对照</text>
+      <view class="muted mt-s">抽查的价值就在这张表：错在哪、错成什么样。</view>
+      <view wx:for="{{details}}" wx:key="wordId" class="detail">
+        <view class="detail-left">
+          <text>{{item.ok ? '✅' : '❌'}}</text>
+          <text class="detail-word">{{item.wordId}}</text>
+          <text class="muted">{{item.typeLabel}}</text>
+        </view>
+        <view class="detail-right">
+          <block wx:if="{{item.ok}}"><text class="ok">正确</text></block>
+          <block wx:else>
+            <text class="strike">{{item.userText || '（未答）'}}</text>
+            <text class="muted"> → </text>
+            <text class="ok">{{item.correctText}}</text>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view class="card">
+      <text class="card-title">给家长看的一句话</text>
+      <view class="muted mt-s">{{parentLine}}</view>
+    </view>
+
+    <button class="btn" bindtap="onStart">再来一组</button>
+    <button class="btn ghost mt-s" bindtap="onHome">回到今日任务</button>
+  </block>
+
+  <footer-nav active="quiz" />
+</view>

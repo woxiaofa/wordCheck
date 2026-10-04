@@ -1,0 +1,24 @@
+.col { display: flex; flex-direction: column; }
+.right { align-items: flex-end; }
+.wrong-word { font-size: 30rpx; font-weight: 600; }
+
+.badge {
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+}
+.badge.hi { background: rgba(255, 92, 114, .18); color: #ff8a9b; border: 1rpx solid rgba(255, 92, 114, .4); }
+.badge.lo { background: rgba(255, 176, 32, .16); color: #ffc861; border: 1rpx solid rgba(255, 176, 32, .35); }
+
+/* 30 天热力图：10 列 × 3 行 */
+.heat {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 8rpx;
+  margin-top: 20rpx;
+}
+.heat-cell {
+  height: 48rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid #2b3949;
+}

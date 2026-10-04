@@ -1,0 +1,21 @@
+.page-study { padding: 16rpx 24rpx 0; }
+
+.bar { margin-bottom: 12rpx; }
+.tag-line { font-size: 26rpx; color: #8fa3b7; }
+
+/* 卡片区：上下留白，让卡片看上去像"一屏一卡" */
+.content { margin-top: 20rpx; min-height: 620rpx; }
+
+.foot-note {
+  margin-top: 24rpx;
+  text-align: center;
+  color: #8fa3b7;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+/* 空状态 */
+.empty { padding: 120rpx 40rpx; text-align: center; }
+.empty-emoji { font-size: 96rpx; }
+.empty-title { margin-top: 20rpx; font-size: 36rpx; font-weight: 700; }
+.empty-sub { margin-top: 12rpx; font-size: 26rpx; color: #8fa3b7; }

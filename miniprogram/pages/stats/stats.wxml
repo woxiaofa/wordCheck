@@ -1,0 +1,62 @@
+<!-- 数据看板与错词本 -->
+<view class="page">
+  <view class="grid-2">
+    <view class="kpi"><view class="num">{{mastery}}%</view><view class="label">掌握率（档位≥5）</view></view>
+    <view class="kpi"><view class="num">{{streak}}</view><view class="label">连续打卡</view></view>
+  </view>
+  <view class="grid-2 mt">
+    <view class="kpi"><view class="num">{{learned}}</view><view class="label">已学词</view></view>
+    <view class="kpi"><view class="num">{{wrongCount}}</view><view class="label">错词个数</view></view>
+  </view>
+
+  <view class="card mt">
+    <view class="row-between">
+      <text class="card-title">近 30 天</text>
+      <text class="muted">共 {{heatSum}} 次</text>
+    </view>
+    <view class="heat">
+      <view
+        wx:for="{{heat}}"
+        wx:key="date"
+        class="heat-cell"
+        style="background:{{item.color}}"
+        data-date="{{item.date}}"
+        data-count="{{item.count}}"
+        bindtap="onHeatTap"
+      ></view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="row-between">
+      <text class="card-title">错词本</text>
+      <text class="muted">{{wrongCount}} 个</text>
+    </view>
+    <view class="muted mt-s">错词在次日、第 3 天、第 7 天强制复现，且换一种题型再考。</view>
+    <view wx:if="{{!wrongList.length}}" class="muted mt">暂无错词。去抽查几组，错的词会自动进来。</view>
+    <view wx:for="{{wrongList}}" wx:key="word" class="line">
+      <view class="col">
+        <text class="wrong-word">{{item.word}}</text>
+        <text class="muted">{{item.def_cn}}</text>
+      </view>
+      <view class="col right">
+        <text class="badge {{item.hot ? 'hi' : 'lo'}}">错 {{item.wrong_count}} 次</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="card-title">复习间隔是怎么定的</text>
+    <view class="muted mt-s">「档位」= 这词记牢到什么程度；「间隔」= 下次什么时候再见。两者是分开的。</view>
+    <view class="line mt-s"><text>想得很快</text><text class="accent">档位 +2</text></view>
+    <view class="line"><text>想起来但费劲</text><text class="accent">档位不变，间隔减半</text></view>
+    <view class="line"><text>连续两次费劲</text><text class="accent">按没想起来处理</text></view>
+    <view class="line"><text>没想起来</text><text class="accent">档位归零，10 分钟后重来</text></view>
+    <view class="muted mt-s">
+      为什么"费劲"只减半不降档：承认这词没退步，只是这次状态不好。但连着两次都费劲，说明那个档位本来就虚高了，
+      就退回去重学——否则后台会把它算成"已掌握"，而用户每次见它只有点印象，数据就在说谎。
+    </view>
+  </view>
+
+  <footer-nav active="stats" />
+</view>

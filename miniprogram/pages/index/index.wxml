@@ -1,0 +1,46 @@
+<!-- 今日任务：一眼一个动作。任务量只做"交代进度"，不要求用户做题量决策 -->
+<view class="page">
+  <view class="card hero">
+    <view class="hero-label">今天要做</view>
+    <view class="hero-num">{{totalCount}} <text class="hero-unit">个词</text></view>
+    <view class="hero-sub">{{breakdown}}</view>
+    <button class="btn" bindtap="goStudy">开始学习</button>
+    <button class="btn ghost mt-s" bindtap="goQuiz">先抽查一组</button>
+  </view>
+
+  <view class="grid-3">
+    <view class="kpi">
+      <view class="num">{{streak}}</view>
+      <view class="label">连续打卡</view>
+    </view>
+    <view class="kpi">
+      <view class="num">{{mastery}}%</view>
+      <view class="label">掌握率</view>
+    </view>
+    <view class="kpi">
+      <view class="num">{{learned}}</view>
+      <view class="label">已学词</view>
+    </view>
+  </view>
+
+  <view class="card mt">
+    <view class="row-between">
+      <text class="card-title">今日进度</text>
+      <text class="muted">{{done}} / {{target}}</text>
+    </view>
+    <view class="progress mt-s">
+      <view class="progress-inner" style="width:{{progressPct}}%"></view>
+    </view>
+    <view class="muted mt-s">完成到 {{target}} 词的 80% 即算打卡</view>
+  </view>
+
+  <view class="card">
+    <text class="card-title">提醒推送的现实约束</text>
+    <view class="muted mt-s">
+      微信订阅消息需要你主动授权，一次性订阅通常只能发一条，所以"每天自动催你背单词"在小程序里做不到。
+      这里的做法是：你在完成学习时顺手订阅一次下一次提醒，其余靠站内待办。
+    </view>
+  </view>
+
+  <footer-nav active="index" />
+</view>

@@ -1,0 +1,11 @@
+{
+  "usingComponents": {
+    "word-card": "/components/word-card/index",
+    "footer-nav": "/components/footer-nav/index",
+    "probe": "/components/probe/index",
+    "card-lite": "/components/card-lite/index",
+    "card-mid": "/components/card-mid/index",
+    "card-noobs": "/components/card-noobs/index",
+    "card-nolist": "/components/card-nolist/index"
+  }
+}

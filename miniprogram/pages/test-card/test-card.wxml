@@ -1,0 +1,9 @@
+<view style="padding:40rpx;color:#e8eef5;font-size:30rpx;line-height:1.8">
+  <view style="font-weight:700">渲染自检页（占位）</view>
+  <view style="margin-top:16rpx;color:#8fa3b7">
+    这个页面已不再用于排错。移除顺序见 README：先从 app.json 删除引用，再删目录，最后清缓存重新编译。
+  </view>
+  <view style="margin-top:32rpx;padding:24rpx;background:#3ea6ff;border-radius:16rpx;text-align:center" bindtap="goStudy">
+    去学习页
+  </view>
+</view>
