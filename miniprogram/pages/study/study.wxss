@@ -3,8 +3,10 @@
 .bar { margin-bottom: 12rpx; }
 .tag-line { font-size: 26rpx; color: #8fa3b7; }
 
-/* 卡片区：上下留白，让卡片看上去像"一屏一卡" */
-.content { margin-top: 20rpx; min-height: 620rpx; }
+/* 卡片区：上下留白，让卡片看上去像"一屏一卡"。
+   高度配合卡片本身的 min-height(680rpx)：卡片越高，上滑的可操作区域越大，
+   手势才落在拇指/食指的自然范围内。 */
+.content { margin-top: 20rpx; min-height: 720rpx; }
 
 .foot-note {
   margin-top: 24rpx;

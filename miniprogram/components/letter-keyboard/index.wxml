@@ -1,23 +1,26 @@
-<!-- 自绘 26 键字母键盘
+<!-- 自绘字母键盘
      为什么必须自研：系统输入法会联想、纠错、自动首字母大写，
-     用它来做拼写题等于把题目难度交给输入法 —— 用户打出前三个字母就被补全了。 -->
+     用它来做拼写题等于把题目难度交给输入法 —— 用户打出前三个字母就被补全了。
+
+     布局：
+       字母键 flex 自动换行（键数是随难度变的，硬切行会出现半行空位）
+       退格键跟在字母后面 —— 不再因为给操作键腾地方而换行
+       「下一题 / 交卷」独立成键盘下方的一整行大按钮，拇指最好够 -->
 <view class="kb">
-  <view class="kb-row" wx:for="{{rows}}" wx:for-item="row" wx:for-index="ri" wx:key="ri">
+  <view class="kb-keys">
     <view
       class="kb-key"
-      wx:for="{{row.keys}}"
+      wx:for="{{keys}}"
       wx:for-item="k"
-      wx:key="letter"
-      data-letter="{{k.letter}}"
+      wx:key="*this"
+      data-letter="{{k}}"
       bindtap="onLetter"
-    >{{k.letter}}</view>
-    <view
-      class="kb-key action {{a.cls}}"
-      wx:for="{{row.actions}}"
-      wx:for-item="a"
-      wx:key="key"
-      data-action="{{a.key}}"
-      bindtap="onAction"
-    >{{a.key === 'confirm' ? confirmLabel : a.label}}</view>
+    >{{k}}</view>
+    <view class="kb-key kb-del" data-action="del" bindtap="onAction">⌫</view>
+  </view>
+
+  <view class="kb-bar">
+    <view wx:if="{{showClear}}" class="kb-clear" data-action="clear" bindtap="onAction">清空</view>
+    <view class="kb-go" data-action="confirm" bindtap="onAction">{{confirmLabel}}</view>
   </view>
 </view>

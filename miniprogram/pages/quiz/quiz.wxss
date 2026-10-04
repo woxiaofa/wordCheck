@@ -43,6 +43,32 @@
   border-color: #3ea6ff;
   background: rgba(62, 166, 255, .14);
 }
+/* 判完之后：正确答案描绿边、选错的描红边，当场看得出差在哪 */
+.qopt.right {
+  border-color: #2fd07a;
+  background: rgba(47, 208, 122, .14);
+}
+.qopt.wrong {
+  border-color: #ff5c72;
+  background: rgba(255, 92, 114, .12);
+}
+
+/* 逐题即时反馈面板 */
+.fb {
+  padding: 24rpx 26rpx;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  border: 2rpx solid #2b3949;
+  background: #18222e;
+}
+.fb-ok { border-color: #2fd07a; background: #16281d; }
+.fb-bad { border-color: #ff5c72; background: #2a1a20; }
+.fb-title { font-size: 30rpx; font-weight: 700; }
+.fb-ok .fb-title { color: #2fd07a; }
+.fb-bad .fb-title { color: #ff8a9b; }
+.fb-line { margin-top: 10rpx; font-size: 28rpx; color: #e8eef5; }
+.fb-strong { color: #2fd07a; font-weight: 700; }
+.fb-note { margin-top: 8rpx; font-size: 24rpx; color: #8fa3b7; }
 
 /* 拼写占位 */
 .slots {

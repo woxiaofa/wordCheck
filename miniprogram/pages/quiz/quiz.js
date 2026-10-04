@@ -1,18 +1,18 @@
 /**
- * 抽查页 —— 交卷制
+ * 抽查页 —— 逐题即时判对错 + 交卷出报告
  *
- * 与"练习"的本质区别：过程中不告诉对错，全部答完才判分。
- * 如果边答边判分，用户会立刻回头改答案并把它当练习，压力消失，抽查的督促价值也就没了。
+ * 与"练习"的本质区别仍然保留：答案是**交卷后统一记录进报告**的，逐题反馈只是"当场告诉你对没对"。
  *
- * 数据来源：
- *   - 题目：云端 quiz.generate（**不含答案**）优先，未部署时用本地词库兜底
- *   - 判分：本地用 shared/quiz.js 判（与云端同一份规则）；云端已配置时以云端结果为准
- *   - 错词：一律走 srs.nextState(prev,'forgot') 重置档位，与学习页共用同一套规则
+ * 为什么改成逐题即时反馈（原为纯交卷制）：
+ *   纯交卷制下，学生选错之后一路错到底，错的那 8 秒里他脑子里记住的是"我选的那个"，
+ *   而不是正确释义——错误印象反而被巩固了一遍。当场给出正确答案，才是加深学习；
+ *   同时流程不打断（看完自动进下一题），报告与错词回流都照旧。
  */
 
 var api = require('../../utils/cloud').api;
 var srs = require('../../utils/srs');
 var quizLib = require('../../utils/quiz');
+var keysLib = require('../../components/letter-keyboard/keys');
 var time = require('../../utils/time');
 var WORDS = require('../../data/words');
 
@@ -20,6 +20,8 @@ var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
 var QUESTION_COUNT = 10;
 var MAX_REPLAY = 3;
+/** 逐题反馈停留时长：够看清正确答案，又不打断节奏 */
+var FEEDBACK_MS = 1800;
 
 Page({
   data: {
@@ -34,6 +36,12 @@ Page({
     answeredCount: 0,
     played: 0,
     playHint: '',
+    // 逐题即时反馈
+    judged: false,
+    feedbackOk: false,
+    feedbackCorrect: '',
+    feedbackUser: '',
+    keyboardLabel: '',
     // 结果
     correct: 0,
     total: 0,
@@ -148,7 +156,8 @@ Page({
       options: q.options || [],
       length: Number(q.length) || String(q.wordId || '').length,
       slots: [],
-      wordId: q.wordId
+      wordId: q.wordId,
+      level: this.resolveLevel(q.wordId)
     };
 
     if (cur.type === 'spell' || cur.type === 'listen') {
@@ -159,12 +168,35 @@ Page({
     this.setData({
       cur: cur,
       typeLabel: this.typeLabelOf(cur.type),
+      keyboardLabel: keysLib.levelLabel(cur.level),
+      judged: false,
+      feedbackOk: false,
+      feedbackCorrect: '',
+      feedbackUser: '',
       progressPct: Math.round(i / this.data.questions.length * 100),
       isLast: i === this.data.questions.length - 1,
       answeredCount: this.countAnswered(),
       played: this.playedCount[cur.wordId] || 0,
       playHint: cur.type === 'listen' ? this.playHintFor(cur.wordId) : ''
     });
+  },
+
+  /**
+   * 拼写/听写的键盘难度：按这个词的掌握情况递进，答错过的自动降一档。
+   *   新词 / 错过的词 → easy（只给正确字母，先保证"顺序"被记住）
+   *   档位 ≥ 4        → hard（全键盘）
+   *   其余            → medium（正确字母 + 形近易混字母）
+   * 内测期可用 wx.setStorageSync('keyboard_level', 'easy'|'medium'|'hard') 强制指定。
+   */
+  resolveLevel: function (wordId) {
+    var forced = wx.getStorageSync('keyboard_level');
+    if (forced === 'easy' || forced === 'medium' || forced === 'hard') return forced;
+
+    var st = this.mirror[wordId];
+    if (!st) return 'easy';
+    if (st.wrong_count >= 1) return 'easy';
+    if (typeof st.stage === 'number' && st.stage >= 4) return 'hard';
+    return 'medium';
   },
 
   buildSlots: function (word, len, typed) {
@@ -214,6 +246,49 @@ Page({
     answers[this.data.index] = opt;
     this.setData({ answers: answers });
     this.renderQuestion();
+    // 选完立刻判：不管选对选错都当场给出正确答案
+    this.judgeCurrent();
+  },
+
+  /**
+   * 当场判这一题并展示正确答案，短暂停顿后自动继续。
+   * 注意：报告与错词回流仍在交卷时统一处理，这里只做"即时反馈"。
+   */
+  judgeCurrent: function () {
+    var i = this.data.index;
+    var q = this.data.questions[i];
+    if (!q) return;
+
+    var ans = this.data.answers[i];
+    var word = this.wordById(q.wordId);
+    var ok = false;
+    var correctText = '';
+    var userText = '';
+
+    if (q.type === 'meaning') {
+      correctText = word ? word.def_cn : '';
+      userText = this.isAnswered(ans) ? String(ans) : '';
+      ok = quizLib.isMeaningCorrect(userText, correctText);
+    } else {
+      correctText = q.wordId;
+      var typed = Array.isArray(ans) ? ans.join('') : String(ans || '');
+      userText = typed;
+      ok = quizLib.isSpellingCorrect(typed, q.wordId, word ? word.variant : '');
+    }
+
+    this.setData({
+      judged: true,
+      feedbackOk: ok,
+      feedbackCorrect: correctText,
+      feedbackUser: userText
+    });
+
+    var self = this;
+    clearTimeout(this._fbTimer);
+    this._fbTimer = setTimeout(function () {
+      if (self.data.isLast) self.submitQuiz();
+      else self.goNext();
+    }, FEEDBACK_MS);
   },
 
   onKeyInput: function (e) {
@@ -224,23 +299,38 @@ Page({
     this.renderQuestion();
   },
 
+  /** 键盘上的「下一题 / 交卷」 */
   onKeyConfirm: function () {
-    this.goNext();
+    if (this.data.judged) { this.goNext(); return; }
+    // 还没判过：先看对错，再继续（没作答就当作跳过，不判）
+    if (!this.isAnswered(this.data.answers[this.data.index])) { this.goNext(); return; }
+    this.judgeCurrent();
   },
 
   onPrev: function () {
     if (this.data.index === 0) return;
+    clearTimeout(this._fbTimer);
     this.setData({ index: this.data.index - 1 });
     this.renderQuestion();
   },
 
+  /** 页面上的「下一题 / 看报告」按钮 */
   onNext: function () {
-    this.goNext();
+    if (this.data.judged) { this.goNext(); return; }
+    if (!this.isAnswered(this.data.answers[this.data.index])) { this.goNext(); return; }
+    this.judgeCurrent();
   },
 
   goNext: function () {
+    clearTimeout(this._fbTimer);
     if (this.data.isLast) { this.submitQuiz(); return; }
-    this.setData({ index: this.data.index + 1 });
+    this.setData({
+      index: this.data.index + 1,
+      judged: false,
+      feedbackOk: false,
+      feedbackCorrect: '',
+      feedbackUser: ''
+    });
     this.renderQuestion();
   },
 
@@ -285,6 +375,7 @@ Page({
 
   submitQuiz: function () {
     var self = this;
+    clearTimeout(this._fbTimer);
     var questions = this.data.questions;
     var answers = this.data.answers;
 
@@ -375,6 +466,11 @@ Page({
   },
 
   onHome: function () {
+    clearTimeout(this._fbTimer);
     wx.redirectTo({ url: '/pages/index/index' });
+  },
+
+  onUnload: function () {
+    clearTimeout(this._fbTimer);
   }
 });

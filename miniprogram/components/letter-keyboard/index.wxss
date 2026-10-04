@@ -1,20 +1,21 @@
+/* 字母区：flex 自动换行。键数随难度变化（5～26 个），
+   硬切行会在难度低时留半行空位，所以交给换行规则，不用 JS 算列数。 */
 .kb {
   background: #1a2432;
   border: 1rpx solid #2b3949;
   border-radius: 20rpx;
   padding: 12rpx;
 }
-.kb-row {
+.kb-keys {
   display: flex;
-  gap: 8rpx;
-  margin-bottom: 8rpx;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10rpx;
 }
-.kb-row:last-child { margin-bottom: 0; }
 
 .kb-key {
-  flex: 1;
-  min-width: 0;
-  height: 84rpx;
+  width: 80rpx;
+  height: 92rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,22 +23,50 @@
   border: 1rpx solid #2b3949;
   border-radius: 12rpx;
   color: #e8eef5;
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 600;
 }
 .kb-key:active {
   background: #3ea6ff;
   color: #ffffff;
 }
-.kb-key.action {
-  font-size: 24rpx;
-  font-weight: 500;
+
+/* 退格跟在字母后面，宽度稍大一点方便连按 */
+.kb-del {
+  width: 108rpx;
+  background: #2b3949;
   color: #cfe0f0;
+  font-size: 30rpx;
 }
-.kb-key.action.del { background: #2b3949; }
-.kb-key.action.clear { background: #2b3949; }
-.kb-key.action.go {
+
+/* 键盘下方的操作行：清空（次要）+ 下一题/交卷（主要，占满剩余宽度） */
+.kb-bar {
+  display: flex;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+.kb-clear {
+  width: 150rpx;
+  height: 92rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2b3949;
+  border-radius: 12rpx;
+  color: #cfe0f0;
+  font-size: 28rpx;
+}
+.kb-clear:active { background: #3a4a5e; }
+.kb-go {
+  flex: 1;
+  height: 92rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(135deg, #3ea6ff, #7c5cff);
+  border-radius: 12rpx;
   color: #ffffff;
+  font-size: 32rpx;
   font-weight: 600;
 }
+.kb-go:active { opacity: .85; }

@@ -6,8 +6,8 @@
       <view class="big-emoji">📝</view>
       <view class="t1">今日抽查</view>
       <view class="muted mt-s">
-        10 道题，<text class="accent">交卷后一起判分</text>，过程中不提示对错——这是抽查和练习的区别。
-        答对的词 15 天后再见，答错的 10 分钟后回来：这次考试决定每个词下次出现的时间。
+        10 道题，每题答完<text class="accent">当场告诉你对没对</text>，并给出正确答案——趁印象最深的时候纠正。
+        最后出一份报告：答对的词 15 天后再见，答错的 10 分钟后回来。
       </view>
     </view>
     <view class="card">
@@ -37,7 +37,7 @@
         wx:for="{{cur.options}}"
         wx:for-item="opt"
         wx:key="*this"
-        class="qopt {{answers[index] === opt ? 'sel' : ''}}"
+        class="qopt {{answers[index] === opt ? 'sel' : ''}} {{judged && opt === feedbackCorrect ? 'right' : ''}} {{judged && answers[index] === opt && !feedbackOk ? 'wrong' : ''}}"
         data-opt="{{opt}}"
         bindtap="onPickOption"
       >{{opt}}</view>
@@ -67,23 +67,42 @@
       </view>
     </view>
 
-    <view class="row gap" wx:if="{{cur.type === 'meaning'}}">
-      <button class="btn ghost" bindtap="onPrev" disabled="{{index === 0}}">上一题</button>
-      <button class="btn" bindtap="onNext">{{isLast ? '交卷' : '下一题'}}</button>
+    <!-- 逐题即时反馈：当场给出正确答案，看完自动进下一题。
+         错的那 8 秒里不纠正，学生记住的就是他自己选错的那个释义。 -->
+    <view wx:if="{{judged}}" class="fb {{feedbackOk ? 'fb-ok' : 'fb-bad'}}">
+      <view class="fb-title">{{feedbackOk ? '✅ 答对了' : '❌ 答错了'}}</view>
+      <block wx:if="{{feedbackOk}}">
+        <view class="fb-line">正确答案：{{feedbackCorrect}}</view>
+      </block>
+      <block wx:else>
+        <view class="fb-line">正确答案：<text class="fb-strong">{{feedbackCorrect}}</text></view>
+        <view class="fb-line muted">你选的：{{feedbackUser || '（未作答）'}}</view>
+        <view class="fb-note">这个词 10 分钟后回到复习队列</view>
+      </block>
+    </view>
+
+    <view class="row gap" wx:if="{{cur.type === 'meaning' || judged}}">
+      <button class="btn ghost" wx:if="{{!judged}}" bindtap="onPrev" disabled="{{index === 0}}">上一题</button>
+      <button class="btn" bindtap="onNext">{{judged ? (isLast ? '看报告' : '下一题') : (isLast ? '交卷' : '下一题')}}</button>
     </view>
     <view class="muted center mt-s">
-      已作答 {{answeredCount}} / {{questions.length}} 题 · 交卷前不会判分，答案可以回去改
+      已作答 {{answeredCount}} / {{questions.length}} 题 · 答完当场告诉你对没对，报告在最后
     </view>
 
     <letter-keyboard
       wx:if="{{cur.type !== 'meaning'}}"
       class="mt"
       length="{{cur.length}}"
+      word="{{cur.wordId}}"
+      level="{{cur.level}}"
       value="{{answers[index]}}"
-      confirm-label="{{isLast ? '交卷' : '下一题'}}"
+      confirm-label="{{judged ? (isLast ? '看报告' : '下一题') : (isLast ? '交卷' : '下一题')}}"
       bind:input="onKeyInput"
       bind:confirm="onKeyConfirm"
     />
+    <view class="muted center mt-s" wx:if="{{cur.type !== 'meaning'}}">
+      键盘难度：{{keyboardLabel}}（按这个词你掌握的程度自动调整）
+    </view>
   </block>
 
   <!-- ============ 交卷结果 ============ -->

@@ -22,7 +22,7 @@
 <view class="card" data-flip
       bindtap="onCardTap" bindtouchstart="onTouchStart" bindtouchmove="onTouchMove"
       bindtouchend="onTouchEnd" bindtouchcancel="onTouchCancel"
-      style="position:relative;box-sizing:border-box;min-height:420rpx;padding:36rpx 32rpx;background:#18222e;border:1rpx solid #2b3949;border-left:8rpx solid #3ea6ff;border-radius:32rpx;color:#e8eef5">
+      style="position:relative;box-sizing:border-box;min-height:680rpx;padding:36rpx 32rpx;background:#18222e;border:1rpx solid #2b3949;border-left:8rpx solid #3ea6ff;border-radius:32rpx;color:#e8eef5">
   <view class="auto-bar" style="position:absolute;left:0;top:0;height:6rpx;background:#3ea6ff;width:{{autoProgress}}%;opacity:{{autoOn ? 1 : 0}}"></view>
 
   <!-- 拖动方向提示（只有上滑一种） -->
@@ -45,8 +45,21 @@
       <view style="margin-top:12rpx;font-size:28rpx;color:#8fa3b7">{{word.phonetic}}　{{word.pos}}</view>
     </view>
 
-    <view style="margin-top:96rpx;text-align:center;font-size:28rpx;color:#3ea6ff">先在心里回忆它的意思，点一下看答案</view>
-    <view wx:if="{{showHint}}" style="margin-top:14rpx;text-align:center;font-size:24rpx;color:#8fa3b7">上滑 = 想得很快，直接过</view>
+    <!-- 答案占位区（两个作用）：
+         ① 把卡片撑到接近满屏 —— 上滑是主操作，可滑动区域必须落在拇指/食指的自然范围里，
+            只有顶部一小条能滑的话，这个手势等于没法用；
+         ② 明确告诉用户"答案待会儿出现在这里"，减少"点了会怎样"的犹豫。
+         用灰色占位条而不是把真实释义模糊掉：模糊仍可能被读出，那就破坏了回忆这一步。 -->
+    <view wx:if="{{!demo}}" style="margin-top:56rpx;padding:26rpx 24rpx;border:2rpx dashed #2b3949;border-radius:24rpx;background:#141d28">
+      <view style="text-align:center;font-size:24rpx;color:#5c7288">答案在这里 · 点一下，或等几秒自动揭晓</view>
+      <view style="margin-top:22rpx;height:36rpx;width:72%;background:#22303f;border-radius:10rpx"></view>
+      <view style="margin-top:16rpx;height:24rpx;width:54%;background:#1e2a38;border-radius:10rpx"></view>
+      <view style="margin-top:16rpx;height:24rpx;width:84%;background:#1e2a38;border-radius:10rpx"></view>
+      <view style="margin-top:16rpx;height:24rpx;width:62%;background:#1e2a38;border-radius:10rpx"></view>
+    </view>
+
+    <view style="margin-top:56rpx;text-align:center;font-size:28rpx;color:#3ea6ff">先在心里回忆它的意思，点一下看答案</view>
+    <view wx:if="{{showHint}}" style="margin-top:14rpx;text-align:center;font-size:24rpx;color:#8fa3b7">按住卡片往上滑 = 想得很快，直接过</view>
   </view>
 
   <!-- 答案 + 反馈按钮 -->
