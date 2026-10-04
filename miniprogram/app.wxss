@@ -8,8 +8,9 @@ page {
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-/* 通用容器 */
-.page { padding: 24rpx 24rpx 40rpx; }
+/* 通用容器。
+   底部 padding = footer-nav(fixed) 的高度 + 安全区，否则最后一屏的按钮会被 tabBar 盖住。 */
+.page { padding: 24rpx 24rpx calc(170rpx + env(safe-area-inset-bottom)); }
 .card {
   background: #18222e;
   border: 1rpx solid #2b3949;

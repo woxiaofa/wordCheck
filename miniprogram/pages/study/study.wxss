@@ -1,12 +1,15 @@
-.page-study { padding: 16rpx 24rpx 0; }
+/* 底部留给 fixed 的 footer-nav（全局 .page 已含安全区计算，这里沿用同值） */
+.page-study { padding: 16rpx 24rpx calc(170rpx + env(safe-area-inset-bottom)); }
 
 .bar { margin-bottom: 12rpx; }
 .tag-line { font-size: 26rpx; color: #8fa3b7; }
 
 /* 卡片区：上下留白，让卡片看上去像"一屏一卡"。
    高度配合卡片本身的 min-height(680rpx)：卡片越高，上滑的可操作区域越大，
-   手势才落在拇指/食指的自然范围内。 */
-.content { margin-top: 20rpx; min-height: 720rpx; }
+   手势才落在拇指/食指的自然范围内。
+   min-height 只在真的有卡片时生效：学完一轮的空状态如果也占 720rpx，
+   "学完了"会被顶到屏幕最下面、按钮被 tabBar 挡住（真机截图确认过）。 */
+.content.has-card { margin-top: 20rpx; min-height: 720rpx; }
 
 .foot-note {
   margin-top: 24rpx;
@@ -16,8 +19,8 @@
   line-height: 1.6;
 }
 
-/* 空状态 */
-.empty { padding: 120rpx 40rpx; text-align: center; }
+/* 空状态：靠上居中，别贴着 tabBar */
+.empty { padding: 40rpx 40rpx 0; text-align: center; }
 .empty-emoji { font-size: 96rpx; }
 .empty-title { margin-top: 20rpx; font-size: 36rpx; font-weight: 700; }
 .empty-sub { margin-top: 12rpx; font-size: 26rpx; color: #8fa3b7; }

@@ -2,14 +2,16 @@
 <view class="page page-study">
   <view class="bar row-between">
     <text class="tag-line">{{stageText}}</text>
-    <text class="muted">{{index + 1}} / {{queue.length}}</text>
+    <!-- 学完最后一个词后 index 会 +1 越界，钳到 queue.length，避免出现 12/11 -->
+    <text class="muted" wx:if="{{queue.length}}">{{index < queue.length ? index + 1 : queue.length}} / {{queue.length}}</text>
   </view>
 
   <view class="progress">
     <view class="progress-inner" style="width:{{progressPct}}%"></view>
   </view>
 
-  <view class="content">
+  <!-- 没有卡片的瞬间（学完一轮）不能占 720rpx，否则"学完了"整块被顶到屏幕外、按钮被 tabBar 盖住 -->
+  <view class="content {{word ? 'has-card' : ''}}">
     <word-card
       wx:if="{{word}}"
       id="card"
