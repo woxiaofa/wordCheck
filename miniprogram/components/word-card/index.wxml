@@ -67,8 +67,11 @@
     <view wx:if="{{!demo}}" style="font-size:54rpx;font-weight:700;color:#e8eef5">{{word.word}}</view>
     <view style="margin-top:20rpx;font-size:40rpx;font-weight:600;color:#3ea6ff">{{word.def_cn}}</view>
     <view style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{stageText}}</view>
-    <view style="margin-top:20rpx;font-size:30rpx;color:#e8eef5">{{word.example_en}}</view>
-    <view style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{word.example_cn}}</view>
+    <!-- 例句：ECDICT 不提供例句，批量切出的词库这里是空的，必须条件渲染，否则会留下两行空白 -->
+    <block wx:if="{{word.example_en}}">
+      <view style="margin-top:20rpx;font-size:30rpx;color:#e8eef5">{{word.example_en}}</view>
+      <view wx:if="{{word.example_cn}}" style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{word.example_cn}}</view>
+    </block>
 
     <view style="margin-top:32rpx">
       <view style="text-align:center;font-size:24rpx;color:#8fa3b7;margin-bottom:16rpx">{{promptText}}</view>

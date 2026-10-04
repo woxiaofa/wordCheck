@@ -29,7 +29,7 @@ miniprogram/                     原生小程序
 │  ├─ study/                     学习页（已实现）
 │  ├─ quiz/                      抽查页（待实现）
 │  └─ stats/                     数据看板与错词本
-├─ data/words.js                 本地示例词库（40 词，自撰）
+├─ data/words.js                 本地词库（300 词，由 scripts/build-words.js 从 ECDICT 切出）
 ├─ utils/
 │  ├─ cloud.js                   云函数调用层（页面不得直接调 wx.cloud）
 │  ├─ srs.js                     SRS 规则（云函数侧副本）
@@ -58,7 +58,25 @@ scripts/
    - `project.config.json` 里的 `appid` → 你的小程序 AppID
 2. **微信开发者工具** → 导入项目 → 选择本仓库根目录（认 `project.config.json`）。
 3. 首次运行会提示"云开发未开通"：在开发者工具左上角点**云开发**，创建一个环境（建议建 `dev` 和 `prod` 两个，别在正式环境造数据）。
-4. 编译。**学习页可以直接用**：云端不可用时会自动回退到本地 40 词示例库，手势、SRS 档位、错词本都能验证。
+4. 编译。**学习页可以直接用**：云端不可用时会自动回退到本地 300 词库，手势、SRS 档位、错词本都能验证。
+
+## 本地词库（300 词 · ECDICT / MIT）
+
+`miniprogram/data/words.js` 由脚本从 ECDICT 机械切出，**不要手改**：
+
+```bash
+node scripts/build-words.js <ecdict.csv 路径> 300                    # 默认：中考/高考/四级，词频 1500–6000
+node scripts/build-words.js <ecdict.csv 路径> 300 out.js 1500 6000 --probe   # 先看分布再定参数
+```
+
+- **为什么是 ECDICT**：MIT 协议，可商用。释义文字是有版权的，抓取商业词典或竞品是法律风险，
+  所以"许可"是选数据源的第一标准，不是"词多"。
+- **切分规则**：只取带 中考 / 高考 / 四级 标签的词，按当代语料库词频升序取前 300。
+  **词频下限必须存在**——直接按词频升序取，拿到的是 `the / and / have / that` 这类功能词，没法背。
+  另外中文义项在 ECDICT 里按"名词优先"排列，脚本改用 `definition`（WordNet，按常用度排序）
+  反推主词性，否则 `eastern` 会被切成"n. 东方人"而不是"adj. 东方的"。
+- **已知缺口：没有例句**。ECDICT 不提供例句，`example_en / example_cn` 全为空，
+  卡片已做条件渲染（没例句就不显示）。要例句需另行生成——自撰无版权问题，别去抄词典。
 
 ## 本地校验（不需要开发者工具，也不需要装依赖）
 
