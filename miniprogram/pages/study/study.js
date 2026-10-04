@@ -52,7 +52,11 @@ Page({
     emptyText: '',
     emptySub: '',
     /** 本轮是否已学完（用于给出"必须去抽查"的引导按钮） */
-    roundDone: false
+    roundDone: false,
+    /** 当前队列是不是"提前巩固"（示例词库学完后，用户主动把未到期的词提前拿出来） */
+    extraRound: false,
+    /** 是否展示"提前巩固"按钮：只有确实存在未到期的词时才给 */
+    canExtra: false
   },
 
   /** @type {Object} 本地 SRS 状态镜像：{ [word]: {stage,last_feedback,next_review_at,correct_count,wrong_count} } */
@@ -60,7 +64,8 @@ Page({
 
   onLoad: function () {
     this.mirror = wx.getStorageSync(STORAGE_KEY) || {};
-    this.buildQueue();
+    this._extraRound = false;
+    this.buildQueue(false);
   },
 
   onShow: function () {
@@ -76,10 +81,25 @@ Page({
 
   /* ---------------- 队列组装 ---------------- */
 
-  buildQueue: function () {
+  /**
+   * 组装队列
+   * @param {boolean} force 是否允许"提前巩固"（把还没到期的词提前拿出来）
+   *
+   * 为什么要这个参数：本地示例词库只有 40 个词，每轮给 10 个新词，
+   * 4 轮就全部学完，之后 SRS 会把它们全部推到未来（最短也是 2 天后）--
+   * 于是接下来连续几天打开都是"一个词都没有"，真机上看起来就像"没有单词数据"。
+   * 不能自动塞词（提前复习会刷新间隔、破坏 SRS），只能由用户主动点"提前巩固"。
+   */
+  buildQueue: function (force) {
     var self = this;
     this.loadedDate = time.getLocalDate();
-    this.setData({ roundStat: { known: 0, vague: 0, forgot: 0 }, ratedCount: 0 });
+    this.setData({
+      roundStat: { known: 0, vague: 0, forgot: 0 },
+      ratedCount: 0,
+      roundDone: false,
+      canExtra: false,
+      extraRound: false
+    });
 
     api.todayTask(this.loadedDate).then(function (data) {
       var words = (data && data.words) || [];
@@ -87,25 +107,49 @@ Page({
       self.setQueue(words, false);
     }).catch(function () {
       // 云端不可用：回退本地词库，仍然按"到期优先"的规则排序
-      var local = self.localQueue();
+      var local = self.localQueue(!!force);
       self.setQueue(local, true);
     });
   },
 
   /** 本地队列：到期复习词优先，其次错词，最后新词（与文档 6.3 的组装顺序一致） */
-  localQueue: function () {
+  localQueue: function (force) {
     var now = Date.now();
-    var due = [], wrong = [], fresh = [];
+    var due = [], wrong = [], fresh = [], parked = [];
     for (var i = 0; i < WORDS.length; i++) {
       var w = WORDS[i];
       var st = this.mirror[w.word];
       if (!st) { fresh.push(w); continue; }
       if (st.next_review_at && st.next_review_at <= now) due.push(w);
       else if (st.wrong_count > 0 && st.last_feedback !== 'known') wrong.push(w);
+      else parked.push(w);              // 学过、但还没到复习时间
     }
-    var merged = due.concat(wrong);
-    var limit = 10;
-    return merged.concat(fresh.slice(0, limit));
+    var merged = due.concat(wrong).concat(fresh.slice(0, 10));
+    this._nextDueAt = 0;
+    if (merged.length) return merged;
+
+    // 一个待学的词都没有：算出最早到期时间，交给界面说清楚（而不是留一片空白）
+    var minAt = 0;
+    for (var j = 0; j < parked.length; j++) {
+      var at = (this.mirror[parked[j].word] || {}).next_review_at || 0;
+      if (at && (!minAt || at < minAt)) minAt = at;
+    }
+    this._nextDueAt = minAt;
+    if (!force || !parked.length) return [];
+
+    var self = this;
+    parked.sort(function (a, b) {
+      return ((self.mirror[a.word] || {}).next_review_at || 0) -
+             ((self.mirror[b.word] || {}).next_review_at || 0);
+    });
+    return parked.slice(0, 10);
+  },
+
+  /** "还有多久到期"的人话说法 */
+  describeWait: function (ts) {
+    var hours = Math.max(1, Math.round((ts - Date.now()) / 3600000));
+    if (hours < 24) return hours + ' 小时';
+    return Math.round(hours / 24) + ' 天';
   },
 
   setQueue: function (words, isLocal) {
@@ -123,9 +167,35 @@ Page({
     this.setData({
       queue: queue,
       index: 0,
-      isLocal: !!isLocal
+      isLocal: !!isLocal,
+      roundDone: false,
+      extraRound: !!this._extraRound
     });
+
+    // 队列为空必须明确说明原因。曾经这里直接走进 showCurrent 的 !w 分支，
+    // 界面只留一个"这一轮学完了"和一个空白，真机上被当成"程序没数据"。
+    if (!queue.length) {
+      this.showEmptyState();
+      return;
+    }
     this.showCurrent();
+  },
+
+  /** 没有待学词汇时的解释性空状态（区别于"这一轮学完了"） */
+  showEmptyState: function () {
+    var nextAt = this._nextDueAt || 0;
+    var sub = nextAt
+      ? '示例词库共 ' + WORDS.length + ' 个词，已全部排进复习计划；最早的一批 ' +
+        this.describeWait(nextAt) + '后到期。'
+      : '示例词库只有 ' + WORDS.length + ' 个词，现在已经全部学过了。';
+    this.setData({
+      word: null,
+      isDemo: false,
+      roundDone: false,
+      emptyText: '今天没有待复习的词',
+      emptySub: sub,
+      canExtra: !!nextAt
+    });
   },
 
   showCurrent: function () {
@@ -141,11 +211,16 @@ Page({
 
     if (!w) {
       var stat = this.data.roundStat || {};
+      var rated = this.data.ratedCount || 0;
       this.setData({
         word: null,
         isDemo: false,
+        // ⚠️ 这一行曾经缺失，导致"下一关：抽查"这块引导永远不显示（roundDone 恒为 false）。
+        // 只在本轮真的评价过词时给，否则"一进来就没词"也会被误当成"学完了"。
+        roundDone: rated > 0,
+        canExtra: false,
         emptyText: '这一轮学完了',
-        emptySub: '本轮 ' + (this.data.ratedCount || 0) + ' 个词：认识 ' + (stat.known || 0) +
+        emptySub: '本轮 ' + rated + ' 个词：认识 ' + (stat.known || 0) +
           '　想了很久 ' + (stat.vague || 0) + '　不认识 ' + (stat.forgot || 0)
       });
       return;
@@ -307,7 +382,18 @@ Page({
   },
 
   onRestart: function () {
-    this.buildQueue();
+    this._extraRound = false;
+    this.buildQueue(false);
+  },
+
+  /**
+   * 提前巩固：把还没到期的词提前拿出来学。
+   * 只在"今天确实没词可学"时出现。必须在界面上说清代价——
+   * 提前复习会刷新这些词的间隔，等于把复习计划整体往前拨。
+   */
+  onExtra: function () {
+    this._extraRound = true;
+    this.buildQueue(true);
   },
 
   /** 学完一轮后引导去抽查：真正决定复习间隔的是抽查结果，不是自评 */

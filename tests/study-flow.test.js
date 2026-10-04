@@ -416,6 +416,60 @@ test('走完整轮：结算文案正确，且中途不出现“卡死”', funct
   assert.ok(page.data.emptyText, '走完后应给出结束文案');
 });
 
+/* ============================================================
+   7. 抽查引导与"没词可学"的空状态
+   —— 这两个 bug 都是真机/模拟器上肉眼可见、但单元测试看不到的
+   ============================================================ */
+
+var WORDS = require('../miniprogram/data/words.js');
+
+test('★ 学完一轮必须给出"去抽查"的引导（roundDone = true）', function () {
+  var page = startRound([{
+    word: 'alpha', phonetic: '/ˈælfə/', pos: 'n.', def_cn: '首个', tags: ['示例'],
+    example_en: 'alpha test', example_cn: '首次测试', freq: 1
+  }]);
+
+  assert.strictEqual(page.data.roundDone, false, '刚进来还没学，不该显示抽查引导');
+
+  tapCard(page);                       // 组件要求先看答案才接受反馈
+  tapFeedback(page, 'known');
+  flushTimers();
+
+  assert.strictEqual(page.data.word, null, '唯一的词学完后应进入结束状态');
+  assert.strictEqual(page.data.roundDone, true,
+    '★ 本轮真的学过词，必须显示抽查引导（曾经这里恒为 false，引导块从未出现过）');
+});
+
+test('★ 一进来就没词时不能假装"这一轮学完了"（roundDone = false）', function () {
+  var page = startRound([]);
+  page._nextDueAt = 0;
+  page.setData({ queue: [], index: 0 });
+  page.showEmptyState();
+
+  assert.strictEqual(page.data.roundDone, false, '"没词可学"不该触发抽查引导');
+  assert.ok(page.data.emptyText.indexOf('今天没有') >= 0, '应给出解释性文案而不是空白');
+  assert.strictEqual(page.data.canExtra, false, '没有未到期的词时不给"提前巩固"');
+});
+
+test('★ 全部学完后"提前巩固"能取出未到期的词，而不是留下空白', function () {
+  var page = startRound([]);
+  // 模拟"示例词库全部学完"：每个词都学过，且都还没到复习时间
+  page.mirror = {};
+  for (var i = 0; i < WORDS.length; i++) {
+    page.mirror[WORDS[i].word] = {
+      stage: 3, last_feedback: 'known', next_review_at: Date.now() + 86400000 * 2,
+      correct_count: 1, wrong_count: 0
+    };
+  }
+
+  assert.strictEqual(page.localQueue(false).length, 0, '正常模式：未到期的词不给');
+  assert.ok(page._nextDueAt > 0, '应算出最早到期时间，供界面说明"还要等多久"');
+
+  var forced = page.localQueue(true);
+  assert.strictEqual(forced.length, 10, '提前巩固模式：应取出一批未到期的词');
+  assert.strictEqual(forced[0].word, WORDS[0].word, '取的是最快到期的那批');
+});
+
 /* ============================================================ */
 
 global.setTimeout = realSetTimeout;

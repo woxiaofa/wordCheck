@@ -44,7 +44,7 @@
       <view class="task-item" wx:if="{{!totalCount}}">
         <view class="task-desc">
           <text class="task-name">暂时没有排队的词</text>
-          <text class="task-why">可以再学一轮，或直接去抽查检验</text>
+          <text class="task-why">学过的词都排进复习计划了，还没到复习时间。去抽查检验真实掌握程度</text>
         </view>
       </view>
     </view>

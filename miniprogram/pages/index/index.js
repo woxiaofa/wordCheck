@@ -38,6 +38,8 @@ Page({
     progressNote: '',
     taskDone: false,
     mainBtnText: '开始学习',
+    /** 今天没有任何待学的词（示例词库学完 / 全部排进未来）：主按钮改为"去做抽查" */
+    allDone: false,
     /** 首次使用引导卡是否显示 */
     intro: false,
     /** "这是什么原理"是否展开 */
@@ -114,10 +116,16 @@ Page({
 
     // 主按钮文案：把"还剩多少"直接放进按钮，任务感 > 按钮本身
     var rest = Math.max(total - done, 0);
+    // 一个待学的词都没有：示例词库只有 40 个词，几轮就学完，
+    // 之后 SRS 把它们全推到未来，这时不该显示"0 个词 + 开始学习"（用户会以为坏了）
+    var allDone = total === 0 && learned > 0;
     var mainBtnText;
-    if (!total || taskDone) mainBtnText = '再学一轮';
+    if (allDone) mainBtnText = '去做抽查';
+    else if (!total || taskDone) mainBtnText = '再学一轮';
     else if (done > 0) mainBtnText = '继续学习 · 还剩 ' + rest + ' 个';
     else mainBtnText = '开始学习';
+
+    if (allDone) progressNote = '今天的词都记在计划里了，去抽查检验一下真实水平';
 
     this.setData({
       totalCount: total,
@@ -133,6 +141,7 @@ Page({
       progressPct: progressPct,
       progressNote: progressNote,
       taskDone: taskDone,
+      allDone: allDone,
       mainBtnText: mainBtnText
     });
   },
@@ -154,6 +163,11 @@ Page({
   goStudy: function () {
     // 点"开始学第 1 轮"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
+    // 今天没有待学的词时，"开始学习"会把用户送进一个空白页，直接改去抽查
+    if (this.data.allDone) {
+      wx.redirectTo({ url: '/pages/quiz/quiz' });
+      return;
+    }
     wx.redirectTo({ url: '/pages/study/study' });
   },
 
