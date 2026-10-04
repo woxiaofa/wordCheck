@@ -308,5 +308,10 @@ Page({
 
   onRestart: function () {
     this.buildQueue();
+  },
+
+  /** 学完一轮后引导去抽查：真正决定复习间隔的是抽查结果，不是自评 */
+  onGoQuiz: function () {
+    wx.redirectTo({ url: '/pages/quiz/quiz' });
   }
 });

@@ -4,10 +4,10 @@
   <block wx:if="{{state === 'intro'}}">
     <view class="card center">
       <view class="big-emoji">📝</view>
-      <view class="t1">抽查模式</view>
+      <view class="t1">今日抽查</view>
       <view class="muted mt-s">
-        一次 10 题，<text class="accent">交卷后统一判分</text>。过程中不告诉对错——
-        这是抽查和练习的本质区别。
+        10 道题，<text class="accent">交卷后一起判分</text>，过程中不提示对错——这是抽查和练习的区别。
+        答对的词 15 天后再见，答错的 10 分钟后回来：这次考试决定每个词下次出现的时间。
       </view>
     </view>
     <view class="card">

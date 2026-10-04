@@ -55,7 +55,7 @@
   </view>
 
   <view class="foot-note">
-    一轮 = 到期复习词 + 错词 + 新词，按遗忘曲线自动排好，学完自动进下一个
+    这一轮的顺序系统已排好：先复习快忘的，再看错词，最后学新词
   </view>
 
   <footer-nav active="study" />

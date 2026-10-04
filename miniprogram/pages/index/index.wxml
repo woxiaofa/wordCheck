@@ -1,11 +1,56 @@
-<!-- 今日任务：一眼一个动作。任务量只做"交代进度"，不要求用户做题量决策 -->
+<!-- 今日任务：一眼回答三个问题——做多少、都是什么词、现在点哪里 -->
 <view class="page">
+
+  <!-- 首次使用：一句话价值 + 一个动作。非阻断、可关闭、永不再现（新手引导第 1 段） -->
+  <view class="card intro" wx:if="{{intro}}">
+    <view class="t1">每天 5 分钟，{{target}} 个词</view>
+    <view class="muted mt-s">
+      今天该复习什么，系统按遗忘曲线排好了，你只需要开始。
+      先学习、后抽查，答对的词隔更久再出现。
+    </view>
+    <button class="btn mt" bindtap="goStudy">开始学第 1 轮</button>
+    <view class="link center mt-s" bindtap="toggleHowto">先看看它怎么运作</view>
+    <view class="intro-close" bindtap="dismissIntro">✕</view>
+  </view>
+
+  <!-- 任务卡：量 + 构成 + 每一项"为什么是它" -->
   <view class="card hero">
-    <view class="hero-label">今天要做</view>
+    <view class="hero-label">{{taskDone ? '今天已完成，可自由加练' : '今天的任务'}}</view>
     <view class="hero-num">{{totalCount}} <text class="hero-unit">个词</text></view>
-    <view class="hero-sub">{{breakdown}}</view>
-    <button class="btn" bindtap="goStudy">开始学习</button>
-    <button class="btn ghost mt-s" bindtap="goQuiz">先抽查一组</button>
+    <view class="hero-sub">大约 {{minutes}} 分钟，一次学完</view>
+
+    <view class="task-list">
+      <view class="task-item" wx:if="{{dueCount}}">
+        <text class="task-num">{{dueCount}}</text>
+        <view class="task-desc">
+          <text class="task-name">到期复习</text>
+          <text class="task-why">之前学过，今天到了快忘的时间点</text>
+        </view>
+      </view>
+      <view class="task-item" wx:if="{{wrongCount}}">
+        <text class="task-num">{{wrongCount}}</text>
+        <view class="task-desc">
+          <text class="task-name">错词</text>
+          <text class="task-why">之前答错过，今天再看一遍</text>
+        </view>
+      </view>
+      <view class="task-item" wx:if="{{newCount}}">
+        <text class="task-num">{{newCount}}</text>
+        <view class="task-desc">
+          <text class="task-name">新词</text>
+          <text class="task-why">第一次见面，混个脸熟</text>
+        </view>
+      </view>
+      <view class="task-item" wx:if="{{!totalCount}}">
+        <view class="task-desc">
+          <text class="task-name">暂时没有排队的词</text>
+          <text class="task-why">可以再学一轮，或直接去抽查检验</text>
+        </view>
+      </view>
+    </view>
+
+    <button class="btn" bindtap="goStudy">{{mainBtnText}}</button>
+    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 10 题，交卷才判分</button>
   </view>
 
   <view class="grid-3">
@@ -31,14 +76,42 @@
     <view class="progress mt-s">
       <view class="progress-inner" style="width:{{progressPct}}%"></view>
     </view>
-    <view class="muted mt-s">完成到 {{target}} 词的 80% 即算打卡</view>
+    <view class="muted mt-s">{{progressNote}}</view>
   </view>
 
+  <!-- 怎么做：三步讲清动作，不谈概念 -->
   <view class="card">
-    <text class="card-title">提醒推送的现实约束</text>
-    <view class="muted mt-s">
-      微信订阅消息需要你主动授权，一次性订阅通常只能发一条，所以"每天自动催你背单词"在小程序里做不到。
-      这里的做法是：你在完成学习时顺手订阅一次下一次提醒，其余靠站内待办。
+    <view class="row-between">
+      <text class="card-title">今天怎么学</text>
+      <text class="link" bindtap="toggleHowto">{{howtoOpen ? '收起' : '这是什么原理'}}</text>
+    </view>
+    <view class="steps mt-s">
+      <view class="step">
+        <text class="step-no">1</text>
+        <view class="step-body">
+          <text class="step-t">看单词，先想意思</text>
+          <text class="step-d">别急着翻面，先在心里说一遍它是什么意思</text>
+        </view>
+      </view>
+      <view class="step">
+        <text class="step-no">2</text>
+        <view class="step-body">
+          <text class="step-t">点开看答案，如实评价</text>
+          <text class="step-d">想得很快 / 想起来但费劲 / 没想起来，三个里选一个</text>
+        </view>
+      </view>
+      <view class="step">
+        <text class="step-no">3</text>
+        <view class="step-body">
+          <text class="step-t">学完去抽查</text>
+          <text class="step-d">抽查答对的词 15 天后再见，答错的 10 分钟后回来</text>
+        </view>
+      </view>
+    </view>
+    <view class="howto-more" wx:if="{{howtoOpen}}">
+      每个词都有一条自己的复习时间线：你越熟练，它出现得越少
+      （10 分钟 → 1 天 → 4 天 → … → 120 天）。评价越如实，排期越准，
+      所以在"想起来了但费劲"时别选"想得很快"——那只会骗过系统，让你重复背已经会的词。
     </view>
   </view>
 
