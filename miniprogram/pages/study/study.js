@@ -16,6 +16,7 @@ var humanError = require('../../utils/cloud').humanError;
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var WORDS = require('../../data/words');
+var books = require('../../utils/books');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -115,9 +116,11 @@ Page({
   /** 本地队列：到期复习词优先，其次错词，最后新词（与文档 6.3 的组装顺序一致） */
   localQueue: function (force) {
     var now = Date.now();
+    // 只从当前词书取词：用户在首页选了"中考"，学习页就不该冒出四级词
+    var pool = books.getWords(books.getKey());
     var due = [], wrong = [], fresh = [], parked = [];
-    for (var i = 0; i < WORDS.length; i++) {
-      var w = WORDS[i];
+    for (var i = 0; i < pool.length; i++) {
+      var w = pool[i];
       var st = this.mirror[w.word];
       if (!st) { fresh.push(w); continue; }
       if (st.next_review_at && st.next_review_at <= now) due.push(w);
@@ -185,9 +188,10 @@ Page({
   showEmptyState: function () {
     var nextAt = this._nextDueAt || 0;
     var sub = nextAt
-      ? '本地词库共 ' + WORDS.length + ' 个词，已全部排进复习计划；最早的一批 ' +
-        this.describeWait(nextAt) + '后到期。'
-      : '本地词库只有 ' + WORDS.length + ' 个词，现在已经全部学过了。';
+      ? '「' + books.currentName() + '」共 ' + books.getWords(books.getKey()).length +
+        ' 个词，已全部排进复习计划；最早的一批 ' + this.describeWait(nextAt) + '后到期。'
+      : '「' + books.currentName() + '」共 ' + books.getWords(books.getKey()).length +
+        ' 个词，现在已经全部学过了。';
     this.setData({
       word: null,
       isDemo: false,

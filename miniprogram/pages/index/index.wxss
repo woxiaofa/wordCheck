@@ -1,4 +1,25 @@
 .hero { text-align: center; padding: 40rpx 28rpx; }
+
+/* ---- 词书选择 ---- */
+.books { padding: 24rpx 28rpx; margin-bottom: 20rpx; }
+.books-title { font-size: 28rpx; font-weight: 700; }
+.book-chips { display: flex; flex-wrap: wrap; margin-top: 18rpx; }
+.book-chip {
+  padding: 12rpx 28rpx;
+  margin: 0 16rpx 16rpx 0;
+  font-size: 26rpx;
+  color: #8fa3b7;
+  background: #131c27;
+  border: 1rpx solid #2b3949;
+  border-radius: 999rpx;
+}
+.book-chip.on {
+  color: #ffffff;
+  font-weight: 600;
+  background: rgba(62, 166, 255, .16);
+  border-color: #3ea6ff;
+}
+
 .hero-label { color: #8fa3b7; font-size: 26rpx; }
 .hero-num { margin-top: 12rpx; font-size: 76rpx; font-weight: 700; line-height: 1.1; }
 .hero-unit { font-size: 30rpx; font-weight: 400; color: #8fa3b7; }

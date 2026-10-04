@@ -15,6 +15,7 @@ var quizLib = require('../../utils/quiz');
 var keysLib = require('../../components/letter-keyboard/keys');
 var time = require('../../utils/time');
 var WORDS = require('../../data/words');
+var books = require('../../utils/books');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -82,7 +83,8 @@ Page({
 
   localQuestions: function (count) {
     var plan = quizLib.planTypes(count);
-    var pool = WORDS;
+    // 只考当前词书里的词（与首页/学习页保持一致）
+    var pool = books.getWords(books.getKey());
     var picked = this.pickWords(pool, count);
 
     return plan.map(function (type, i) {
@@ -459,6 +461,8 @@ Page({
   },
 
   wordById: function (word) {
+    // 在全库里找（不是当前词书）：题目一定来自当前词书，
+    // 但这里只做单词对象查找，用全库兜底更稳，切换词书也不会查不到
     for (var i = 0; i < WORDS.length; i++) {
       if (WORDS[i].word === word) return WORDS[i];
     }

@@ -17,16 +17,31 @@
  *   - 自带音标、中文释义、考试标签（zk 中考 / gk 高考 / cet4 四级 / cet6 / ky 考研 /
  *     ielts / toefl / gre）、柯林斯星级、词频，正好对得上我们的字段规范。
  *
- * 两个已知缺口：
- *   1) **没有例句** —— ECDICT 不提供例句。生成的词库 example_en/example_cn 为空，
- *      卡片已做条件渲染（没有例句就不显示）。需要例句时另行批量生成（自撰无版权问题）。
- *   2) 音标用了西里尔字母 ә(U+04D9) 代替 IPA ə(U+0259)，脚本里统一规范化。
+ * 两个已知缺口及其处理：
+ *   1) **没有例句** —— ECDICT 不提供。例句在 scripts/data/examples.js 里人工自撰，
+ *      生成时合并进来（自撰无版权问题，绝不能抄词典）。因为合并发生在生成期，
+ *      词库可以反复重新生成而不丢例句。
+ *   2) **主词性会反推错** —— 同样在 examples.js 里用 POS_OVERRIDES 人工修正。
+ *   3) 音标用了西里尔字母 ә(U+04D9) 代替 IPA ə(U+0259)，脚本里统一规范化。
  *
  * 本脚本不联网、不写死任何词，纯机械切分，可重复执行。
  */
 
 var fs = require('fs');
 var path = require('path');
+
+/** 人工维护的例句与义项修正（全部自撰，见该文件头部说明） */
+var EX_DATA = require('./data/examples.js');
+var EXAMPLES = EX_DATA.EXAMPLES;
+var POS_OVERRIDES = EX_DATA.POS_OVERRIDES;
+var ALIASES = EX_DATA.ALIASES || {};
+
+/**
+ * 人工剔除的词。
+ * aids：ECDICT 给的是"高级综合数据系统；先进交互调试系统"，跟学生要背的意思
+ *       完全不是一回事，而它另一个常见义项不适合出现在面向中学生的产品里，直接不收。
+ */
+var SKIP_WORDS = { aids: 1 };
 
 /** 注意：不能用 `Number(x) || 1200` —— 传 0 时会被当成 falsy 而取默认值 */
 function numArg(v, dflt) {
@@ -186,6 +201,7 @@ for (var i = 1; i < lines.length; i++) {
   // 只要纯小写字母单词：排除短语、带撇号/连字符的、以及过短的词
   if (!/^[a-z]{3,}$/.test(word)) continue;
   if (seen[word]) continue;
+  if (SKIP_WORDS[word]) continue;              // 人工剔除：见文件头的 SKIP_WORDS 说明
 
   var tags = parseTags(f[IDX.tag]);
   if (!tags.length) continue;                       // 不在中考/高考/四级范围
@@ -238,6 +254,34 @@ if (probe) {
 var top = picked.slice(0, target);
 console.log('  取前 ' + top.length + ' 个，词频区间 ' + top[0].freq + ' – ' + top[top.length - 1].freq);
 
+/* ---------------- 合并人工维护的例句与义项修正 ----------------
+   ECDICT 不给例句，主词性也会反推错，这两件事只能人工补（见 scripts/data/examples.js）。
+   补在这里而不是手改 words.js，是为了让词库可以反复重新生成而不丢数据。 */
+
+var noExample = [];      // 没有例句的词
+var exampleMismatch = []; // 例句里根本没出现这个词的（多半是写错了）
+
+top.forEach(function (w) {
+  var ex = EXAMPLES[w.word];
+  if (ex) {
+    w.example_en = ex[0];
+    w.example_cn = ex[1];
+    // 校验：例句必须真的包含这个词（或其常见变形），否则说明句子配错词了
+    var stem = w.word.replace(/(e|y)$/, '');
+    var pat = ALIASES[w.word] ? (ALIASES[w.word] + '|' + stem) : stem;   // 不规则变形走 ALIASES
+    var re = new RegExp('\\b(' + pat + ')', 'i');
+    if (!re.test(w.example_en)) exampleMismatch.push(w.word + ' → ' + w.example_en);
+  } else {
+    noExample.push(w.word);
+  }
+
+  var ov = POS_OVERRIDES[w.word];
+  if (ov) {
+    if (ov.pos) w.pos = ov.pos;
+    if (ov.def) w.def_cn = ov.def;
+  }
+});
+
 /* ---------------- 输出 ---------------- */
 
 function esc(s) {
@@ -247,7 +291,7 @@ function esc(s) {
 var body = top.map(function (w) {
   return "  { word: '" + w.word + "', phonetic: '" + esc(w.phonetic) + "', pos: '" + w.pos +
     "', def_cn: '" + esc(w.def_cn) + "',\n" +
-    "    example_en: '', example_cn: '',\n" +
+    "    example_en: '" + esc(w.example_en) + "', example_cn: '" + esc(w.example_cn) + "',\n" +
     "    tags: [" + w.tags.map(function (t) { return "'" + t + "'"; }).join(', ') +
     "], freq: " + w.freq + " }";
 }).join(',\n');
@@ -260,8 +304,8 @@ var out = "/*\n" +
   " *   是法律风险（见 docs/词库与发音方案.md）。切分规则：中考 / 高考 / 四级标签，\n" +
   " *   按当代语料库词频升序取前 " + top.length + " 个。\n" +
   " *\n" +
-  " * 已知缺口：**没有例句**（ECDICT 不提供）。example_en / example_cn 全为空，\n" +
-  " *   卡片已做条件渲染。要例句时需另行生成——自撰的例句无版权问题，别去抄词典。\n" +
+  " * 例句：由 scripts/data/examples.js 人工自撰（ECDICT 不提供例句，自撰也没有版权问题）。\n" +
+  " *   改例句请改那个文件再重新生成本文件，别直接改这里。\n" +
   " *\n" +
   " * 重新生成：node scripts/build-words.js <ecdict.csv> " + top.length + "\n" +
   " *\n" +
@@ -306,5 +350,11 @@ console.log('  缺音标 ' + noPhonetic.length +
   ' · 缺词性 ' + noPos.length +
   ' · 释义过短 ' + shortDef.length +
   ' · 重复 ' + dupCount);
+console.log('  例句覆盖 ' + (top.length - noExample.length) + '/' + top.length +
+  (noExample.length ? '　缺例句：' + noExample.join(', ') : '　（全覆盖）'));
+if (exampleMismatch.length) {
+  console.log('  ⚠ 例句里没出现该词，请检查 scripts/data/examples.js：');
+  exampleMismatch.forEach(function (s) { console.log('    ' + s); });
+}
 if (noPhonetic.length) console.log('  缺音标的词：' + noPhonetic.map(function (w) { return w.word; }).join(', '));
 if (shortDef.length) console.log('  释义过短：' + shortDef.map(function (w) { return w.word + '=' + w.def_cn; }).join(', '));

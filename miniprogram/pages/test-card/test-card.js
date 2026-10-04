@@ -23,16 +23,19 @@ Page({
   data: {
     learned: 0,
     total: WORDS.length,
-    today: 0
+    today: 0,
+    book: '全部'
   },
 
   onShow: function () {
     var mirror = wx.getStorageSync(STORAGE_KEY) || {};
     var activity = wx.getStorageSync(ACTIVITY_KEY) || {};
     var time = require('../../utils/time');
+    var books = require('../../utils/books');
     this.setData({
       learned: Object.keys(mirror).length,
-      today: activity[time.getLocalDate()] || 0
+      today: activity[time.getLocalDate()] || 0,
+      book: books.currentName() + '（' + books.getWords(books.getKey()).length + ' 词）'
     });
   },
 

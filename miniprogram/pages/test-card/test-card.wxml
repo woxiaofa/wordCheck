@@ -8,6 +8,7 @@
     <view style="color:#8fa3b7;font-size:26rpx">本机进度</view>
     <view style="margin-top:8rpx">已学 {{learned}} / {{total}} 个词</view>
     <view style="color:#8fa3b7;font-size:26rpx;margin-top:4rpx">今日已完成 {{today}} 个</view>
+    <view style="color:#8fa3b7;font-size:26rpx;margin-top:4rpx">当前词库 {{book}}</view>
   </view>
 
   <view style="margin-top:32rpx;padding:24rpx;background:#3ea6ff;border-radius:16rpx;text-align:center" bindtap="goStudy">

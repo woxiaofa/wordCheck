@@ -13,6 +13,27 @@
     <view class="intro-close" bindtap="dismissIntro">✕</view>
   </view>
 
+  <!-- 词书选择：只在这一本里出任务。
+       切换词书不会清空进度（SRS 状态是按单词存的），切回来接着学。 -->
+  <view class="card books">
+    <view class="row-between">
+      <text class="books-title">词库：{{bookName}}</text>
+      <text class="muted" style="font-size:24rpx">{{bookCount}} 个词</text>
+    </view>
+    <view class="book-chips">
+      <view
+        wx:for="{{books}}"
+        wx:key="key"
+        class="book-chip {{item.key === bookKey ? 'on' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onSelectBook"
+      >{{item.name}}</view>
+    </view>
+    <view class="muted center mt-s" style="font-size:24rpx">
+      {{bookDesc}} · 换词库不会清除已记住的词
+    </view>
+  </view>
+
   <!-- 任务卡：量 + 构成 + 每一项"为什么是它" -->
   <view class="card hero">
     <view class="hero-label">{{taskDone ? '今天已完成，可自由加练' : '今天的任务'}}</view>

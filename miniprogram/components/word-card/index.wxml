@@ -67,10 +67,14 @@
     <view wx:if="{{!demo}}" style="font-size:54rpx;font-weight:700;color:#e8eef5">{{word.word}}</view>
     <view style="margin-top:20rpx;font-size:40rpx;font-weight:600;color:#3ea6ff">{{word.def_cn}}</view>
     <view style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{stageText}}</view>
-    <!-- 例句：ECDICT 不提供例句，批量切出的词库这里是空的，必须条件渲染，否则会留下两行空白 -->
+    <!-- 例句：ECDICT 不提供例句，由 scripts/data/examples.js 人工自撰后合并进来。
+         加左侧竖线和"例"字，避免被当成第二个义项。 -->
     <block wx:if="{{word.example_en}}">
-      <view style="margin-top:20rpx;font-size:30rpx;color:#e8eef5">{{word.example_en}}</view>
-      <view wx:if="{{word.example_cn}}" style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7">{{word.example_cn}}</view>
+      <view style="margin-top:24rpx;padding-left:20rpx;border-left:6rpx solid #2b3949">
+        <view style="font-size:22rpx;color:#5d7286">例</view>
+        <view style="margin-top:6rpx;font-size:30rpx;color:#e8eef5;line-height:1.6">{{word.example_en}}</view>
+        <view wx:if="{{word.example_cn}}" style="margin-top:6rpx;font-size:26rpx;color:#8fa3b7;line-height:1.6">{{word.example_cn}}</view>
+      </view>
     </block>
 
     <view style="margin-top:32rpx">

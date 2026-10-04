@@ -12,6 +12,7 @@
 var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
+var books = require('../../utils/books');
 
 var STORAGE_KEY = 'word_state_mirror';
 /** 首次引导卡：点"开始学"或关闭后写入，之后永不再现 */
@@ -43,7 +44,13 @@ Page({
     /** 首次使用引导卡是否显示 */
     intro: false,
     /** "这是什么原理"是否展开 */
-    howtoOpen: false
+    howtoOpen: false,
+    /** 词书 */
+    books: [],
+    bookKey: 'all',
+    bookName: '全部',
+    bookDesc: '',
+    bookCount: 0
   },
 
   onShow: function () {
@@ -78,14 +85,30 @@ Page({
     clearTimeout(this._introTimer);
   },
 
+  onSelectBook: function (e) {
+    var key = e.currentTarget.dataset.key;
+    if (!books.setKey(key)) return;
+    this.refresh();
+    wx.showToast({ title: '已切换到「' + books.currentName() + '」', icon: 'none' });
+  },
+
   refresh: function () {
     var mirror = wx.getStorageSync(STORAGE_KEY) || {};
     var now = Date.now();
     var today = time.getLocalDate();
 
+    // 只在当前词书里统计：选了"中考"就不该把四级词算进今日任务
+    var bookKey = books.getKey();
+    var pool = books.getWords(bookKey);
+    var bookList = books.list();
+    var cur = null;
+    for (var b = 0; b < bookList.length; b++) {
+      if (bookList[b].key === bookKey) { cur = bookList[b]; break; }
+    }
+
     var due = 0, wrong = 0, fresh = 0, learned = 0, mastered = 0;
-    for (var i = 0; i < WORDS.length; i++) {
-      var st = mirror[WORDS[i].word];
+    for (var i = 0; i < pool.length; i++) {
+      var st = mirror[pool[i].word];
       if (!st) { fresh++; continue; }
       learned++;
       if (srs.isMastered(st)) mastered++;
@@ -142,7 +165,12 @@ Page({
       progressNote: progressNote,
       taskDone: taskDone,
       allDone: allDone,
-      mainBtnText: mainBtnText
+      mainBtnText: mainBtnText,
+      books: bookList,
+      bookKey: bookKey,
+      bookName: cur ? cur.name : '全部',
+      bookDesc: cur ? cur.desc : '',
+      bookCount: cur ? cur.count : pool.length
     });
   },
 
