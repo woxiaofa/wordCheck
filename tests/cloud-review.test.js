@@ -295,8 +295,11 @@ steps.push(function () {
 steps.push(function () {
   return ok('⑥ 答错的词：状态写库并追加到今日任务 repeat', function () {
     seedUser();
+    // 今日日期必须动态算：写死日期的测试一过午夜就假失败（2026-10-06 实锤）
+    var time = require('../shared/time');
+    var today = time.getLocalDate(Date.now());
     db.raw.daily_tasks = [{
-      _id: 'daily:u1:2026-10-05', user_id: 'u1', task_date: '2026-10-05',
+      _id: 'daily:u1:' + today, user_id: 'u1', task_date: today,
       snapshot_json: { new: ['search'], review: [], repeat: [] }
     }];
     return submit('search', 'forgot').then(function (r) {

@@ -16,7 +16,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-const { getLocalDate } = require('./shared/time');
+const { getLocalDate } = require('./time');
 
 const COLL = {
   users: 'users',

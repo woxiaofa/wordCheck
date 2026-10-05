@@ -20,9 +20,10 @@ assets/fonts/*.otf
 assets/fonts/*.ttf
 assets/fonts/*.ttc
 
-# 注意：cloud/functions/*/shared/ 这几个副本【必须】随仓库跟踪、随部署上传——
-# 开发者工具/CLI 上传时会忽略 .gitignore 命中的文件，曾导致云端
-# "Cannot find module ./shared/time"（2026-10-05 实锤）。勿再把它们加回来。
+# 注意：云函数目录里的共享模块副本（quiz/srs/state-store/time.js，平铺在函数根目录）
+# 【必须】随仓库跟踪、随部署上传——曾经 shared/ 子目录方案在 CLI 部署后
+# 云端报 Cannot find module（2026-10-05/06 实锤），已改平铺并由
+# scripts/prepare-functions.js 生成。勿再改回子目录结构。
 
 # Piper 语音模型（63MB，按需下载，见 scripts/gen_audio_piper.py 注释里的 hf-mirror 链接）
 scripts/piper-models/

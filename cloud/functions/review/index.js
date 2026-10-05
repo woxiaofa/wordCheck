@@ -17,9 +17,9 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-const { nextState, REQ_ID_TTL_DAYS } = require('./shared/srs');
-const { getLocalDate, getLocalDayStart } = require('./shared/time');
-const { upsertState } = require('./shared/state-store');
+const { nextState, REQ_ID_TTL_DAYS } = require('./srs');
+const { getLocalDate, getLocalDayStart } = require('./time');
+const { upsertState } = require('./state-store');
 
 const COLL = {
   state: 'user_word_state',

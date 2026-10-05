@@ -8,7 +8,7 @@
  *   3) 催学只生成文本由家长自己发微信，不做任何推送（合规红线）
  *   4) 学员进度从 user_word_state 现算（班级规模小，不值得为它维护冗余集合）
  *
- * 部署前置：本目录需含 shared/ 副本（scripts/prepare-functions.js 生成）；
+ * 部署前置：本目录需含平铺的共享模块副本（scripts/prepare-functions.js 生成，勿用子目录：CLI 部署后云端会丢）；
  *           控制台需建 classes 集合 + 唯一索引 {code:1}、assignments 索引
  *           {class_id:1, created_at:-1}、users 索引 {class_id:1}。
  */
@@ -18,7 +18,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
-const { getLocalDate, getLocalDayStart } = require('./shared/time');
+const { getLocalDate, getLocalDayStart } = require('./time');
 
 const COLL = {
   users: 'users',

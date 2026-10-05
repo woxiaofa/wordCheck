@@ -18,10 +18,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-const quizLib = require('./shared/quiz');
-const srs = require('./shared/srs');
-const { getLocalDate } = require('./shared/time');
-const { upsertState } = require('./shared/state-store');
+const quizLib = require('./quiz');
+const srs = require('./srs');
+const { getLocalDate } = require('./time');
+const { upsertState } = require('./state-store');
 
 const COLL = {
   words: 'words',
