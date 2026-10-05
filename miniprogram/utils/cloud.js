@@ -8,7 +8,7 @@
  */
 
 /** 云环境 ID —— 部署前必须改成你自己的环境 ID（不要提交到公开仓库） */
-var ENV_ID = 'REPLACE_WITH_YOUR_ENV_ID';
+var ENV_ID = 'doud1-0dgnmmw9d8d4885e';
 
 var initialized = false;
 var initError = null;
