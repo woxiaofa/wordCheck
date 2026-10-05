@@ -360,12 +360,12 @@ Page({
   },
 
   /**
-   * 单词发音：走 utils/tts.js（微信同声传译插件），学习卡上的 🔊 按钮就是它。
-   * 插件未在小程序后台添加时给一次性明确提示，而不是沉默失败。
+   * 单词发音：走 utils/tts.js（本地 mp3 优先，插件兜底），学习卡上的 🔊 按钮就是它。
+   * 音频缺失且无插件时给一次性明确提示，而不是沉默失败。
    */
   speakWord: function (w) {
     if (!tts.isAvailable()) {
-      wx.showToast({ title: '发音需在小程序后台添加“同声传译”插件', icon: 'none' });
+      wx.showToast({ title: '发音资源未就绪，请重新编译/更新版本', icon: 'none' });
       return;
     }
     tts.speak(w, function (ok) {

@@ -345,7 +345,7 @@ Page({
     this.playedCount[q.wordId] = n + 1;
 
     if (!this.speakWord(q.wordId)) {
-      wx.showToast({ title: '发音需在小程序后台添加“同声传译”插件', icon: 'none' });
+      wx.showToast({ title: '发音资源未就绪，请重新编译/更新版本', icon: 'none' });
     }
     this.renderQuestion();
   },

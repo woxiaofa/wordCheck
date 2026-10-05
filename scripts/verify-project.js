@@ -307,6 +307,47 @@ function checkAllWxml() {
   notes.push('检查了 ' + files.length + ' 个 wxml 文件（含标签配平、重复属性、绑定一致性）');
 }
 
+/**
+ * 4. 主包体积红线
+ *
+ * 为什么查：小程序主包上限 2MB。单词发音 mp3 打进主包后占大头（300 词 ≈1.4MB），
+ * 词库一扩就会撞线，而且撞线是在"上传体验版"那一步才炸，本地看不出来。
+ * 这里提前告警：>1.5MB 提示搬去分包/云存储，>2MB 直接算问题。
+ */
+const AUDIO_DIR = path.join(MP, 'assets', 'audio');
+const MAIN_PKG_LIMIT = 2048 * 1024;   // 2MB
+const AUDIO_WARN = 1500 * 1024;       // 1.5MB：留出余量给代码增长
+
+function dirSize(dir) {
+  let total = 0;
+  (function walk(d) {
+    fs.readdirSync(d, { withFileTypes: true }).forEach((ent) => {
+      const p = path.join(d, ent.name);
+      if (ent.isDirectory()) walk(p);
+      else total += fs.statSync(p).size;
+    });
+  })(dir);
+  return total;
+}
+
+function checkPackageSize() {
+  if (!exists(AUDIO_DIR)) {
+    notes.push('未生成本地发音音频（assets/audio 不存在，发音走插件兜底）');
+    return;
+  }
+  const audio = dirSize(AUDIO_DIR);
+  const others = dirSize(MP) - audio;
+  const total = audio + others;
+  const kb = (n) => (n / 1024).toFixed(0) + 'KB';
+  notes.push('主包体积：' + kb(total) + '（代码 ' + kb(others) + ' + 发音音频 ' + kb(audio) + '），上限 2MB');
+
+  if (total > MAIN_PKG_LIMIT) {
+    problems.push('主包体积 ' + kb(total) + ' 超过 2MB 上限：把 assets/audio 挪进分包（配 preloadRule）或改云存储按需拉取');
+  } else if (audio > AUDIO_WARN) {
+    notes.push('提示：发音音频已占 ' + kb(audio) + '，词库继续扩充前建议搬去分包/云存储');
+  }
+}
+
 /* ---------------- 主流程 ---------------- */
 
 if (require.main === module) {
@@ -314,6 +355,7 @@ if (require.main === module) {
   checkReferences();
   checkPages();
   checkAllWxml();
+  checkPackageSize();
 
   console.log('项目自检');
   notes.forEach((n) => console.log('  · ' + n));

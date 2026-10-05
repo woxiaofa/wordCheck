@@ -35,7 +35,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.5.0",
-  "appid": "wxfb212e68cdb9d786",
+  "appid": "wx5f7e9231b54d8879",
   "projectname": "word-coach",
   "cloudfunctionRoot": "cloud/functions/",
   "miniprogramRoot": "miniprogram/",

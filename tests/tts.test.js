@@ -1,9 +1,9 @@
 /**
  * 发音模块测试（Node 环境跑，重点验证降级行为）
  *
- * 微信同声传译插件只在真机/开发者工具里存在，Node 里 requirePlugin 必然拿不到。
- * 恰好要测的就是"拿不到插件时不能崩、必须明确回调 false"——
- * 真机上插件没添加时的表现与此一致。
+ * 优先级：本地 mp3（audio-manifest.js 清单）→ WechatSI 插件 → 回调 false。
+ * Node 里 requirePlugin 必然拿不到插件，恰好测"无插件不能崩"；
+ * 本地音频命中时用 mock 的 wx 验证播放器被正确调用。
  */
 
 var assert = require('assert');
@@ -20,6 +20,7 @@ global.wx = {
 };
 
 var tts = require('../miniprogram/utils/tts');
+var manifest = require('../miniprogram/data/audio-manifest.js');
 
 var pass = 0;
 function ok(name, fn) {
@@ -27,26 +28,56 @@ function ok(name, fn) {
   catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; }
 }
 
+// 从清单里取一个真实存在的词；再取一个必然不在清单里的词
+var localWord = Object.keys(manifest)[0];
+var missingWord = 'zzz-not-in-manifest-zzz';
+
 console.log('发音模块测试：');
 
-ok('Node 环境下 isAvailable() 为 false，且不抛异常', function () {
-  assert.strictEqual(tts.isAvailable(), false);
+ok('清单非空（本地音频已生成）', function () {
+  assert.ok(tts.hasLocalAudio(), 'audio-manifest.js 为空 —— 先跑 gen_audio_piper.py + build-audio-manifest.js');
 });
 
-ok('无插件时 speak() 同步回调 false，不抛异常', function () {
+ok('本地命中的词：播放器 src 指向 /assets/audio/，回调 true', function () {
+  if (!localWord) { throw new Error('清单为空，跳过条件不成立'); }
+  calls.length = 0;
   var result = null;
-  tts.speak('apple', function (okFlag) { result = okFlag; });
-  assert.strictEqual(result, false);
+  tts.speak(localWord, function (okFlag) { result = okFlag; });
+  assert.strictEqual(result, true);
+  assert.strictEqual(calls.length, 1, '应调用一次 play');
+  // mock 里记录格式为 "play:<src>"
+  var src = calls[0].replace(/^play:/, '');
+  assert.ok(src.indexOf('/assets/audio/' + localWord + '.mp3') === 0,
+    'src 应为包内音频路径，实际: ' + src);
 });
 
-ok('不传回调也不崩（老代码可能直接 tts.speak(w)）', function () {
-  tts.speak('apple');
+ok('本地命中时不再走插件额度（重复 speak 只重新 play）', function () {
+  if (!localWord) { throw new Error('清单为空'); }
+  calls.length = 0;
+  tts.speak(localWord, function () {});
+  tts.speak(localWord, function () {});
+  assert.strictEqual(calls.length, 2);
+  assert.ok(calls.every(function (c) { return c.replace(/^play:/, '').indexOf('/assets/audio/') === 0; }));
+});
+
+ok('清单外 + 无插件：同步回调 false，不抛异常', function () {
+  var result = null;
+  tts.speak(missingWord, function (okFlag) { result = okFlag; });
+  assert.strictEqual(result, false);
 });
 
 ok('空词同样回调 false', function () {
   var result = null;
   tts.speak('', function (okFlag) { result = okFlag; });
   assert.strictEqual(result, false);
+});
+
+ok('不传回调也不崩（老代码可能直接 tts.speak(w)）', function () {
+  if (localWord) tts.speak(localWord); else tts.speak(missingWord);
+});
+
+ok('isAvailable()：有本地音频或插件即为 true（Node 下取决于清单）', function () {
+  assert.strictEqual(tts.isAvailable(), tts.hasLocalAudio());
 });
 
 ok('_reset() 可重复调用不崩', function () {

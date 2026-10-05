@@ -19,3 +19,9 @@ desktop.ini
 assets/fonts/*.otf
 assets/fonts/*.ttf
 assets/fonts/*.ttc
+
+# Piper 语音模型（63MB，按需下载，见 scripts/gen_audio_piper.py 注释里的 hf-mirror 链接）
+scripts/piper-models/
+
+# 词表导出（由 words.js 生成，是生成音频的中间产物）
+scripts/words.json
