@@ -58,7 +58,12 @@ Page({
     /** 当前队列是不是"提前巩固"（本地词库学完后，用户主动把未到期的词提前拿出来） */
     extraRound: false,
     /** 是否展示"提前巩固"按钮：只有确实存在未到期的词时才给 */
-    canExtra: false
+    canExtra: false,
+    /**
+     * 队列是否在装配中（云端 task.today 冷启动 1~2 秒）。
+     * 装配期间不渲染"学完了"空状态——否则新号第一次打开会先闪一下"再学一轮"。
+     */
+    queueLoading: true
   },
 
   /** @type {Object} 本地 SRS 状态镜像：{ [word]: {stage,last_feedback,next_review_at,correct_count,wrong_count} } */
@@ -100,7 +105,8 @@ Page({
       ratedCount: 0,
       roundDone: false,
       canExtra: false,
-      extraRound: false
+      extraRound: false,
+      queueLoading: true
     });
 
     api.todayTask(this.loadedDate).then(function (data) {
@@ -173,7 +179,8 @@ Page({
       index: 0,
       isLocal: !!isLocal,
       roundDone: false,
-      extraRound: !!this._extraRound
+      extraRound: !!this._extraRound,
+      queueLoading: false
     });
 
     // 队列为空必须明确说明原因。曾经这里直接走进 showCurrent 的 !w 分支，

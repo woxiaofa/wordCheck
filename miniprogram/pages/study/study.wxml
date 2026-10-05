@@ -36,7 +36,13 @@
     </view>
   </view>
 
-  <view class="empty" wx:if="{{!word}}">
+  <!-- 队列装配中（云端冷启动 1~2 秒）：只给一句中性的等待文案，
+       不渲染"学完了"空状态——否则新号第一次打开会先闪一下"再学一轮" -->
+  <view class="empty" wx:if="{{!word && queueLoading}}">
+    <view class="muted center" style="padding:60rpx 0">正在取出今天的词…</view>
+  </view>
+
+  <view class="empty" wx:if="{{!word && !queueLoading}}">
     <view class="empty-emoji">🎉</view>
     <view class="empty-title">{{emptyText}}</view>
     <view class="empty-sub">{{emptySub}}</view>
