@@ -103,8 +103,11 @@ function humanError(err) {
   if (!err) return '未知错误';
   if (err.code === 'ENV_NOT_SET' || err.code === 'CLOUD_NOT_INIT') return err.message;
   if (err.code === 'CALL_FAIL') {
-    if (String(err.message).indexOf('cannot find') >= 0) return '云函数未部署，请先上传部署';
-    if (String(err.message).indexOf('timeout') >= 0) return '网络超时，请重试';
+    var m = String(err.message);
+    if (m.indexOf('cannot find') >= 0) return '云函数未部署，请先上传部署';
+    if (m.indexOf('timeout') >= 0) return '网络超时，请重试';
+    if (m.indexOf('Cannot find module') >= 0) return '云函数部署不完整（缺依赖模块），请重新上传部署';
+    if (m.indexOf('execute fail') >= 0) return '云函数执行失败，点"云自检"看具体原因';
     return '网络异常，请重试';
   }
   return err.message || '操作失败';
@@ -234,6 +237,14 @@ var api = {
   /** 周报数据 */
   weeklyReport: function (week) {
     return call('report', 'weekly', { week: week });
+  },
+
+  /**
+   * 云端自检（review 云函数的 diagnose）：{"action":"diagnose","all":true}
+   * 排查"云函数到底活着没有、库里有没有数据"时用，页面可直接把结果摊开给用户看。
+   */
+  diagnose: function (all, clean) {
+    return call('review', 'diagnose', { all: all !== false, clean: !!clean });
   },
 
   /* ------------- 班级（家长/老师端，批次 1） ------------- */

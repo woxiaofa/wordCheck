@@ -9,7 +9,10 @@
   <view wx:elif="{{cloudError}}" class="card">
     <view class="t1">班级功能需要联网</view>
     <view class="muted mt-s">{{cloudError}}</view>
+    <view wx:if="{{cloudRaw}}" class="raw-err">{{cloudRaw}}</view>
     <button class="btn mt" bindtap="reload">重试</button>
+    <button class="btn ghost mt-s" bindtap="runDiagnose">云自检</button>
+    <view wx:if="{{diagnoseText}}" class="raw-err">{{diagnoseText}}</view>
   </view>
 
   <!-- ===== 未加入任何班级 ===== -->

@@ -36,6 +36,9 @@ Page({
     /** 学员进度报告：{ [studentId]: {loading, error, assignments, recent_logs} } */
     reports: {},
 
+    /** 云自检结果文本（排查"云到底通不通"时展示，平时为空不占地方） */
+    diagnoseText: '',
+
     // 学生端
     myAssignments: [],
     myAssignError: '',
@@ -67,8 +70,12 @@ Page({
         self.loadStudentData();
       }
     }).catch(function (err) {
-      self.setData({ loading: false, cloudError: cloud.humanError(err) });
-      // 整页失败的现场必须留日志，否则"网络异常"四个字无从排查
+      self.setData({
+        loading: false,
+        cloudError: cloud.humanError(err),
+        // 原始报错摊在页面上：不用翻 Console 也能定位
+        cloudRaw: (err && (err.errMsg || err.message)) || String(err)
+      });
       console.warn('[class] myClass 加载失败', (err && (err.errMsg || err.message)) || err);
     });
   },
@@ -303,6 +310,25 @@ Page({
     wx.redirectTo({ url: '/pages/study/study' });
   },
 
+  /** 云自检：把"云函数活着吗 / 库里有数据吗"直接摊在页面上，不靠猜 */
+  runDiagnose: function () {
+    var self = this;
+    this.setData({ diagnoseText: '自检中…' });
+    cloud.api.diagnose(true).then(function (r) {
+      self.setData({
+        diagnoseText:
+          '云函数版本 ' + (r.version || '未带版本戳（旧代码）') + '\n' +
+          '状态记录 ' + r.stateTotal + ' 条 / 覆盖 ' + r.usersWithState + ' 人\n' +
+          '脏记录 ' + r.dirty + ' 条\n' +
+          '学习日志 ' + r.reviewLogTotal + ' 条\n' +
+          (r.hint || '')
+      });
+    }).catch(function (err) {
+      self.setData({ diagnoseText: '自检失败：' + ((err && (err.errMsg || err.message)) || err) });
+    });
+  },
+
+  /** 学生退出班级（换班用） */
   leaveConfirm: function () {
     var self = this;
     wx.showModal({

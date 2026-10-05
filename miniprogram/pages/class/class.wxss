@@ -6,6 +6,20 @@
 .row-between { display: flex; align-items: center; justify-content: space-between; }
 .grow { flex: 1; }
 
+/* 排查用：把原始报错和云自检结果摊在页面上（等宽小字，可长按复制） */
+.raw-err {
+  margin-top: 14rpx;
+  padding: 16rpx 18rpx;
+  background: #101a24;
+  border: 2rpx solid #24313f;
+  border-radius: 12rpx;
+  color: #ffb4bf;
+  font-size: 22rpx;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 /* 邀请码徽章 */
 .code-badge {
   padding: 14rpx 20rpx;
