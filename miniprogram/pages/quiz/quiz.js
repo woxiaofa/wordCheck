@@ -75,9 +75,12 @@ Page({
       var qs = (data && data.questions) || [];
       if (!qs.length) throw new Error('EMPTY');
       self.beginQuiz(qs, false);
-    }).catch(function () {
+    }).catch(function (err) {
       wx.hideLoading();
-      // 云端未部署：用本地词库出题，判分规则与云端一致
+      // 云端未部署：用本地词库出题，判分规则与云端一致。
+      // 留下线索：本地题的成绩提交云端也会失败，教练端看不到进度时先看这条
+      console.warn('[cloud] generateQuiz 失败，本轮用本地题（成绩可能无法同步）：',
+        (err && (err.errMsg || err.message)) || err);
       self.beginQuiz(self.localQuestions(QUESTION_COUNT), true);
     });
   },
@@ -427,7 +430,11 @@ Page({
         return { wordId: q.wordId, type: q.type, answer: Array.isArray(a) ? a.join('') : a };
       }),
       clientReqId: 'quiz-' + srs.newReqId()
-    }).catch(function () {});
+    }).catch(function (err) {
+      // 不完全静默：抽查成绩没上云时，教练端作业进度会停在 0，必须留下线索
+      console.warn('[cloud] submitQuiz 失败，这次抽查成绩没有同步到云端：',
+        (err && (err.errMsg || err.message)) || err);
+    });
 
     var total = questions.length;
     var rate = total ? correctCount / total : 0;
