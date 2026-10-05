@@ -1,0 +1,504 @@
+/**
+ * 云函数：class —— 家长/老师端（教练端）
+ *
+ * 职责：建班级、邀请码加入、布置任务、看学员进度、生成催学文案。
+ * 硬约定（实施手册第五章）：
+ *   1) 身份只认 OPENID；coach 身份以 classes.owner_id 为准，不信客户端
+ *   2) assign 走 client_req_id 幂等，重试不产生重复作业
+ *   3) 催学只生成文本由家长自己发微信，不做任何推送（合规红线）
+ *   4) 学员进度从 user_word_state 现算（班级规模小，不值得为它维护冗余集合）
+ *
+ * 部署前置：本目录需含 shared/ 副本（scripts/prepare-functions.js 生成）；
+ *           控制台需建 classes 集合 + 唯一索引 {code:1}、assignments 索引
+ *           {class_id:1, created_at:-1}、users 索引 {class_id:1}。
+ */
+
+const cloud = require('wx-server-sdk');
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
+
+const db = cloud.database();
+const _ = db.command;
+const { getLocalDate } = require('./shared/time');
+
+const COLL = {
+  users: 'users',
+  classes: 'classes',
+  assignments: 'assignments',
+  state: 'user_word_state',
+  requests: 'request_dedup'
+};
+
+const LIMITS = {
+  NAME_MAX: 20,
+  CODE_LEN: 6,
+  CODE_ALPHABET: '23456789ABCDEFGHJKMNPQRSTUVWXYZ', // 去掉易混的 0O1IL
+  CLASS_SIZE_MAX: 50,
+  ASSIGN_COUNT_MIN: 3,
+  ASSIGN_COUNT_MAX: 30,
+  NOTE_MAX: 60,
+  WORDS_FETCH_MAX: 50           // 选词时最多拉取的候选数（freq 升序）
+};
+
+// 邀请码 → 班级 文档的缓存有效期（沿用 request_dedup 的清理思路，靠 TTL 惰性过期）
+const REQ_TTL_MS = 2 * 86400000;
+
+exports.main = async (event) => {
+  const { OPENID } = cloud.getWXContext();
+  if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
+
+  switch (event.action) {
+    case 'createClass':   return onCreateClass(OPENID, event);
+    case 'joinClass':     return onJoinClass(OPENID, event);
+    case 'myClass':       return onMyClass(OPENID);
+    case 'assign':        return onAssign(OPENID, event);
+    case 'assignments':   return onAssignments(OPENID);
+    case 'myAssignments': return onMyAssignments(OPENID);
+    case 'students':      return onStudents(OPENID);
+    case 'studentDetail': return onStudentDetail(OPENID, event);
+    case 'nudge':         return onNudge(OPENID, event);
+    default:              return fail('BAD_ACTION', '未知 action: ' + event.action);
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/* 建班级（家长/老师端入口）                                             */
+/* ------------------------------------------------------------------ */
+async function onCreateClass(openid, { name, clientReqId }) {
+  if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
+  name = typeof name === 'string' ? name.trim().slice(0, LIMITS.NAME_MAX) : '';
+  if (!name) return fail('BAD_PARAM', '班级名称不能为空');
+
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+
+  // 已是教练的不能再建（一个微信号管一个班，MVP 先立这条规矩）
+  const owned = await findOwnedClass(user._id);
+  if (owned) return ok({ class: publicClass(owned), created: false });
+
+  // 邀请码撞码重试（6 位 30^6 ≈ 7 亿，实际一次就中）
+  let cls = null;
+  for (let i = 0; i < 5 && !cls; i++) {
+    const code = genCode();
+    const dup = await db.collection(COLL.classes).where({ code }).limit(1).get();
+    if (dup.data && dup.data[0]) continue;
+    const addRes = await db.collection(COLL.classes).add({
+      data: {
+        name,
+        code,
+        owner_id: user._id,
+        student_ids: [],
+        created_at: Date.now()
+      }
+    });
+    cls = { _id: addRes._id, name, code, owner_id: user._id, student_ids: [] };
+  }
+  if (!cls) return fail('CODE_GEN_FAIL', '邀请码生成失败，请重试');
+
+  await db.collection(COLL.users).doc(user._id)
+    .update({ data: { role: 'coach', class_id: cls._id } });
+
+  return ok({ class: publicClass(cls), created: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* 邀请码加入班级（学生端）                                              */
+/* ------------------------------------------------------------------ */
+async function onJoinClass(openid, { code }) {
+  code = typeof code === 'string' ? code.trim().toUpperCase() : '';
+  if (code.length !== LIMITS.CODE_LEN) return fail('BAD_PARAM', '邀请码格式不正确');
+
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+
+  if (user.role === 'coach') return fail('ROLE_CONFLICT', '你是班级创建者，不能以学生身份加入其他班级');
+
+  const found = await db.collection(COLL.classes).where({ code }).limit(1).get();
+  const cls = found.data && found.data[0];
+  if (!cls) return fail('CLASS_NOT_FOUND', '邀请码无效，请核对后重试');
+
+  if (cls.owner_id === user._id) return fail('ROLE_CONFLICT', '这是你自己创建的班级');
+
+  if (user.class_id === cls._id) return ok({ class: publicClass(cls), joined: false });
+
+  const ids = Array.isArray(cls.student_ids) ? cls.student_ids : [];
+  if (ids.length >= LIMITS.CLASS_SIZE_MAX) return fail('CLASS_FULL', '该班级人数已满');
+
+  if (!ids.includes(user._id)) {
+    await db.collection(COLL.classes).doc(cls._id)
+      .update({ data: { student_ids: _.push(user._id) } }).catch(async () => {
+        // student_ids 字段缺失（老数据）时整体写入
+        await db.collection(COLL.classes).doc(cls._id)
+          .update({ data: { student_ids: ids.concat(user._id) } });
+      });
+  }
+  await db.collection(COLL.users).doc(user._id)
+    .update({ data: { class_id: cls._id } });
+
+  return ok({ class: publicClass(cls), joined: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* 查我所在的班级（学生/教练通用）                                        */
+/* ------------------------------------------------------------------ */
+async function onMyClass(openid) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+  if (!user.class_id) return ok({ class: null });
+
+  const r = await db.collection(COLL.classes).doc(user.class_id).get().catch(() => null);
+  if (!r || !r.data) return ok({ class: null });   // 班级被删了，视为无班级
+
+  const cls = r.data;
+  const isOwner = cls.owner_id === user._id;
+  return ok({
+    class: publicClass(cls),
+    role: isOwner ? 'coach' : 'student',
+    student_count: isOwner ? (cls.student_ids || []).length : undefined
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* 布置任务（教练端）                                                    */
+/* ------------------------------------------------------------------ */
+async function onAssign(openid, { tag, count, deadline, note, clientReqId }) {
+  if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
+
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  // --- 入参校验 ---
+  const VALID_TAGS = ['全部', '中考', '高考', '四级'];
+  if (!VALID_TAGS.includes(tag)) return fail('BAD_PARAM', '词库标签无效');
+  count = parseInt(count, 10);
+  if (!(count >= LIMITS.ASSIGN_COUNT_MIN && count <= LIMITS.ASSIGN_COUNT_MAX)) {
+    return fail('BAD_PARAM', '词数需在 ' + LIMITS.ASSIGN_COUNT_MIN + '~' + LIMITS.ASSIGN_COUNT_MAX + ' 之间');
+  }
+  if (deadline !== undefined && deadline !== null && deadline !== '') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return fail('BAD_PARAM', '截止日期格式应为 YYYY-MM-DD');
+    if (deadline < getLocalDate()) return fail('BAD_PARAM', '截止日期不能早于今天');
+  } else {
+    deadline = '';
+  }
+  note = typeof note === 'string' ? note.trim().slice(0, LIMITS.NOTE_MAX) : '';
+
+  // --- 幂等闸 ---
+  const dup = await db.collection(COLL.requests)
+    .where({ _id: ctx.user._id + ':assign:' + clientReqId }).limit(1).get()
+    .catch(() => ({ data: [] }));
+  if (dup.data && dup.data[0]) {
+    const prev = await db.collection(COLL.assignments).doc(dup.data[0].ref).get().catch(() => null);
+    if (prev && prev.data) return ok({ assignment: publicAssignment(prev.data), dedup: true });
+  }
+
+  // --- 选词：按词频升序取前 count 个（简单可解释，学生先学高频词） ---
+  const wordsRes = await db.collection('words')
+    .where(tag === '全部' ? {} : { tags: tag })
+    .orderBy('freq', 'asc')
+    .limit(LIMITS.WORDS_FETCH_MAX)
+    .get();
+  const wordIds = (wordsRes.data || []).slice(0, count).map(w => w._id);
+  if (wordIds.length < LIMITS.ASSIGN_COUNT_MIN) {
+    return fail('WORDS_EMPTY', '该词库暂无可布置的单词');
+  }
+
+  const now = Date.now();
+  const addRes = await db.collection(COLL.assignments).add({
+    data: {
+      class_id: ctx.cls._id,
+      tag,
+      word_ids: wordIds,
+      count: wordIds.length,
+      deadline,
+      note,
+      created_by: ctx.user._id,
+      created_at: now
+    }
+  });
+
+  // 记录幂等映射（含引用，重复请求直接返回同一份作业）
+  await db.collection(COLL.requests).add({
+    _id: ctx.user._id + ':assign:' + clientReqId,
+    ref: addRes._id,
+    created_at: now,
+    expire_at: now + REQ_TTL_MS
+  }).catch(() => {});
+
+  const created = await db.collection(COLL.assignments).doc(addRes._id).get();
+  return ok({ assignment: publicAssignment(created.data), dedup: false });
+}
+
+/* ------------------------------------------------------------------ */
+/* 教练端：作业列表（带全班进度）                                         */
+/* ------------------------------------------------------------------ */
+async function onAssignments(openid) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  const list = await db.collection(COLL.assignments)
+    .where({ class_id: ctx.cls._id })
+    .orderBy('created_at', 'desc')
+    .limit(20)
+    .get();
+  const assignments = list.data || [];
+  if (!assignments.length) return ok({ assignments: [] });
+
+  const studentIds = ctx.cls.student_ids || [];
+  const withProgress = [];
+  for (const a of assignments) {
+    const per = await progressByStudent(studentIds, a.word_ids);
+    withProgress.push(Object.assign(publicAssignment(a), {
+      finished: per.filter(p => p.done >= a.count).length,
+      total_students: studentIds.length,
+      per_student: per
+    }));
+  }
+  return ok({ assignments: withProgress });
+}
+
+/* ------------------------------------------------------------------ */
+/* 学生端：我班级的作业 + 我的进度                                        */
+/* ------------------------------------------------------------------ */
+async function onMyAssignments(openid) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+  if (!user.class_id) return ok({ assignments: [] });
+
+  const list = await db.collection(COLL.assignments)
+    .where({ class_id: user.class_id })
+    .orderBy('created_at', 'desc')
+    .limit(20)
+    .get();
+  const assignments = list.data || [];
+  if (!assignments.length) return ok({ assignments: [] });
+
+  const wordAll = [];
+  assignments.forEach(a => (a.word_ids || []).forEach(w => wordAll.push(w)));
+
+  // 我对这些词的学习情况
+  const stateRes = await db.collection(COLL.state)
+    .where({ user_id: user._id, word_id: _.in(wordAll) })
+    .limit(1000)
+    .get();
+  const stateMap = {};
+  (stateRes.data || []).forEach(s => { stateMap[s.word_id] = s; });
+
+  const today = getLocalDate();
+  const result = assignments.map(a => {
+    let done = 0;
+    const words = (a.word_ids || []).map(id => {
+      const s = stateMap[id];
+      const learned = !!(s && (s.correct_count > 0 || s.stage > 0));
+      if (learned) done++;
+      return { word_id: id, learned };
+    });
+    return Object.assign(publicAssignment(a), {
+      done,
+      words,
+      expired: !!(a.deadline && a.deadline < today)
+    });
+  });
+  return ok({ assignments: result });
+}
+
+/* ------------------------------------------------------------------ */
+/* 教练端：学员列表                                                      */
+/* ------------------------------------------------------------------ */
+async function onStudents(openid) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  const ids = ctx.cls.student_ids || [];
+  if (!ids.length) return ok({ students: [] });
+
+  const res = await db.collection(COLL.users)
+    .where({ _id: _.in(ids) })
+    .limit(LIMITS.CLASS_SIZE_MAX)
+    .get();
+  const students = (res.data || []).map(u => ({
+    id: u._id,
+    nickname: u.nickname || '',
+    avatar: u.avatar || '',
+    stats: u.stats_cache || { total_words: 0, learned_words: 0, streak_days: 0 },
+    last_seen_at: u.last_seen_at || 0
+  }));
+  return ok({ students });
+}
+
+/* ------------------------------------------------------------------ */
+/* 教练端：单个学员详情（学习记录 + 各作业完成度）                          */
+/* ------------------------------------------------------------------ */
+async function onStudentDetail(openid, { studentId }) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  const ids = ctx.cls.student_ids || [];
+  if (!ids.includes(studentId)) return fail('FORBIDDEN', '该学生不在你的班级');
+
+  const uRes = await db.collection(COLL.users).doc(studentId).get().catch(() => null);
+  if (!uRes || !uRes.data) return fail('NOT_FOUND', '学生不存在');
+
+  const logRes = await db.collection('review_logs')
+    .where({ user_id: studentId })
+    .orderBy('created_at', 'desc')
+    .limit(30)
+    .get();
+
+  const assignments = await db.collection(COLL.assignments)
+    .where({ class_id: ctx.cls._id })
+    .orderBy('created_at', 'desc')
+    .limit(20)
+    .get();
+  const withProgress = [];
+  for (const a of (assignments.data || [])) {
+    const per = await progressByStudent([studentId], a.word_ids);
+    withProgress.push(Object.assign(publicAssignment(a), {
+      done: per.length ? per[0].done : 0
+    }));
+  }
+
+  return ok({
+    student: {
+      id: uRes.data._id,
+      nickname: uRes.data.nickname || '',
+      avatar: uRes.data.avatar || '',
+      stats: uRes.data.stats_cache || {},
+      last_seen_at: uRes.data.last_seen_at || 0
+    },
+    recent_logs: (logRes.data || []).map(l => ({
+      word_id: l.word_id,
+      feedback: l.feedback,
+      mode: l.mode,
+      created_at: l.created_at
+    })),
+    assignments: withProgress
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* 催学：只生成文案，不做推送（家长复制后自己去发微信）                      */
+/* ------------------------------------------------------------------ */
+async function onNudge(openid, { studentId }) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  const ids = ctx.cls.student_ids || [];
+  if (!ids.includes(studentId)) return fail('FORBIDDEN', '该学生不在你的班级');
+
+  const uRes = await db.collection(COLL.users).doc(studentId).get().catch(() => null);
+  if (!uRes || !uRes.data) return fail('NOT_FOUND', '学生不存在');
+  const stu = uRes.data;
+
+  const assignments = await db.collection(COLL.assignments)
+    .where({ class_id: ctx.cls._id })
+    .orderBy('created_at', 'desc')
+    .limit(5)
+    .get();
+  let line = '';
+  for (const a of (assignments.data || [])) {
+    const per = await progressByStudent([studentId], a.word_ids);
+    const done = per.length ? per[0].done : 0;
+    const left = a.count - done;
+    if (left > 0) {
+      line = '《' + (a.note || a.tag + '作业') + '》还剩 ' + left + ' 个词' +
+        (a.deadline ? '，' + a.deadline + ' 截止' : '');
+      break;
+    }
+  }
+
+  const stats = stu.stats_cache || {};
+  const seenAgo = stu.last_seen_at ? fmtAgo(Date.now() - stu.last_seen_at) : '还没来过';
+  const parts = [];
+  parts.push('【' + ctx.cls.name + '】' + (stu.nickname || '同学'));
+  if (stats.learned_words > 0) {
+    parts.push('目前已经积累了 ' + stats.learned_words + ' 个词' +
+      (stats.streak_days > 1 ? '，连续打卡 ' + stats.streak_days + ' 天' : '') + '，继续保持！');
+  } else {
+    parts.push('单词之旅还没有开始，今天花 5 分钟学第一课吧！');
+  }
+  parts.push(line || '今天的任务：学 10 个新词 + 巩固到期复习，大约 3 分钟。');
+  parts.push('（上次活跃：' + seenAgo + '）');
+
+  return ok({ text: parts.join('\n') });
+}
+
+/* ------------------------------------------------------------------ */
+/* 工具                                                                */
+/* ------------------------------------------------------------------ */
+async function getUser(openid) {
+  const r = await db.collection(COLL.users).where({ openid }).limit(1).get();
+  return r.data && r.data[0] ? r.data[0] : null;
+}
+
+async function findOwnedClass(userId) {
+  const r = await db.collection(COLL.classes).where({ owner_id: userId }).limit(1).get();
+  return r.data && r.data[0] ? r.data[0] : null;
+}
+
+/** 教练校验 + 上下文。失败时返回 { err } */
+async function requireCoach(openid) {
+  const user = await getUser(openid);
+  if (!user) return { err: fail('NO_USER', '用户不存在，请先 login') };
+  if (user.role !== 'coach') return { err: fail('NOT_COACH', '仅班级创建者可执行此操作') };
+  const cls = await findOwnedClass(user._id);
+  if (!cls) return { err: fail('NO_CLASS', '你还没有创建班级') };
+  return { user, cls };
+}
+
+/**
+ * 按学生统计作业词的完成数。
+ * 完成定义：user_word_state 里该词存在且 correct_count>0 或 stage>0（学过并至少答对一次/进入复习流程）。
+ */
+async function progressByStudent(studentIds, wordIds) {
+  if (!studentIds.length || !wordIds || !wordIds.length) return [];
+  const res = await db.collection(COLL.state)
+    .where({ user_id: _.in(studentIds), word_id: _.in(wordIds) })
+    .limit(1000)
+    .get();
+  const map = {};
+  (res.data || []).forEach(s => {
+    const learned = s.correct_count > 0 || s.stage > 0;
+    if (!learned) return;
+    if (!map[s.user_id]) map[s.user_id] = { user_id: s.user_id, done: 0 };
+    map[s.user_id].done++;
+  });
+  return studentIds.map(id => map[id] || { user_id: id, done: 0 });
+}
+
+function genCode() {
+  let s = '';
+  for (let i = 0; i < LIMITS.CODE_LEN; i++) {
+    s += LIMITS.CODE_ALPHABET[Math.floor(Math.random() * LIMITS.CODE_ALPHABET.length)];
+  }
+  return s;
+}
+
+function fmtAgo(ms) {
+  if (ms < 60000) return '1 分钟内';
+  if (ms < 3600000) return Math.floor(ms / 60000) + ' 分钟前';
+  if (ms < 86400000) return Math.floor(ms / 3600000) + ' 小时前';
+  return Math.floor(ms / 86400000) + ' 天前';
+}
+
+function publicClass(c) {
+  return {
+    id: c._id,
+    name: c.name,
+    code: c.code,                 // 学生端输入邀请码用；教练本来就看得到
+    created_at: c.created_at
+  };
+}
+
+/** 作业下发字段：word_ids 明细只给学生端 myAssignments 用，教练列表不给 */
+function publicAssignment(a) {
+  return {
+    id: a._id,
+    tag: a.tag,
+    count: a.count,
+    deadline: a.deadline || '',
+    note: a.note || '',
+    created_at: a.created_at
+  };
+}
+
+const ok = (data) => ({ ok: true, data });
+const fail = (code, message) => ({ ok: false, code, message });

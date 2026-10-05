@@ -20,6 +20,9 @@ assets/fonts/*.otf
 assets/fonts/*.ttf
 assets/fonts/*.ttc
 
+# 云函数目录里的 shared 副本（由 scripts/prepare-functions.js 生成，部署前自动就位）
+cloud/functions/*/shared/
+
 # Piper 语音模型（63MB，按需下载，见 scripts/gen_audio_piper.py 注释里的 hf-mirror 链接）
 scripts/piper-models/
 

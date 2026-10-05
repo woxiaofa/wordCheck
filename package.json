@@ -7,8 +7,10 @@
     "test": "node tests/srs.test.js && node tests/time.test.js && node tests/quiz.test.js && node tests/word-card.test.js && node tests/word-card-init.test.js && node tests/study-page.test.js && node tests/study-flow.test.js && node tests/keyboard.test.js && node tests/books.test.js && node tests/tts.test.js",
     "shared:sync": "node scripts/sync-shared.js",
     "shared:check": "node scripts/sync-shared.js --check",
+    "functions:prepare": "node scripts/prepare-functions.js",
+    "functions:check": "node scripts/prepare-functions.js --check",
     "verify": "node scripts/verify-project.js && node scripts/check-bindings.js",
-    "check": "node scripts/verify-project.js && node scripts/check-bindings.js && node tests/srs.test.js && node tests/time.test.js && node tests/quiz.test.js && node tests/word-card.test.js && node tests/word-card-init.test.js && node tests/study-page.test.js && node tests/study-flow.test.js && node tests/keyboard.test.js && node tests/books.test.js && node tests/tts.test.js"
+    "check": "node scripts/verify-project.js && node scripts/check-bindings.js && node scripts/prepare-functions.js --check && node tests/srs.test.js && node tests/time.test.js && node tests/quiz.test.js && node tests/word-card.test.js && node tests/word-card-init.test.js && node tests/study-page.test.js && node tests/study-flow.test.js && node tests/keyboard.test.js && node tests/books.test.js && node tests/tts.test.js"
   },
   "engines": {
     "node": ">=16"
