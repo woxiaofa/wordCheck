@@ -111,23 +111,57 @@
         还没有学员加入。把上面的邀请码发给孩子，等孩子输入后就出现在这里。
       </view>
       <view class="stu" wx:for="{{students}}" wx:key="id">
-        <view class="stu-ava">{{item.nickname[0] || '学'}}</view>
-        <view class="stu-mid">
-          <view>{{item.nickname}}</view>
-          <!-- 家长真正想看的是"今天学没学、学得怎么样"，累计词数只是补充 -->
-          <view wx:if="{{item.synced}}" class="muted" style="font-size:22rpx">
-            今天 {{item.today.count}} 个<text wx:if="{{item.today.count}}"> · 掌握 {{item.todayRate}}%</text>
-            <text wx:if="{{item.wrong}}"> · 易错 {{item.wrong}} 词</text>
-          </view>
-          <view wx:else class="muted" style="font-size:22rpx">
-            还没同步数据（孩子打开小程序学过之后才会出现）
-          </view>
-          <view class="muted" style="font-size:22rpx;opacity:.75">
-            累计 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
+        <view class="stu-main" data-id="{{item.id}}" bindtap="toggleReport">
+          <view class="stu-ava">{{item.nickname[0] || '学'}}</view>
+          <view class="stu-mid">
+            <view>{{item.nickname}}<text class="muted" style="font-size:20rpx">（点看报告）</text></view>
+            <!-- 家长真正想看的是"今天学没学、学得怎么样"，累计词数只是补充 -->
+            <view wx:if="{{item.synced}}" class="muted" style="font-size:22rpx">
+              今天 {{item.today.count}} 个<text wx:if="{{item.today.count}}"> · 掌握 {{item.todayRate}}%</text>
+              <text wx:if="{{item.wrong}}"> · 易错 {{item.wrong}} 词</text>
+            </view>
+            <view wx:else class="muted" style="font-size:22rpx">
+              还没同步数据（孩子打开小程序学过之后才会出现）
+            </view>
+            <view class="muted" style="font-size:22rpx;opacity:.75">
+              累计 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
+            </view>
           </view>
         </view>
-        <button class="btn sm ghost" data-id="{{item.id}}" bindtap="makeNudge">催一催</button>
+        <button class="btn sm ghost" data-id="{{item.id}}" catchtap="makeNudge">催一催</button>
       </view>
+
+      <!-- 学员进度报告（点学员卡展开） -->
+      <block wx:for="{{students}}" wx:for-item="stu" wx:key="id">
+        <view wx:if="{{reports[stu.id] && reports[stu.id].open}}" class="report">
+          <view class="report-title">{{stu.nickname}} 的进度报告</view>
+          <view wx:if="{{reports[stu.id].loading}}" class="muted mt-s">加载中…</view>
+          <view wx:elif="{{reports[stu.id].error}}" class="muted mt-s">
+            加载失败：{{reports[stu.id].error}}
+            <text class="link" data-id="{{stu.id}}" bindtap="toggleReport"> 重试</text>
+          </view>
+          <block wx:else>
+            <view wx:if="{{!reports[stu.id].assignments.length && !reports[stu.id].logs.length}}"
+                  class="muted mt-s">还没有学习记录，等孩子学一轮后再来看。</view>
+            <view wx:for="{{reports[stu.id].assignments}}" wx:key="id" class="report-assign">
+              <view class="row-between">
+                <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+                <text class="muted" style="font-size:22rpx">{{item.done}}/{{item.count}}</text>
+              </view>
+              <view class="bar"><view class="bar-in" style="width:{{item.count ? item.done * 100 / item.count : 0}}%"></view></view>
+            </view>
+            <view wx:if="{{reports[stu.id].logs.length}}" class="report-logs">
+              <view class="muted" style="font-size:22rpx;margin-bottom:8rpx">最近评分</view>
+              <view class="report-log" wx:for="{{reports[stu.id].logs}}" wx:key="index">
+                <text class="log-mark {{item.ok ? 'ok' : 'bad'}}">{{item.ok ? '✓' : '✗'}}</text>
+                <text class="log-word">{{item.word_text}}</text>
+                <text class="muted log-trans">{{item.translation}}</text>
+                <text class="muted log-time">{{item.timeText}}</text>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
     </view>
   </block>
 

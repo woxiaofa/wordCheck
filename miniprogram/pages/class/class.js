@@ -33,6 +33,8 @@ Page({
     /** 数据加载失败时显示在对应卡片里的错误（绝不静默吞错：吞了就无法排查） */
     assignError: '',
     stuError: '',
+    /** 学员进度报告：{ [studentId]: {loading, error, assignments, recent_logs} } */
+    reports: {},
 
     // 学生端
     myAssignments: [],
@@ -193,6 +195,60 @@ Page({
     });
   },
 
+  /**
+   * 学员进度报告：点学员卡展开/收起。首次展开（或数据超过 5 分钟）时
+   * 拉取该学员的作业完成度 + 最近学习记录（单词文本已在服务端翻译好）。
+   */
+  toggleReport: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var cur = this.data.reports[id];
+    var self = this;
+
+    if (cur && !cur.loading) {
+      if (cur.open) {
+        var closeUpd = {};
+        closeUpd['reports.' + id + '.open'] = false;
+        this.setData(closeUpd);
+        return;
+      }
+      var fresh = cur.at && (Date.now() - cur.at < 5 * 60000);
+      var openUpd = {};
+      openUpd['reports.' + id + '.open'] = true;
+      this.setData(openUpd);
+      if (fresh && !cur.error) return;   // 数据还新鲜，直接展示
+    }
+
+    var loadUpd = {};
+    loadUpd['reports.' + id + '.loading'] = true;
+    loadUpd['reports.' + id + '.open'] = true;
+    loadUpd['reports.' + id + '.error'] = '';
+    this.setData(loadUpd);
+    cloud.api.studentDetail(id).then(function (r) {
+      var logs = (r.recent_logs || []).slice(0, 10).map(function (l) {
+        return Object.assign({}, l, {
+          timeText: l.created_at ? fmtTime(l.created_at) : '',
+          ok: l.feedback === 'known'
+        });
+      });
+      var upd = {};
+      upd['reports.' + id] = {
+        open: true, loading: false, error: '', at: Date.now(),
+        nickname: (r.student && r.student.nickname) || '',
+        assignments: r.assignments || [],
+        logs: logs
+      };
+      self.setData(upd);
+    }).catch(function (err) {
+      var upd = {};
+      upd['reports.' + id] = {
+        open: true, loading: false, error: cloud.humanError(err), at: Date.now(),
+        assignments: [], logs: []
+      };
+      self.setData(upd);
+      console.warn('[class] 学员报告加载失败', err);
+    });
+  },
+
   copyCode: function () {
     var code = this.data.cls && this.data.cls.code;
     if (!code) return;
@@ -267,4 +323,14 @@ function fmtAgo(ms) {
   if (ms < 3600000) return Math.floor(ms / 60000) + ' 分钟前活跃';
   if (ms < 86400000) return Math.floor(ms / 3600000) + ' 小时前活跃';
   return Math.floor(ms / 86400000) + ' 天前活跃';
+}
+
+/** 报告里的记录时间：今天显示时分，更早显示月-日 时分 */
+function fmtTime(ts) {
+  var d = new Date(ts);
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  var today = time.getLocalDate(Date.now());
+  if (time.getLocalDate(ts) === today) return hm;
+  return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + hm;
 }

@@ -30,6 +30,13 @@ const COLL = {
 };
 
 /**
+ * 版本戳：随每个响应返回（_v 字段），小程序端 Console 会打印
+ * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
+ * 不用再猜 —— 版本号对不上就是没部署成功。
+ */
+const VERSION = 'rev-20261005-state-id';
+
+/**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
  */
 exports.main = async (event, context) => {
@@ -180,24 +187,31 @@ async function onDueList(openid, { limit }) {
 /* ------------------------------------------------------------------ */
 
 /**
- * 用法（云控制台 → 云函数 → review → 云端测试）：
- *   {"action":"diagnose"}                 只看
- *   {"action":"diagnose","clean":true}    连清带看
+ * 自检入口，两种用法：
  *
- * 返回：该用户在 user_word_state 里的记录数、其中 word_id 为空的脏记录数、
- *       以及 users.stats_cache 的当前值 —— "教练端进度恒 0"一眼就能定位到是哪一环断了。
+ * A) 云控制台 → 云函数 → review → 云端测试（**不需要**小程序登录态）：
+ *      {"action":"diagnose","all":true}                 全表只查
+ *      {"action":"diagnose","all":true,"clean":true}    全表连清带查
+ *    早先版本在这里要求 OPENID，控制台测试永远返回 NO_USER，自检形同虚设。
+ *
+ * B) 小程序端调用（带登录态）：{"action":"diagnose"}
+ *      只看当前用户；加 "clean":true 连清带看。
+ *
+ * 返回：记录总数、word_id 为空的脏记录数、review_logs 是否有数据、
+ *       stats_cache 当前值 —— "进度恒 0"一眼定位到是哪一环断了。
  */
-async function onDiagnose(openid, { clean }) {
+async function onDiagnose(openid, { clean, all }) {
+  if (all || !openid) return diagnoseAll(clean);
   const user = await getUser(openid);
-  if (!user) return fail('NO_USER', '用户不存在，先打开一次小程序触发登录');
+  if (!user) return diagnoseAll(clean);
 
   const res = await db.collection(COLL.state)
     .where({ user_id: user._id })
     .limit(1000)
     .field({ word_id: true, stage: true, last_feedback: true })
     .get();
-  const all = res.data || [];
-  const dirty = all.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
+  const allRows = res.data || [];
+  const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
 
   let cleaned = 0;
   if (clean) {
@@ -211,17 +225,62 @@ async function onDiagnose(openid, { clean }) {
     .where({ user_id: user._id }).limit(1).get().catch(() => ({ data: [] }));
 
   return ok({
+    scope: 'user',
     userId: user._id,
-    stateTotal: all.length,
+    version: VERSION,
+    stateTotal: allRows.length,
     dirty: dirty.length,
     dirtyIds: dirty.slice(0, 10).map((d) => String(d._id)),
     cleaned: cleaned,
     hasReviewLog: !!(logs.data && logs.data.length),
     statsCache: user.stats_cache || null,
     hint: dirty.length
-      ? '存在 word_id 为空的脏记录（' + dirty.length + ' 条），会让该用户每条新词都写不进去。' +
-        (clean ? '已清理 ' + cleaned + ' 条。' : '再填 {"action":"diagnose","clean":true} 可自动清理。')
+      ? '存在 word_id 为空的脏记录（' + dirty.length + ' 条）。' +
+        (clean ? '已清理 ' + cleaned + ' 条。' : '加 "clean":true 可自动清理。')
       : '状态表干净，学习数据可以正常写入'
+  });
+}
+
+/** 全表诊断：不依赖任何用户身份，控制台"云端测试"可直接跑 */
+async function diagnoseAll(clean) {
+  const res = await db.collection(COLL.state)
+    .limit(1000)
+    .field({ user_id: true, word_id: true })
+    .get().catch(() => ({ data: [] }));
+  const allRows = res.data || [];
+  const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
+
+  const byUser = {};
+  allRows.forEach((d) => {
+    const k = String(d.user_id);
+    byUser[k] = (byUser[k] || 0) + 1;
+  });
+
+  let cleaned = 0;
+  if (clean) {
+    for (const d of dirty) {
+      const r = await db.collection(COLL.state).doc(d._id).remove().catch(() => null);
+      if (r) cleaned++;
+    }
+  }
+
+  const logCount = await db.collection(COLL.logs).count()
+    .catch(() => ({ total: -1 }));
+
+  return ok({
+    scope: 'all',
+    version: VERSION,
+    stateTotal: allRows.length,
+    usersWithState: Object.keys(byUser).length,
+    perUserCounts: byUser,
+    dirty: dirty.length,
+    dirtyIds: dirty.slice(0, 10).map((d) => String(d._id)),
+    cleaned: cleaned,
+    reviewLogTotal: logCount.total,
+    hint: dirty.length
+      ? '全表存在 word_id 为空的脏记录（' + dirty.length + ' 条）。' +
+        (clean ? '已清理 ' + cleaned + ' 条。' : '加 "clean":true 可自动清理。')
+      : '状态表干净。当前写入器用确定性 _id（user_id:word_id），脏数据也挡不住新写入。'
   });
 }
 
@@ -252,5 +311,5 @@ async function enqueueTodayOnce(userId, today, wordId, now) {
   });
 }
 
-const ok = (data) => ({ ok: true, data });
-const fail = (code, message) => ({ ok: false, code, message });
+const ok = (data) => ({ ok: true, _v: VERSION, data });
+const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

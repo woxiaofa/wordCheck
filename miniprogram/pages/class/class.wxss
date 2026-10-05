@@ -111,6 +111,7 @@
   padding-top: 22rpx;
   border-top: 2rpx solid #1e2a38;
 }
+.stu-main { display: flex; align-items: center; gap: 18rpx; flex: 1; min-width: 0; }
 .stu-ava {
   width: 72rpx;
   height: 72rpx;
@@ -125,3 +126,40 @@
   flex-shrink: 0;
 }
 .stu-mid { flex: 1; font-size: 28rpx; }
+
+/* 学员进度报告（展开区） */
+.report {
+  margin-top: 14rpx;
+  margin-left: 90rpx;
+  padding: 20rpx 24rpx;
+  background: #16222f;
+  border-radius: 16rpx;
+  border: 2rpx solid #1e2a38;
+}
+.report-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #3ea6ff;
+  margin-bottom: 10rpx;
+}
+.report-assign { margin-top: 14rpx; }
+.report-logs { margin-top: 20rpx; }
+.report-log {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 8rpx 0;
+  font-size: 26rpx;
+}
+.log-mark { width: 36rpx; text-align: center; font-weight: 700; flex-shrink: 0; }
+.log-mark.ok { color: #2fd07a; }
+.log-mark.bad { color: #ff5c72; }
+.log-word { font-weight: 600; }
+.log-trans {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 22rpx;
+}
+.log-time { font-size: 20rpx; opacity: .7; flex-shrink: 0; }

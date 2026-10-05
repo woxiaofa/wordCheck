@@ -219,7 +219,7 @@ function submit(word, feedback, reqId) {
 var steps = [];
 
 steps.push(function () {
-  return ok('① 正常新词：写入成功且带 word_id，统计 +1', function () {
+  return ok('① 正常新词：写入成功且带 word_id，统计 +1，_id 为 user:word', function () {
     seedUser();
     return submit('search').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
@@ -227,6 +227,8 @@ steps.push(function () {
       assert.strictEqual(st.length, 1, '应写入 1 条状态');
       assert.strictEqual(st[0].word_id, 'search');
       assert.strictEqual(st[0].user_id, 'u1');
+      assert.strictEqual(st[0]._id, 'u1:search',
+        '状态文档必须用确定性主键 user_id:word_id（脏数据挡道的根治手段）');
       assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1, '已学词数应 +1');
     });
   });

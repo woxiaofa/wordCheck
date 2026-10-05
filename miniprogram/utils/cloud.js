@@ -13,6 +13,13 @@ var ENV_ID = 'cloud1-d0gmmv8o9df84265e';
 var initialized = false;
 var initError = null;
 
+/**
+ * 云端版本探测：每个云函数的响应都带 _v 版本戳。
+ * 同一函数的版本变化、或压根没有 _v（= 云端还是没加版本戳的旧代码），
+ * 都会在 Console 打一行明白话 —— "部署到底生效没有"不再靠猜。
+ */
+var seenVersions = {};
+
 /** 小程序启动时调用一次 */
 function initCloud() {
   if (initialized) return true;
@@ -57,6 +64,7 @@ function call(name, action, payload) {
       success: function (res) {
         var r = res && res.result;
         if (!r) return reject(makeError('EMPTY_RESULT', '云函数没有返回内容'));
+        trackVersion(name, r._v);
         if (r.ok === false) return reject(makeError(r.code || 'BIZ_FAIL', r.message || '操作失败'));
         resolve(r.data);
       },
@@ -66,6 +74,22 @@ function call(name, action, payload) {
       }
     });
   });
+}
+
+/** 记录并播报云端函数版本：变了、或发现旧版（无 _v）都明说 */
+function trackVersion(name, v) {
+  if (!v) {
+    if (!seenVersions[name]) {
+      seenVersions[name] = '(旧版本)';
+      console.warn('[cloud] ' + name + ' 云端是旧版本（响应没有版本戳）——' +
+        '这次改动没有部署成功，请在云函数目录右键"上传并部署"');
+    }
+    return;
+  }
+  if (seenVersions[name] !== v) {
+    console.info('[cloud] ' + name + ' 云端版本: ' + v);
+    seenVersions[name] = v;
+  }
 }
 
 function makeError(code, message) {

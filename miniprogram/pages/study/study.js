@@ -327,9 +327,9 @@ Page({
       mode: 'learn',
       clientReqId: CACHE_PREFIX + srs.newReqId()
     }).catch(function (err) {
-      // 不完全静默：学习记录没上云时，教练端进度会永远是 0，必须留下线索。
-      // 正式版要在这里把请求压进补传队列。
-      console.warn('[cloud] submitReview 失败，这条学习记录没有同步到云端：',
+      // 不静默：学习记录没上云时，教练端进度会永远是 0，必须留下线索。
+      // submitReview 内部已把这条请求压进补传队列，启动/回前台会自动重放。
+      console.warn('[cloud] submitReview 失败（已进补传队列，稍后自动重试）：',
         (err && (err.errMsg || err.message)) || err);
     });
 

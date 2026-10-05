@@ -430,6 +430,26 @@ async function onStudentDetail(openid, { studentId }) {
     .limit(30)
     .get();
 
+  // 把 word_id 翻译成人能读的"单词 + 释义"（word_id 存的是词文本，
+  // 这里同时按 _id 兜底查一遍，两种主键方案都兼容）
+  const logs0 = logRes.data || [];
+  const uniqIds = [];
+  logs0.forEach((l) => {
+    if (l.word_id && uniqIds.indexOf(l.word_id) === -1) uniqIds.push(l.word_id);
+  });
+  const wordMap = {};
+  const wordFields = { word: true, translation: true };
+  for (const key of ['word', '_id']) {
+    if (!uniqIds.length) break;
+    const q = key === 'word' ? { word: _.in(uniqIds) } : { _id: _.in(uniqIds) };
+    const wr = await db.collection('words').where(q).limit(100).field(wordFields)
+      .get().catch(() => ({ data: [] }));
+    (wr.data || []).forEach((w) => {
+      if (w.word) wordMap[w.word] = { text: w.word, trans: w.translation || '' };
+      if (w._id) wordMap[w._id] = { text: w.word || w._id, trans: w.translation || '' };
+    });
+  }
+
   const assignments = await db.collection(COLL.assignments)
     .where({ class_id: ctx.cls._id })
     .orderBy('created_at', 'desc')
@@ -451,8 +471,10 @@ async function onStudentDetail(openid, { studentId }) {
       stats: uRes.data.stats_cache || {},
       last_seen_at: uRes.data.last_seen_at || 0
     },
-    recent_logs: (logRes.data || []).map(l => ({
+    recent_logs: logs0.map(l => ({
       word_id: l.word_id,
+      word_text: (wordMap[l.word_id] || {}).text || l.word_id,
+      translation: (wordMap[l.word_id] || {}).trans || '',
       feedback: l.feedback,
       mode: l.mode,
       created_at: l.created_at
@@ -587,5 +609,6 @@ function publicAssignment(a) {
   };
 }
 
-const ok = (data) => ({ ok: true, data });
-const fail = (code, message) => ({ ok: false, code, message });
+const VERSION = 'class-20261005';
+const ok = (data) => ({ ok: true, _v: VERSION, data });
+const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

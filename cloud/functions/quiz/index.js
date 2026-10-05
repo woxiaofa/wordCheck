@@ -358,5 +358,6 @@ async function getUser(openid) {
   return r.data && r.data[0] ? r.data[0] : null;
 }
 
-const ok = (data) => ({ ok: true, data });
-const fail = (code, message) => ({ ok: false, code, message });
+const VERSION = 'quiz-20261005';
+const ok = (data) => ({ ok: true, _v: VERSION, data });
+const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
