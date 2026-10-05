@@ -32,7 +32,7 @@
   <view wx:if="{{demo}}" style="margin-bottom:28rpx;padding:26rpx 24rpx;border:2rpx dashed #7c5cff;border-radius:20rpx;background:#241f3d">
     <view style="font-size:34rpx;font-weight:700;color:#ffffff">先试一下手势</view>
     <view style="margin-top:12rpx;font-size:28rpx;color:#d6cfff;line-height:1.7">
-      手指按住卡片，<text style="color:#ffffff;font-weight:700;text-decoration:underline">往上滑</text>——这是主要操作
+      手指按住卡片，<text style="color:#ffffff;font-weight:700;text-decoration:underline">往上滑</text>——<text style="color:#8ff0bd;font-weight:700">会了就直接过，看下一个词</text>
     </view>
   </view>
 
@@ -59,7 +59,7 @@
     </view>
 
     <view style="margin-top:56rpx;text-align:center;font-size:28rpx;color:#3ea6ff">先在心里回忆它的意思，点一下看答案</view>
-    <view wx:if="{{showHint}}" style="margin-top:14rpx;text-align:center;font-size:24rpx;color:#8fa3b7">按住卡片往上滑 = 想得很快，直接过</view>
+    <view wx:if="{{showHint}}" style="margin-top:14rpx;text-align:center;font-size:24rpx;color:#8fa3b7">会了？按住卡片往上滑，不用点答案，直接看下一个词</view>
   </view>
 
   <!-- 答案 + 反馈按钮 -->
@@ -80,16 +80,17 @@
     <view style="margin-top:32rpx">
       <view style="text-align:center;font-size:24rpx;color:#8fa3b7;margin-bottom:16rpx">{{promptText}}</view>
 
-      <!-- 文案用"认识 / 不认识"这类学习者自己的说法，比"想得很快 / 没想起来"更贴近判断习惯；
-           括注里写清它会造成什么后果，避免用户凭感觉乱点。 -->
-      <view wx:if="{{showKnownBtn}}" data-fb="known" bindtap="onFeedback" style="margin-bottom:14rpx;padding:24rpx 26rpx;border-radius:22rpx;background:#22a862;color:#ffffff;font-size:30rpx;font-weight:600">认识　<text style="font-size:24rpx;font-weight:400;opacity:.9">（想得很快）</text></view>
-      <view data-fb="vague" bindtap="onFeedback" style="margin-bottom:14rpx;padding:24rpx 26rpx;border-radius:22rpx;background:#e08b00;color:#ffffff;font-size:30rpx;font-weight:600">想了很久　<text style="font-size:24rpx;font-weight:400;opacity:.9">（想起来了，但费劲）</text></view>
-      <view data-fb="forgot" bindtap="onFeedback" style="padding:24rpx 26rpx;border-radius:22rpx;background:#e03a52;color:#ffffff;font-size:30rpx;font-weight:600">不认识　<text style="font-size:24rpx;font-weight:400;opacity:.9">（完全没想起来）</text></view>
+      <!-- 文案用"认识 / 不认识"这类学习者自己的说法。
+           视觉权重刻意拉平：只有"认识"是实色（希望用户多数时候点它），
+           另外两个是深底描边 —— 反馈按钮是卡片配角，释义和例句才是主角
+           （内测反馈：三个大色块太抢眼，"想了很久"字长还像重点）。 -->
+      <view wx:if="{{showKnownBtn}}" data-fb="known" bindtap="onFeedback" style="margin-bottom:14rpx;padding:22rpx 26rpx;border-radius:22rpx;background:#22a862;color:#ffffff;font-size:30rpx;font-weight:600;text-align:center">认识</view>
+      <view data-fb="vague" bindtap="onFeedback" style="margin-bottom:14rpx;padding:22rpx 26rpx;border-radius:22rpx;background:#1e2a38;border:2rpx solid #e08b00;color:#f0b35c;font-size:30rpx;font-weight:500;text-align:center">想了很久</view>
+      <view data-fb="forgot" bindtap="onFeedback" style="padding:22rpx 26rpx;border-radius:22rpx;background:#1e2a38;border:2rpx solid #e03a52;color:#ff8f9e;font-size:30rpx;font-weight:500;text-align:center">没想起来</view>
 
       <!-- 后果提示：把"你这一个选择会换来什么"直接写出来 -->
       <view style="margin-top:18rpx;text-align:center;font-size:22rpx;color:#8fa3b7;line-height:1.7">
-        认识 → 隔得更久再见{{cappedHint}}<br />
-        想了很久 → 明天再来　·　不认识 → 10 分钟后重来
+        认识 → 隔得更久再见{{cappedHint}}　·　费劲 → 明天再来　·　没想起来 → 10 分钟后重来
       </view>
     </view>
   </view>
