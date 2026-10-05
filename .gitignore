@@ -14,3 +14,8 @@ cloud/functions/*/node_modules/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 开源字体文件（17MB，按需下载，见 assets/fonts/README.md）
+assets/fonts/*.otf
+assets/fonts/*.ttf
+assets/fonts/*.ttc

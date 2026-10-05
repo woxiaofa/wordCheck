@@ -9,7 +9,17 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 SIZE = 1024
-FONT_BOLD = "C:/Windows/Fonts/msyhbd.ttc"
+
+# ⚠️ 字体版权：微软雅黑(msyhbd.ttc)、黑体、宋体、楷体都是 Windows 自带的微软/方正授权字体，
+#    放进对外发布的图像（头像、宣传图）里属于再分发，有授权风险，**本项目一律不用**。
+#    这里只用 SIL OFL 1.1 授权的「思源黑体 Source Han Sans」（Adobe，明确允许商用与再分发）。
+#    字体文件不入库（17MB），首次使用前按 assets/fonts/README.md 里的命令下载一次即可。
+FONT_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts")
+FONT_CANDIDATES = [
+    os.path.join(FONT_DIR, "SourceHanSansSC-Heavy.otf"),
+    os.path.join(FONT_DIR, "SourceHanSansSC-Bold.otf"),
+    os.path.join(FONT_DIR, "SourceHanSansSC-Black.otf"),
+]
 
 BLUE = (62, 166, 255)    # #3EA6FF
 PURPLE = (124, 92, 255)  # #7C5CFF
@@ -32,6 +42,20 @@ def make_gradient(size):
     return img
 
 
+def pick_font(size):
+    """找到第一个可用的开源字体；找不到就明确报错（绝不静默回退到微软雅黑）"""
+    path = next((p for p in FONT_CANDIDATES if os.path.exists(p)), None)
+    if not path:
+        raise SystemExit(
+            "\n缺少开源中文字体。请先执行一次：\n"
+            "  mkdir -p assets/fonts && curl -L -o assets/fonts/SourceHanSansSC-Heavy.otf \\\n"
+            "    https://ghproxy.net/https://raw.githubusercontent.com/adobe-fonts/source-han-sans/"
+            "release/OTF/SimplifiedChinese/SourceHanSansSC-Heavy.otf\n"
+            "（思源黑体，SIL OFL 1.1，允许商用与再分发。详见 assets/fonts/README.md）\n")
+    print("使用字体: " + os.path.basename(path))
+    return ImageFont.truetype(path, size)
+
+
 def build(size):
     img = make_gradient(size).convert("RGBA")
 
@@ -48,7 +72,7 @@ def build(size):
 
     # 中央大字「查」（白色粗体，带轻微投影）
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT_BOLD, int(size * 0.52))
+    font = pick_font(int(size * 0.52))
     bbox = draw.textbbox((0, 0), "查", font=font)
     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
     cx, cy = size / 2, size * 0.47  # 视觉中心略上移，给徽章留位
