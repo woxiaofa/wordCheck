@@ -4,6 +4,7 @@
     "pages/study/study",
     "pages/quiz/quiz",
     "pages/stats/stats",
+    "pages/class/class",
     "pages/test-card/test-card"
   ],
   "window": {

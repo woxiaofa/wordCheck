@@ -1,0 +1,127 @@
+/* 班级页样式：沿用全局暗色卡片体系，只补本页特有的少量类 */
+
+.center { text-align: center; }
+.mt { margin-top: 24rpx; }
+.mt-s { margin-top: 14rpx; }
+.row-between { display: flex; align-items: center; justify-content: space-between; }
+.grow { flex: 1; }
+
+/* 邀请码徽章 */
+.code-badge {
+  padding: 14rpx 20rpx;
+  border-radius: 16rpx;
+  background: #16222f;
+  border: 2rpx dashed #3ea6ff;
+  text-align: center;
+}
+.code {
+  font-size: 40rpx;
+  font-weight: 700;
+  letter-spacing: 6rpx;
+  color: #3ea6ff;
+  margin-top: 4rpx;
+}
+
+/* 分隔线（未加入态的两个入口之间） */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 26rpx 0;
+  color: #8fa3b7;
+  font-size: 24rpx;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 2rpx;
+  background: #1e2a38;
+}
+.divider text { padding: 0 20rpx; }
+
+/* 表单 */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 22rpx;
+}
+.form-label {
+  width: 84rpx;
+  font-size: 26rpx;
+  color: #8fa3b7;
+  flex-shrink: 0;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.chip {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: #1e2a38;
+  color: #8fa3b7;
+  font-size: 26rpx;
+}
+.chip.on {
+  background: rgba(62, 166, 255, .18);
+  color: #3ea6ff;
+  border: 2rpx solid #3ea6ff;
+}
+.input {
+  background: #1e2a38;
+  border-radius: 14rpx;
+  padding: 14rpx 20rpx;
+  font-size: 26rpx;
+  color: #e8eef5;
+}
+.picker-val {
+  background: #1e2a38;
+  border-radius: 14rpx;
+  padding: 14rpx 24rpx;
+  font-size: 26rpx;
+  color: #e8eef5;
+}
+
+/* 作业条目 */
+.assign {
+  margin-top: 22rpx;
+  padding-top: 22rpx;
+  border-top: 2rpx solid #1e2a38;
+}
+.assign-name { font-size: 28rpx; font-weight: 600; }
+.bar {
+  height: 12rpx;
+  border-radius: 999rpx;
+  background: #1e2a38;
+  margin-top: 12rpx;
+  overflow: hidden;
+}
+.bar-in {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #2fd07a, #3ea6ff);
+  transition: width .3s;
+}
+.bad-text { color: #ff5c72; font-size: 24rpx; }
+
+/* 学员行 */
+.stu {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 22rpx;
+  padding-top: 22rpx;
+  border-top: 2rpx solid #1e2a38;
+}
+.stu-ava {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2b7fb8, #7c5cff);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stu-mid { flex: 1; font-size: 28rpx; }

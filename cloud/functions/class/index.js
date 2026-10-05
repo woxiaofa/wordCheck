@@ -49,6 +49,7 @@ exports.main = async (event) => {
   switch (event.action) {
     case 'createClass':   return onCreateClass(OPENID, event);
     case 'joinClass':     return onJoinClass(OPENID, event);
+    case 'leaveClass':    return onLeaveClass(OPENID);
     case 'myClass':       return onMyClass(OPENID);
     case 'assign':        return onAssign(OPENID, event);
     case 'assignments':   return onAssignments(OPENID);
@@ -135,6 +136,23 @@ async function onJoinClass(openid, { code }) {
     .update({ data: { class_id: cls._id } });
 
   return ok({ class: publicClass(cls), joined: true });
+}
+
+/* ------------------------------------------------------------------ */
+/* 学生退出班级（换班用；教练不能退出自己建的班）                          */
+/* ------------------------------------------------------------------ */
+async function onLeaveClass(openid) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+  if (!user.class_id) return ok({ left: false });
+  if (user.role === 'coach') return fail('ROLE_CONFLICT', '创建者不能退出班级，如需删除班级请联系开发者');
+
+  await db.collection(COLL.classes).doc(user.class_id)
+    .update({ data: { student_ids: _.pull(user._id) } }).catch(() => {});
+  await db.collection(COLL.users).doc(user._id)
+    .update({ data: { class_id: '' } });
+
+  return ok({ left: true });
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,0 +1,151 @@
+<!-- 班级页：一页三态——未加入（二选一入口）/ 教练端 / 学生端。
+     数据全部来自 class 云函数；云不可用时整页降级为提示，本地功能不受影响。 -->
+<view class="page">
+
+  <!-- ===== 加载中 ===== -->
+  <view wx:if="{{loading}}" class="card center muted">正在载入班级…</view>
+
+  <!-- ===== 云不可用 ===== -->
+  <view wx:elif="{{cloudError}}" class="card">
+    <view class="t1">班级功能需要联网</view>
+    <view class="muted mt-s">{{cloudError}}</view>
+    <button class="btn mt" bindtap="reload">重试</button>
+  </view>
+
+  <!-- ===== 未加入任何班级 ===== -->
+  <view wx:elif="{{!my.role}}" class="card">
+    <view class="t1">家长 / 老师布置任务</view>
+    <view class="muted mt-s">
+      创建班级后把邀请码告诉孩子，孩子在这里输入即可加入。
+      你可以布置单词任务、查看掌握进度、生成催学提醒。
+    </view>
+    <button class="btn ok mt" bindtap="startCreate">我是家长 / 老师，建班级</button>
+    <view class="divider"><text>或者</text></view>
+    <button class="btn ghost" bindtap="startJoin">我有邀请码，加入班级</button>
+  </view>
+
+  <!-- ===== 教练端 ===== -->
+  <block wx:elif="{{my.role === 'coach'}}">
+
+    <!-- 班级卡：名字 + 邀请码（复制给孩子） -->
+    <view class="card">
+      <view class="row-between">
+        <view>
+          <view class="muted" style="font-size:24rpx">我的班级</view>
+          <view class="t1">{{cls.name}}</view>
+        </view>
+        <view class="code-badge" bindtap="copyCode">
+          <view class="muted" style="font-size:22rpx">邀请码（点我复制）</view>
+          <view class="code">{{cls.code}}</view>
+        </view>
+      </view>
+      <view class="muted mt-s" style="font-size:24rpx">
+        把邀请码发给孩子 → 孩子打开本页选「加入班级」输入即可
+      </view>
+    </view>
+
+    <!-- 布置任务 -->
+    <view class="card">
+      <view class="card-title">布置任务</view>
+      <view class="form-row">
+        <text class="form-label">词库</text>
+        <view class="chips">
+          <view
+            wx:for="{{tags}}"
+            wx:key="key"
+            class="chip {{form.tag === item ? 'on' : ''}}"
+            data-tag="{{item}}"
+            bindtap="pickTag"
+          >{{item}}</view>
+        </view>
+      </view>
+      <view class="form-row">
+        <text class="form-label">词数</text>
+        <slider min="3" max="30" step="1" value="{{form.count}}" activeColor="#3ea6ff"
+                block-size="20" show-value bindchange="pickCount" class="grow" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">截止</text>
+        <picker mode="date" value="{{form.deadline}}" start="{{today}}" bindchange="pickDeadline">
+          <view class="picker-val">{{form.deadline || '不限（可选）'}}</view>
+        </picker>
+        <text wx:if="{{form.deadline}}" class="link" bindtap="clearDeadline">清除</text>
+      </view>
+      <view class="form-row">
+        <text class="form-label">备注</text>
+        <input class="grow input" value="{{form.note}}" placeholder="如：周末之前过一遍（可选）"
+               maxlength="30" bindinput="inputNote" />
+      </view>
+      <button class="btn ok mt" loading="{{assigning}}" disabled="{{assigning}}" bindtap="submitAssign">
+        布置 {{form.count}} 个词{{form.tag === '全部' ? '' : '（' + form.tag + '）'}}
+      </button>
+    </view>
+
+    <!-- 已布置的作业 -->
+    <view class="card" wx:if="{{assignments.length}}">
+      <view class="card-title">已布置（{{assignments.length}}）</view>
+      <view class="assign" wx:for="{{assignments}}" wx:key="id">
+        <view class="row-between">
+          <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+          <text class="muted" style="font-size:24rpx">{{item.finished}}/{{item.total_students}} 人完成</text>
+        </view>
+        <view class="muted" style="font-size:24rpx">
+          {{item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}
+        </view>
+        <view class="bar"><view class="bar-in" style="width:{{item.total_students ? item.finished * 100 / item.total_students : 0}}%"></view></view>
+      </view>
+    </view>
+
+    <!-- 学员 -->
+    <view class="card">
+      <view class="card-title">学员（{{students.length}}）</view>
+      <view wx:if="{{!students.length}}" class="muted mt-s">
+        还没有学员加入。把上面的邀请码发给孩子，等孩子输入后就出现在这里。
+      </view>
+      <view class="stu" wx:for="{{students}}" wx:key="id">
+        <view class="stu-ava">{{item.nickname[0] || '学'}}</view>
+        <view class="stu-mid">
+          <view>{{item.nickname}}</view>
+          <view class="muted" style="font-size:22rpx">
+            已学 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
+          </view>
+        </view>
+        <button class="btn sm ghost" data-id="{{item.id}}" bindtap="makeNudge">催一催</button>
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== 学生端 ===== -->
+  <block wx:elif="{{my.role === 'student'}}">
+    <view class="card">
+      <view class="muted" style="font-size:24rpx">我加入的班级</view>
+      <view class="t1">{{cls.name}}</view>
+    </view>
+
+    <view class="card" wx:if="{{assignments.length}}">
+      <view class="card-title">老师 / 家长布置的任务</view>
+      <view class="assign" wx:for="{{assignments}}" wx:key="id">
+        <view class="row-between">
+          <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+          <text class="{{item.expired ? 'bad-text' : 'muted'}}" style="font-size:24rpx">
+            {{item.expired ? '已过期 · ' : ''}}{{item.done}}/{{item.count}}
+          </text>
+        </view>
+        <view class="bar"><view class="bar-in" style="width:{{item.count ? item.done * 100 / item.count : 0}}%"></view></view>
+        <button class="btn sm mt-s {{item.done >= item.count ? 'ghost' : 'ok'}}"
+                data-idx="{{index}}" bindtap="goStudyAssignment">
+          {{item.done >= item.count ? '已完成，再去巩固' : '去做这份作业'}}
+        </button>
+      </view>
+    </view>
+    <view class="card" wx:else>
+      <view class="muted center">班里还没有布置任务，先按今日任务学习吧。</view>
+    </view>
+
+    <view class="card">
+      <button class="btn ghost sm" bindtap="leaveConfirm">退出班级（换班用）</button>
+    </view>
+  </block>
+
+  <footer-nav active="class" />
+</view>

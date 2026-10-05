@@ -130,6 +130,58 @@ var api = {
   /** 周报数据 */
   weeklyReport: function (week) {
     return call('report', 'weekly', { week: week });
+  },
+
+  /* ------------- 班级（家长/老师端，批次 1） ------------- */
+
+  /** 建班级（幂等：重复调用返回同一班级） */
+  createClass: function (name, clientReqId) {
+    return call('class', 'createClass', { name: name, clientReqId: clientReqId });
+  },
+
+  /** 学生凭邀请码加入 */
+  joinClass: function (code) {
+    return call('class', 'joinClass', { code: code });
+  },
+
+  /** 学生退出班级（换班用） */
+  leaveClass: function () {
+    return call('class', 'leaveClass', {});
+  },
+
+  /** 查我所在的班级（教练/学生通用，没有则 class 为 null） */
+  myClass: function () {
+    return call('class', 'myClass', {});
+  },
+
+  /** 教练布置任务（幂等） */
+  assignTask: function (params) {
+    return call('class', 'assign', params);
+  },
+
+  /** 教练：作业列表（带全班进度） */
+  coachAssignments: function () {
+    return call('class', 'assignments', {});
+  },
+
+  /** 学生：我班级的作业 + 我的逐词进度 */
+  myAssignments: function () {
+    return call('class', 'myAssignments', {});
+  },
+
+  /** 教练：学员列表 */
+  coachStudents: function () {
+    return call('class', 'students', {});
+  },
+
+  /** 教练：单个学员详情 */
+  studentDetail: function (studentId) {
+    return call('class', 'studentDetail', { studentId: studentId });
+  },
+
+  /** 教练：生成催学文案（只返回文本，不推送） */
+  nudgeText: function (studentId) {
+    return call('class', 'nudge', { studentId: studentId });
   }
 };
 
