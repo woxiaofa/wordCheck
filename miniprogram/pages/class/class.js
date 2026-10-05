@@ -68,6 +68,8 @@ Page({
       }
     }).catch(function (err) {
       self.setData({ loading: false, cloudError: cloud.humanError(err) });
+      // 整页失败的现场必须留日志，否则"网络异常"四个字无从排查
+      console.warn('[class] myClass 加载失败', (err && (err.errMsg || err.message)) || err);
     });
   },
 
