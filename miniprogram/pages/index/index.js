@@ -127,10 +127,15 @@ Page({
 
     // 打卡口径：完成目标的 80% 即算
     var checkinNeed = Math.round(target * CHECKIN_RATIO);
-    var taskDone = done >= target;
+    // 任务完成 = 做完"今天这份任务"（total），而不是打卡目标（target）——
+    // 新号任务只有 10 个新词时，学完 10 个就该显示"任务完成"，
+    // 否则会蹦出"继续学习 · 还剩 0 个"这种自相矛盾的按钮
+    var taskDone = total > 0 && done >= total;
     var progressNote;
-    if (taskDone) {
-      progressNote = '🎉 今天的任务全部完成，太稳了';
+    if (taskDone && done >= checkinNeed) {
+      progressNote = '🎉 任务和打卡都完成了，太稳了';
+    } else if (taskDone) {
+      progressNote = '🎉 今天布置的任务全部完成，再学 ' + (checkinNeed - done) + ' 个打卡就稳了';
     } else if (done >= checkinNeed) {
       progressNote = '今天的打卡已经稳了，多学一个多赚一个';
     } else {

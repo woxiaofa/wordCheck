@@ -82,8 +82,12 @@
     </view>
 
     <!-- 已布置的作业 -->
-    <view class="card" wx:if="{{assignments.length}}">
+    <view class="card" wx:if="{{assignError || assignments.length}}">
       <view class="card-title">已布置（{{assignments.length}}）</view>
+      <view wx:if="{{assignError}}" class="muted mt-s">
+        加载失败：{{assignError}}
+        <text class="link" bindtap="reload"> 重试</text>
+      </view>
       <view class="assign" wx:for="{{assignments}}" wx:key="id">
         <view class="row-between">
           <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
@@ -99,7 +103,11 @@
     <!-- 学员 -->
     <view class="card">
       <view class="card-title">学员（{{students.length}}）</view>
-      <view wx:if="{{!students.length}}" class="muted mt-s">
+      <view wx:if="{{stuError}}" class="muted mt-s">
+        加载失败：{{stuError}}
+        <text class="link" bindtap="reload"> 重试</text>
+      </view>
+      <view wx:if="{{!students.length && !stuError}}" class="muted mt-s">
         还没有学员加入。把上面的邀请码发给孩子，等孩子输入后就出现在这里。
       </view>
       <view class="stu" wx:for="{{students}}" wx:key="id">
@@ -122,8 +130,12 @@
       <view class="t1">{{cls.name}}</view>
     </view>
 
-    <view class="card" wx:if="{{assignments.length}}">
+    <view class="card" wx:if="{{myAssignError || assignments.length}}">
       <view class="card-title">老师 / 家长布置的任务</view>
+      <view wx:if="{{myAssignError}}" class="muted mt-s">
+        加载失败：{{myAssignError}}
+        <text class="link" bindtap="reload"> 重试</text>
+      </view>
       <view class="assign" wx:for="{{assignments}}" wx:key="id">
         <view class="row-between">
           <text class="assign-name">{{item.note || item.tag + '作业'}}</text>

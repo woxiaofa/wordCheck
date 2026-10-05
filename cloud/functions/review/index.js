@@ -111,6 +111,26 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
     await enqueueTodayOnce(user._id, today, wordId, now);
   }
 
+  // --- 冗余统计（实施手册规范 6：看板数字冗余在 users.stats_cache 上，
+  //     教练端"已学 N 词/连续 N 天"直接读它，禁止高频 count() 聚合） ---
+  // 这里只做增量：新词进入 SRS 时 learned_words+1；按 last_active_date 判定连续打卡
+  const sc = user.stats_cache || { total_words: 0, learned_words: 0, streak_days: 0 };
+  let streak = sc.streak_days || 0;
+  if (sc.last_active_date !== today) {
+    const yesterday = getLocalDate(now - 86400000);
+    streak = (sc.last_active_date === yesterday) ? streak + 1 : 1;
+  }
+  await db.collection(COLL.users).doc(user._id).update({
+    data: {
+      stats_cache: {
+        total_words: sc.total_words || 0,
+        learned_words: (sc.learned_words || 0) + (prev ? 0 : 1),
+        streak_days: streak,
+        last_active_date: today
+      }
+    }
+  }).catch(() => {});   // 统计失败不影响主流程，可由后续提交自然修正
+
   // --- 幂等第二道闸：写入去重记录（带过期时间，由定时任务清理） ---
   const result = { stage: next.stage, nextReviewAt: next.nextReviewAt };
   await db.collection(COLL.requests).add({

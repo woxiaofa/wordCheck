@@ -30,9 +30,13 @@ Page({
     assigning: false,
     assignments: [],
     students: [],
+    /** 数据加载失败时显示在对应卡片里的错误（绝不静默吞错：吞了就无法排查） */
+    assignError: '',
+    stuError: '',
 
     // 学生端
     myAssignments: [],
+    myAssignError: '',
 
     today: ''
   },
@@ -68,8 +72,12 @@ Page({
   loadCoachData: function () {
     var self = this;
     cloud.api.coachAssignments().then(function (r) {
-      self.setData({ assignments: r.assignments || [] });
-    }).catch(function () { /* 列表失败不阻断页面 */ });
+      self.setData({ assignments: r.assignments || [], assignError: '' });
+    }).catch(function (err) {
+      // 不静默：加载失败必须让教练看到原因，否则"布置了却看不到"无从排查
+      self.setData({ assignError: cloud.humanError(err) });
+      console.warn('[class] assignments 加载失败', err);
+    });
 
     cloud.api.coachStudents().then(function (r) {
       var now = Date.now();
@@ -78,8 +86,11 @@ Page({
           lastSeenText: s.last_seen_at ? fmtAgo(now - s.last_seen_at) : '还没来过'
         });
       });
-      self.setData({ students: students });
-    }).catch(function () { /* 同上 */ });
+      self.setData({ students: students, stuError: '' });
+    }).catch(function (err) {
+      self.setData({ stuError: cloud.humanError(err) });
+      console.warn('[class] students 加载失败', err);
+    });
   },
 
   startCreate: function () {
@@ -215,8 +226,12 @@ Page({
   loadStudentData: function () {
     var self = this;
     cloud.api.myAssignments().then(function (r) {
-      self.setData({ myAssignments: r.assignments || [] });
-    }).catch(function () { /* 失败不阻断 */ });
+      self.setData({ myAssignments: r.assignments || [], myAssignError: '' });
+    }).catch(function (err) {
+      // 不静默：学生"看不到作业"曾因这里吞错而无法排查
+      self.setData({ myAssignError: cloud.humanError(err) });
+      console.warn('[class] myAssignments 加载失败', err);
+    });
   },
 
   /** 去做作业：暂跳学习页（词级联动待批次 2，先保证闭环能跑） */
