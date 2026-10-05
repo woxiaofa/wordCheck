@@ -39,12 +39,28 @@ App({
     var self = this;
     cloud.api.login().then(function (res) {
       self.globalData.user = res.user;
+      // 登录成功说明云端可达：趁机把上次失败的学习/抽查记录补传上去
+      self.flushPending();
     }).catch(function (err) {
       // ENV_NOT_SET（还没填环境 ID）属预期状态，不刷屏
       if (err && err.code !== 'ENV_NOT_SET') {
         console.warn('[app] 静默登录失败：', err && err.message);
       }
     });
+  },
+
+  /**
+   * 重放本地补传队列。
+   * 只要有一条学习记录没送到云端，家长端就会一直显示"已学 0 词"，
+   * 所以这里必须保证最终送达（服务端按 clientReqId 幂等，重放不会重复计数）。
+   */
+  flushPending: function () {
+    if (!cloud.pendingCount()) return;
+    cloud.flushPending().then(function (r) {
+      if (r.done || r.left) {
+        console.log('[app] 补传结果：成功 ' + r.done + ' 条，剩余 ' + r.left + ' 条');
+      }
+    }).catch(function () { /* 补传失败不影响使用，下次再试 */ });
   },
 
   onShow: function () {
@@ -55,5 +71,8 @@ App({
       this.globalData.todayTask = null;
     }
     this.globalData.launchDate = today;
+
+    // 回到前台：再试一次补传（网络可能已经恢复）
+    this.flushPending();
   }
 });

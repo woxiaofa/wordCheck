@@ -37,9 +37,11 @@ exports.main = async (event, context) => {
   if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
 
   switch (event.action) {
-    case 'submit': return onSubmit(OPENID, event);
-    case 'due':    return onDueList(OPENID, event);
-    default:       return fail('BAD_ACTION', '未知 action: ' + event.action);
+    case 'submit':   return onSubmit(OPENID, event);
+    case 'due':      return onDueList(OPENID, event);
+    // 自检：云控制台 → 云函数 → review → 云端测试，填 {"action":"diagnose"} 即可
+    case 'diagnose': return onDiagnose(OPENID, event);
+    default:         return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
 
@@ -171,6 +173,56 @@ async function onDueList(openid, { limit }) {
     .get();
 
   return ok({ due: res.data, truncated: res.data.length >= cap });
+}
+
+/* ------------------------------------------------------------------ */
+/* 自检：把"云端到底怎么回事"摆到台面上                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 用法（云控制台 → 云函数 → review → 云端测试）：
+ *   {"action":"diagnose"}                 只看
+ *   {"action":"diagnose","clean":true}    连清带看
+ *
+ * 返回：该用户在 user_word_state 里的记录数、其中 word_id 为空的脏记录数、
+ *       以及 users.stats_cache 的当前值 —— "教练端进度恒 0"一眼就能定位到是哪一环断了。
+ */
+async function onDiagnose(openid, { clean }) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，先打开一次小程序触发登录');
+
+  const res = await db.collection(COLL.state)
+    .where({ user_id: user._id })
+    .limit(1000)
+    .field({ word_id: true, stage: true, last_feedback: true })
+    .get();
+  const all = res.data || [];
+  const dirty = all.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
+
+  let cleaned = 0;
+  if (clean) {
+    for (const d of dirty) {
+      const r = await db.collection(COLL.state).doc(d._id).remove().catch(() => null);
+      if (r) cleaned++;
+    }
+  }
+
+  const logs = await db.collection(COLL.logs)
+    .where({ user_id: user._id }).limit(1).get().catch(() => ({ data: [] }));
+
+  return ok({
+    userId: user._id,
+    stateTotal: all.length,
+    dirty: dirty.length,
+    dirtyIds: dirty.slice(0, 10).map((d) => String(d._id)),
+    cleaned: cleaned,
+    hasReviewLog: !!(logs.data && logs.data.length),
+    statsCache: user.stats_cache || null,
+    hint: dirty.length
+      ? '存在 word_id 为空的脏记录（' + dirty.length + ' 条），会让该用户每条新词都写不进去。' +
+        (clean ? '已清理 ' + cleaned + ' 条。' : '再填 {"action":"diagnose","clean":true} 可自动清理。')
+      : '状态表干净，学习数据可以正常写入'
+  });
 }
 
 /* ------------------------------------------------------------------ */

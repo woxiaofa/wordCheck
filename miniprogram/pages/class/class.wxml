@@ -114,8 +114,16 @@
         <view class="stu-ava">{{item.nickname[0] || '学'}}</view>
         <view class="stu-mid">
           <view>{{item.nickname}}</view>
-          <view class="muted" style="font-size:22rpx">
-            已学 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
+          <!-- 家长真正想看的是"今天学没学、学得怎么样"，累计词数只是补充 -->
+          <view wx:if="{{item.synced}}" class="muted" style="font-size:22rpx">
+            今天 {{item.today.count}} 个<text wx:if="{{item.today.count}}"> · 掌握 {{item.todayRate}}%</text>
+            <text wx:if="{{item.wrong}}"> · 易错 {{item.wrong}} 词</text>
+          </view>
+          <view wx:else class="muted" style="font-size:22rpx">
+            还没同步数据（孩子打开小程序学过之后才会出现）
+          </view>
+          <view class="muted" style="font-size:22rpx;opacity:.75">
+            累计 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
           </view>
         </view>
         <button class="btn sm ghost" data-id="{{item.id}}" bindtap="makeNudge">催一催</button>

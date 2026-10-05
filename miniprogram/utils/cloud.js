@@ -86,6 +86,76 @@ function humanError(err) {
   return err.message || '操作失败';
 }
 
+/* ---------------- 失败补传队列 ---------------- */
+
+/**
+ * 学习/抽查记录一旦没送到云端，家长端就永远看不到孩子进度（表现为"已学 0 词"），
+ * 而用户完全无从察觉。这里把失败的写请求压进本地队列，下次启动/回到前台时重放。
+ *
+ * 安全性：服务端对 clientReqId 做幂等（重复提交返回 replay:true，不重复计数），
+ * 所以同一条记录重放多少次都只会生效一次。
+ */
+var PENDING_KEY = 'cloud_pending_review';
+var PENDING_MAX = 200;        // 队列上限，超出丢最旧的（防 storage 撑爆）
+var PENDING_MAX_FAIL = 5;     // 单条最多重放 5 次，超过丢弃并记日志（可能是数据本身有问题）
+
+function readPending() {
+  try {
+    var v = wx.getStorageSync(PENDING_KEY);
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+
+function writePending(list) {
+  try { wx.setStorageSync(PENDING_KEY, list); } catch (e) { /* storage 不可用时只丢补偿，不影响主流程 */ }
+}
+
+function enqueuePending(name, action, payload) {
+  if (!payload || !payload.clientReqId) return;   // 没有幂等 ID 的请求不能重放
+  var list = readPending();
+  if (list.length >= PENDING_MAX) list.shift();
+  list.push({ name: name, action: action, payload: payload, fails: 0, at: Date.now() });
+  writePending(list);
+}
+
+function pendingCount() {
+  return readPending().length;
+}
+
+/**
+ * 重放积压请求（顺序执行，最多重放整队）。
+ * @returns {Promise<{tried:number,done:number,left:number}>}
+ */
+function flushPending() {
+  var list = readPending();
+  if (!list.length) return Promise.resolve({ tried: 0, done: 0, left: 0 });
+
+  var results = [];
+  var chain = Promise.resolve();
+  list.forEach(function (item) {
+    chain = chain.then(function () {
+      return call(item.name, item.action, item.payload)
+        .then(function () { results.push(true); }, function () { results.push(false); });
+    });
+  });
+
+  return chain.then(function () {
+    var rest = [];
+    list.forEach(function (item, i) {
+      if (results[i]) return;                       // 成功，出队
+      item.fails = (item.fails || 0) + 1;
+      if (item.fails >= PENDING_MAX_FAIL) {
+        console.warn('[cloud] 补传放弃（已重试 ' + item.fails + ' 次）：', item.payload &&
+          item.payload.wordId);
+        return;
+      }
+      rest.push(item);
+    });
+    writePending(rest);
+    return { tried: list.length, done: list.length - rest.length, left: rest.length };
+  });
+}
+
 /* ---------------- 业务接口（薄封装，页面只认这些方法名） ---------------- */
 
 var api = {
@@ -99,9 +169,16 @@ var api = {
     return call('task', 'today', { date: date });
   },
 
-  /** 提交一次复习反馈（必须带幂等 ID） */
+  /**
+   * 提交一次复习反馈（必须带幂等 ID）
+   * 失败不丢：压进补传队列，下次启动/回前台自动重放。
+   * 调用方仍会收到 reject（页面上该提示提示），但数据不会永久丢失。
+   */
   submitReview: function (params) {
-    return call('review', 'submit', params);
+    return call('review', 'submit', params).catch(function (err) {
+      enqueuePending('review', 'submit', params);
+      throw err;
+    });
   },
 
   /** 取今日到期词（学习卡队列来源） */
@@ -124,7 +201,10 @@ var api = {
    *        answer：选义题为选中的释义字符串；拼写/听写题为输入的字符数组
    */
   submitQuiz: function (params) {
-    return call('quiz', 'submit', params);
+    return call('quiz', 'submit', params).catch(function (err) {
+      enqueuePending('quiz', 'submit', params);
+      throw err;
+    });
   },
 
   /** 周报数据 */
@@ -191,5 +271,8 @@ module.exports = {
   getInitError: getInitError,
   call: call,
   humanError: humanError,
-  api: api
+  api: api,
+  // 补传队列：app 启动/回前台时重放，保证学习数据最终一定到云端
+  flushPending: flushPending,
+  pendingCount: pendingCount
 };

@@ -18,14 +18,15 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
-const { getLocalDate } = require('./shared/time');
+const { getLocalDate, getLocalDayStart } = require('./shared/time');
 
 const COLL = {
   users: 'users',
   classes: 'classes',
   assignments: 'assignments',
   state: 'user_word_state',
-  requests: 'request_dedup'
+  requests: 'request_dedup',
+  logs: 'review_logs'
 };
 
 const LIMITS = {
@@ -347,13 +348,66 @@ async function onStudents(openid) {
   const docs = await Promise.all(ids.map(id =>
     db.collection(COLL.users).doc(id).get().then(r => r.data).catch(() => null)
   ));
-  const students = docs.filter(Boolean).map(u => ({
-    id: u._id,
-    nickname: u.nickname || '',
-    avatar: u.avatar || '',
-    stats: u.stats_cache || { total_words: 0, learned_words: 0, streak_days: 0 },
-    last_seen_at: u.last_seen_at || 0
-  }));
+  // 家长最关心的不是"累计学了多少"，而是"今天学没学、学得怎么样、哪些词老错"。
+  // 这里一次批量把三份数据取齐（班级上限 50，两次查询足够）：
+  //   a) 今日学习明细（review_logs，按 user_id+created_at 索引）
+  //   b) 累计掌握 / 易错词（user_word_state）
+  //   c) 是否同步过（有日志 = 数据到过云端；否则卡片要显示"还没同步"而不是"0 词"，
+  //      否则家长分不清"孩子没学"和"数据丢了"）
+  const dayStart = getLocalDayStart(Date.now());
+
+  const todayRes = await db.collection(COLL.logs)
+    .where({ user_id: _.in(ids), created_at: _.gte(dayStart) })
+    .limit(1000)
+    .field({ user_id: true, feedback: true })
+    .get().catch(() => ({ data: [] }));
+  const todayMap = {};
+  (todayRes.data || []).forEach((l) => {
+    const m = todayMap[l.user_id] || (todayMap[l.user_id] = { count: 0, known: 0, forgot: 0 });
+    m.count++;
+    if (l.feedback === 'known') m.known++;
+    else if (l.feedback === 'forgot') m.forgot++;
+  });
+
+  const stRes = await db.collection(COLL.state)
+    .where({ user_id: _.in(ids) })
+    .limit(1000)
+    .field({ user_id: true, stage: true, correct_count: true, wrong_count: true })
+    .get().catch(() => ({ data: [] }));
+  const statMap = {};
+  (stRes.data || []).forEach((s) => {
+    const m = statMap[s.user_id] || (statMap[s.user_id] = { learned: 0, wrong: 0, rated: 0 });
+    if ((s.correct_count || 0) > 0 || (s.stage || 0) > 0) m.learned++;
+    if ((s.wrong_count || 0) > 0) m.wrong++;
+    m.rated++;
+  });
+
+  // 是否同步过：查一次该班任意一条历史日志即可（不下发明细）
+  const syncRes = await db.collection(COLL.logs)
+    .where({ user_id: _.in(ids) })
+    .limit(1000)
+    .field({ user_id: true })
+    .get().catch(() => ({ data: [] }));
+  const syncedSet = {};
+  (syncRes.data || []).forEach((l) => { syncedSet[l.user_id] = true; });
+
+  const students = docs.filter(Boolean).map((u) => {
+    const today = todayMap[u._id] || { count: 0, known: 0, forgot: 0 };
+    const st = statMap[u._id] || { learned: 0, wrong: 0, rated: 0 };
+    return {
+      id: u._id,
+      nickname: u.nickname || '',
+      avatar: u.avatar || '',
+      stats: u.stats_cache || { total_words: 0, learned_words: 0, streak_days: 0 },
+      today: today,
+      // 今日掌握率：会 / 全部评过分（没评分时为 null，前端显示"—"而不是 0%）
+      todayRate: today.count ? Math.round((today.known / today.count) * 100) : null,
+      learned: st.learned,
+      wrong: st.wrong,
+      synced: !!syncedSet[u._id],
+      last_seen_at: u.last_seen_at || 0
+    };
+  });
   return ok({ students });
 }
 
