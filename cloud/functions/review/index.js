@@ -90,7 +90,24 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
   if (prev) {
     await db.collection(COLL.state).doc(prev._id).update({ data: doc });
   } else {
-    await db.collection(COLL.state).add({ data: Object.assign({ created_at: now }, doc) });
+    try {
+      await db.collection(COLL.state).add({ data: Object.assign({ created_at: now }, doc) });
+    } catch (e) {
+      // 唯一键冲突的两种来源：
+      //   a) 并发重复提交 —— 回读后更新即可（幂等兜底）；
+      //   b) 库里存在 word_id 为空的脏数据 —— 唯一索引把所有 null 视为同一个值，
+      //      该用户之后每条新词都会撞墙，必须给出可执行的报错而不是裸 E11000。
+      const again = await db.collection(COLL.state)
+        .where({ user_id: user._id, word_id: wordId }).limit(1).get().catch(() => null);
+      const hit = again && again.data && again.data[0];
+      if (hit) {
+        await db.collection(COLL.state).doc(hit._id).update({ data: doc });
+      } else {
+        return fail('STATE_CONFLICT',
+          'user_word_state 里存在 word_id 为空的脏数据：请在云控制台删除该集合中' +
+          '没有 word_id 字段（或值为 null）的记录后重试');
+      }
+    }
   }
 
   // --- 记录明细（用于错词本与后续算法调优；保留策略见《设计约定》） ---
