@@ -128,6 +128,8 @@
     <view class="card">
       <view class="muted" style="font-size:24rpx">我加入的班级</view>
       <view class="t1">{{cls.name}}</view>
+      <!-- 显示邀请码：和教练端的码一比对，立刻能发现"加了同名班"这种张冠李戴 -->
+      <view class="muted" style="font-size:24rpx">邀请码 {{cls.code}}</view>
     </view>
 
     <view class="card" wx:if="{{myAssignError || assignments.length}}">
@@ -151,7 +153,11 @@
       </view>
     </view>
     <view class="card" wx:else>
-      <view class="muted center">班里还没有布置任务，先按今日任务学习吧。</view>
+      <view wx:if="{{emptyHint === 'TEACHER_HAS_OTHER_CLASS'}}" class="muted" style="line-height:1.8">
+        老师确实布置过作业，但不在你加入的这个班里——多半是班级重名，加错了班。
+        <text class="link" bindtap="leaveConfirm">退出班级</text> 后用老师最新发的邀请码重新加入即可。
+      </view>
+      <view wx:else class="muted center">班里还没有布置任务，先按今日任务学习吧。</view>
     </view>
 
     <view class="card">

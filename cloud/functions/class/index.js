@@ -287,7 +287,21 @@ async function onMyAssignments(openid) {
     .limit(20)
     .get();
   const assignments = list.data || [];
-  if (!assignments.length) return ok({ assignments: [] });
+  if (!assignments.length) {
+    // 自诊断：学生说"看不到作业"时，先分清"老师真没布置"还是"加错了班"。
+    // 若老师名下（created_by）存在任何作业、却不挂在本班 → 大概率存在同名班级，
+    // 学生凭旧码/记错的码进了另一个班。给前端明确 hint，别只回空数组。
+    const clsRes = await db.collection(COLL.classes).doc(user.class_id).get().catch(() => null);
+    const ownerId = clsRes && clsRes.data ? clsRes.data.owner_id : '';
+    if (ownerId) {
+      const any = await db.collection(COLL.assignments)
+        .where({ created_by: ownerId }).limit(1).get().catch(() => null);
+      if (any && any.data && any.data.length) {
+        return ok({ assignments: [], hint: 'TEACHER_HAS_OTHER_CLASS' });
+      }
+    }
+    return ok({ assignments: [] });
+  }
 
   const wordAll = [];
   assignments.forEach(a => (a.word_ids || []).forEach(w => wordAll.push(w)));

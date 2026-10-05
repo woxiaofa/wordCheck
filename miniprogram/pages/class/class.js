@@ -37,6 +37,8 @@ Page({
     // 学生端
     myAssignments: [],
     myAssignError: '',
+    /** 空列表时的服务端诊断提示（如 TEACHER_HAS_OTHER_CLASS：老师布置过作业但不在这个班） */
+    emptyHint: '',
 
     today: ''
   },
@@ -226,7 +228,11 @@ Page({
   loadStudentData: function () {
     var self = this;
     cloud.api.myAssignments().then(function (r) {
-      self.setData({ myAssignments: r.assignments || [], myAssignError: '' });
+      self.setData({
+        myAssignments: r.assignments || [],
+        myAssignError: '',
+        emptyHint: r.hint || ''
+      });
     }).catch(function (err) {
       // 不静默：学生"看不到作业"曾因这里吞错而无法排查
       self.setData({ myAssignError: cloud.humanError(err) });
