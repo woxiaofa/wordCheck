@@ -26,7 +26,25 @@ App({
       // 不抛异常，只记录；页面层会在调用云函数时给出可读提示
       console.warn('[app] 云开发初始化失败：请检查 miniprogram/utils/cloud.js 里的 ENV_ID，' +
         '以及在开发者工具中是否已开通云开发环境。');
+      return;
     }
+    this.silentLogin();
+  },
+
+  /**
+   * 静默登录：初始化成功即调 user.login，服务端首次自动建用户。
+   * 本地优先设计——失败只打日志，学习流程照走本地兜底，不打扰用户。
+   */
+  silentLogin: function () {
+    var self = this;
+    cloud.api.login().then(function (res) {
+      self.globalData.user = res.user;
+    }).catch(function (err) {
+      // ENV_NOT_SET（还没填环境 ID）属预期状态，不刷屏
+      if (err && err.code !== 'ENV_NOT_SET') {
+        console.warn('[app] 静默登录失败：', err && err.message);
+      }
+    });
   },
 
   onShow: function () {
