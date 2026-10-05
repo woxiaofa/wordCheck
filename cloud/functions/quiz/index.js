@@ -21,6 +21,7 @@ const _ = db.command;
 const quizLib = require('./shared/quiz');
 const srs = require('./shared/srs');
 const { getLocalDate } = require('./shared/time');
+const { upsertState } = require('./shared/state-store');
 
 const COLL = {
   words: 'words',
@@ -307,11 +308,16 @@ async function applyForgot(userId, wordId, now, questionType) {
   };
 
   if (prev) {
-    await db.collection(COLL.state).doc(prev._id).update({ data: doc }).catch(() => {});
+    await db.collection(COLL.state).doc(prev._id).update({ data: doc }).catch((e) => {
+      console.error('[quiz] 错词状态更新失败:', e && e.errMsg);
+    });
   } else {
-    await db.collection(COLL.state).add({
-      data: Object.assign({ user_id: userId, word_id: wordId, created_at: now }, doc)
-    }).catch(() => {});
+    // 与 review 同一套自愈写入：撞唯一键自动清脏数据重试，不静默丢数据
+    const errCode = await upsertState(db, COLL.state, userId, wordId, doc, now).catch((e) => {
+      console.error('[quiz] 错词状态写入异常:', e && e.errMsg);
+      return 'STATE_STORE_ERROR';
+    });
+    if (errCode) console.error('[quiz] 错词状态未能写入（不影响交卷判分）:', wordId, errCode);
   }
 }
 

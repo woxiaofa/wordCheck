@@ -19,6 +19,7 @@ const _ = db.command;
 
 const { nextState, REQ_ID_TTL_DAYS } = require('./shared/srs');
 const { getLocalDate, getLocalDayStart } = require('./shared/time');
+const { upsertState } = require('./shared/state-store');
 
 const COLL = {
   state: 'user_word_state',
@@ -90,23 +91,13 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
   if (prev) {
     await db.collection(COLL.state).doc(prev._id).update({ data: doc });
   } else {
-    try {
-      await db.collection(COLL.state).add({ data: Object.assign({ created_at: now }, doc) });
-    } catch (e) {
-      // 唯一键冲突的两种来源：
-      //   a) 并发重复提交 —— 回读后更新即可（幂等兜底）；
-      //   b) 库里存在 word_id 为空的脏数据 —— 唯一索引把所有 null 视为同一个值，
-      //      该用户之后每条新词都会撞墙，必须给出可执行的报错而不是裸 E11000。
-      const again = await db.collection(COLL.state)
-        .where({ user_id: user._id, word_id: wordId }).limit(1).get().catch(() => null);
-      const hit = again && again.data && again.data[0];
-      if (hit) {
-        await db.collection(COLL.state).doc(hit._id).update({ data: doc });
-      } else {
-        return fail('STATE_CONFLICT',
-          'user_word_state 里存在 word_id 为空的脏数据：请在云控制台删除该集合中' +
-          '没有 word_id 字段（或值为 null）的记录后重试');
-      }
+    // 新词进入 SRS：撞唯一键时由 state-store 自愈（清理 word_id 为空的
+    // 脏文档 → 回读 → 重试），脏数据导致的"进度恒 0"在这里自动恢复
+    const errCode = await upsertState(db, COLL.state, user._id, wordId, doc, now);
+    if (errCode) {
+      return fail('STATE_CONFLICT',
+        '学习状态写入冲突：请在云控制台 user_word_state 集合删除 word_id 为空的记录' +
+        '（云函数日志有现场）；若反复出现请把日志发开发');
     }
   }
 
