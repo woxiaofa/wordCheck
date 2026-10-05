@@ -132,13 +132,13 @@
       <view class="muted" style="font-size:24rpx">邀请码 {{cls.code}}</view>
     </view>
 
-    <view class="card" wx:if="{{myAssignError || assignments.length}}">
+    <view class="card" wx:if="{{myAssignError || myAssignments.length}}">
       <view class="card-title">老师 / 家长布置的任务</view>
       <view wx:if="{{myAssignError}}" class="muted mt-s">
         加载失败：{{myAssignError}}
         <text class="link" bindtap="reload"> 重试</text>
       </view>
-      <view class="assign" wx:for="{{assignments}}" wx:key="id">
+      <view class="assign" wx:for="{{myAssignments}}" wx:key="id">
         <view class="row-between">
           <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
           <text class="{{item.expired ? 'bad-text' : 'muted'}}" style="font-size:24rpx">

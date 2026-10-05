@@ -342,11 +342,12 @@ async function onStudents(openid) {
   const ids = ctx.cls.student_ids || [];
   if (!ids.length) return ok({ students: [] });
 
-  const res = await db.collection(COLL.users)
-    .where({ _id: _.in(ids) })
-    .limit(LIMITS.CLASS_SIZE_MAX)
-    .get();
-  const students = (res.data || []).map(u => ({
+  // 逐条取：云开发里 where({_id: _.in(ids)}) 的行为在部分版本上不稳定，
+  // 班级规模上限 50，直接按 id 取更可靠，也顺带跳过已被删除的学员
+  const docs = await Promise.all(ids.map(id =>
+    db.collection(COLL.users).doc(id).get().then(r => r.data).catch(() => null)
+  ));
+  const students = docs.filter(Boolean).map(u => ({
     id: u._id,
     nickname: u.nickname || '',
     avatar: u.avatar || '',
