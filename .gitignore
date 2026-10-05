@@ -20,8 +20,9 @@ assets/fonts/*.otf
 assets/fonts/*.ttf
 assets/fonts/*.ttc
 
-# 云函数目录里的 shared 副本（由 scripts/prepare-functions.js 生成，部署前自动就位）
-cloud/functions/*/shared/
+# 注意：cloud/functions/*/shared/ 这几个副本【必须】随仓库跟踪、随部署上传——
+# 开发者工具/CLI 上传时会忽略 .gitignore 命中的文件，曾导致云端
+# "Cannot find module ./shared/time"（2026-10-05 实锤）。勿再把它们加回来。
 
 # Piper 语音模型（63MB，按需下载，见 scripts/gen_audio_piper.py 注释里的 hf-mirror 链接）
 scripts/piper-models/
