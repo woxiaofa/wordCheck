@@ -338,6 +338,30 @@ Page({
     });
   },
 
+  /** 历史数据修复：v2 写入器事故期间的学习明细都在日志里，一键无损找回 */
+  runRepair: function () {
+    var self = this;
+    this.setData({ diagnoseText: '修复中…（从学习日志回填状态记录）' });
+    cloud.api.repairHistory().then(function (r) {
+      var lines = [
+        '✅ 回填完成',
+        '扫描日志 ' + (r.scannedLogs || 0) + ' 条 · 涉及 ' + (r.distinctPairs || 0) + ' 个词',
+        '新建状态 ' + (r.created || 0) + ' 条 · 更新 ' + (r.updated || 0) + ' 条'
+      ];
+      var lu = r.learnedByUser || {};
+      Object.keys(lu).forEach(function (uid) {
+        lines.push('  ' + uid.slice(-6) + ': 现有 ' + lu[uid] + ' 词');
+      });
+      if (r.writeFails && r.writeFails.length) {
+        lines.push('⚠ 写入失败 ' + r.writeFails.length + ' 条: ' + r.writeFails.join(', '));
+      }
+      lines.push('建议：回到首页/班级页下拉刷新，再看作业进度');
+      self.setData({ diagnoseText: lines.join('\n') });
+    }).catch(function (err) {
+      self.setData({ diagnoseText: '修复失败：' + ((err && (err.errMsg || err.message)) || err) });
+    });
+  },
+
   /** 云自检：把"云函数活着吗 / 库里有数据吗"直接摊在页面上，不靠猜 */
   runDiagnose: function () {
     var self = this;

@@ -69,6 +69,11 @@ function createFakeDb() {
 
   function collection(name) {
     var self = {
+      orderBy: function () { return self; },
+      limit: function () { return self; },
+      field: function () { return self; },
+      get: function () { return Promise.resolve({ data: ensure(name).map(clone) }); },
+      count: function () { return Promise.resolve({ total: ensure(name).length }); },
       where: function (q) {
         var rows = ensure(name).filter(function (d) { return match(d, q); });
         var chain = {
@@ -110,6 +115,12 @@ function createFakeDb() {
             return Promise.resolve({ stats: { updated: idx === -1 ? 0 : 1 } });
           },
           set: function (o) {
+            // 云端真实行为（2026-10-06 探针实锤）：set 的 data 里带 _id
+            // 必抛 -501007"不能更新_id的值"—— 写入器绝不允许这么做
+            if (o.data && o.data._id !== undefined) {
+              return Promise.reject(new Error(
+                'document.set:fail -501007 invalid parameter, 不能更新_id的值'));
+            }
             // 云开发服务端语义：有则替换、无则新建（不经过插入路径，不会撞唯一键）
             var data = clone(o.data);
             data._id = id;
@@ -125,6 +136,12 @@ function createFakeDb() {
       add: function (o) {
         var data = clone(o.data);
         counters.adds++;
+        // 云端真实行为（探针实锤）：user_word_state 上 add 带 _id 报
+        // "database request fail [FailedOp]" —— 写入器的 add 兜底必须不带 _id
+        if (name === 'user_word_state' && data._id !== undefined) {
+          return Promise.reject(new Error(
+            'collection.add:fail database request fail. [FailedOp]'));
+        }
         if (name === 'user_word_state') {
           // 复刻线上观测到的行为（不是教科书 Mongo 语义）：
           // 该用户名下只要存在 word_id 为空的脏文档，后续每一次插入都会撞唯一键，
@@ -344,6 +361,49 @@ steps.push(function () {
         assert.strictEqual(pair[0].last_feedback, 'vague', '最后一次反馈应生效');
         assert.strictEqual(pair[0].wrong_count, 1, '错误次数应记为 1');
       });
+  });
+});
+
+steps.push(function () {
+  return ok('⑧ 修复回填：从 review_logs 重建缺失的状态记录并修正云记账', function () {
+    seedUser();
+    db.raw.users[0].stats_cache.learned_words = 99;   // 事故期间虚高的账
+    var now = Date.now();
+    db.raw.review_logs = [
+      { user_id: 'u1', word_id: 'search', feedback: 'known', mode: 'learn', created_at: now - 3600e3 },
+      { user_id: 'u1', word_id: 'circle', feedback: 'forgot', mode: 'learn', created_at: now - 1800e3 }
+    ];
+    db.raw.user_word_state = [];   // 事故现场：状态表空
+    return review.main({ action: 'repair' }, {}).then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      var st = db.raw.user_word_state || [];
+      assert.strictEqual(st.length, 2, '应为两个词各回填一条状态，实际：' + JSON.stringify(st));
+      var circle = st.filter(function (d) { return d.word_id === 'circle'; })[0];
+      assert.ok(circle, 'circle 应被回填');
+      assert.strictEqual(circle.wrong_count, 1, '回填应带错误计数');
+      assert.ok(circle.next_review_at > now - 1800e3, '到期时间应按 SRS 重算');
+      assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 2,
+        '云记账应被重建为真实词汇量（事故期间每次提交都被当成新词）');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑨ 修复幂等：对已有状态记录的词只更新不重复新建', function () {
+    seedUser();
+    var now = Date.now();
+    db.raw.review_logs = [
+      { user_id: 'u1', word_id: 'search', feedback: 'known', mode: 'learn', created_at: now - 3600e3 }
+    ];
+    db.raw.user_word_state = [
+      { _id: 'gen-old-7', user_id: 'u1', word_id: 'search', stage: 3, correct_count: 5 }
+    ];
+    return review.main({ action: 'repair' }, {}).then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      var st = db.raw.user_word_state || [];
+      assert.strictEqual(st.length, 1, '已有记录应被更新而不是新建，实际：' + JSON.stringify(st.map(function (d) { return d._id; })));
+      assert.strictEqual(st[0]._id, 'gen-old-7', '老 _id 文档应原地更新');
+    });
   });
 });
 

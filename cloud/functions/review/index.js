@@ -37,7 +37,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-probe';
+const VERSION = 'rev-20261006-fixset';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -51,6 +51,8 @@ exports.main = async (event, context) => {
     case 'due':      return onDueList(OPENID, event);
     // 自检：云控制台 → 云函数 → review → 云端测试，填 {"action":"diagnose"} 即可
     case 'diagnose': return onDiagnose(OPENID, event);
+    // 修复：状态表因 v2 写入器事故缺记录，从 review_logs 回填 + 重建云记账
+    case 'repair':   return onRepair(OPENID, event);
     default:         return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
@@ -244,6 +246,111 @@ async function onDiagnose(openid, { clean, all }) {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* 历史数据修复：从 review_logs 回填 user_word_state + 重建云记账        */
+/* ------------------------------------------------------------------ */
+/**
+ * v2 写入器事故（set 带 _id 必抛 -501007、update 静默 updated:0）期间，
+ * 提交都"成功"了（有日志、云记账在涨），但状态表一条新记录都没落下来。
+ * 日志里有完整的学习明细（user_id + word_id + feedback + 时间），可以无损回填：
+ *   - 每个日志里的 (user, word) 对：状态表缺就按确定性 _id 新建，
+ *     档位用 srs.nextState 按最后一次反馈重算，与在线提交完全同构；
+ *   - 顺手重建 users.stats_cache.learned_words（事故期间每次提交都被当成新词，
+ *     记账虚高，跟真实词汇量对不上）。
+ * 幂等：已存在的记录只更新不新建，跑多少次结果一致。
+ */
+async function onRepair(openid, { dryRun }) {
+  const logsRes = await db.collection(COLL.logs)
+    .orderBy('created_at', 'desc').limit(1000)
+    .field({ user_id: true, word_id: true, feedback: true, created_at: true })
+    .get().catch(() => ({ data: [] }));
+  const rows = logsRes.data || [];
+  if (!rows.length) return fail('NO_DATA', '学习日志为空，无从回填');
+
+  // 按 (user, word) 归并：最后一次反馈决定档位，正误计数累加
+  const pairs = {};
+  rows.forEach((l) => {
+    if (!l.user_id || !l.word_id) return;
+    const k = String(l.user_id) + '|' + String(l.word_id);
+    const m = pairs[k] || (pairs[k] = {
+      user_id: l.user_id, word_id: l.word_id,
+      known: 0, wrong: 0, last_feedback: 'known', last_at: 0, first_at: 0
+    });
+    if (l.feedback === 'known') m.known++;
+    if (l.feedback === 'forgot') m.wrong++;
+    if (l.created_at > m.last_at) { m.last_at = l.created_at; m.last_feedback = l.feedback; }
+    if (!m.first_at || l.created_at < m.first_at) m.first_at = l.created_at;
+  });
+
+  let created = 0, updated = 0, skipped = 0;
+  const detail = [];
+  for (const k of Object.keys(pairs)) {
+    const m = pairs[k];
+    const next = nextState(null, m.last_feedback, m.last_at);
+    const doc = {
+      user_id: m.user_id,
+      word_id: m.word_id,
+      stage: next.stage,
+      last_feedback: m.last_feedback,
+      next_review_at: next.nextReviewAt,
+      correct_count: m.known,
+      wrong_count: m.wrong,
+      last_wrong_type: m.wrong > 0 ? 'repair' : null,
+      updated_at: m.last_at
+    };
+    if (dryRun) { skipped++; continue; }
+
+    // 先按字段查（老版本自动 _id 的历史文档也要被更新而不是重复新建）
+    const found = await db.collection(COLL.state)
+      .where({ user_id: m.user_id, word_id: m.word_id }).limit(1).get()
+      .catch(() => null);
+    const hit = found && found.data && found.data[0];
+    if (hit) {
+      await db.collection(COLL.state).doc(hit._id).update({ data: doc }).catch(() => {});
+      updated++;
+    } else {
+      const err = await upsertState(db, COLL.state, m.user_id, m.word_id, doc, m.first_at);
+      if (err) { detail.push('写入失败:' + String(m.word_id)); continue; }
+      created++;
+    }
+  }
+
+  // 重建云记账：learned_words = 状态表里该用户的真实记录数
+  const stRes = await db.collection(COLL.state).limit(1000)
+    .field({ user_id: true }).get().catch(() => ({ data: [] }));
+  const perUser = {};
+  (stRes.data || []).forEach((d) => {
+    const k = String(d.user_id);
+    perUser[k] = (perUser[k] || 0) + 1;
+  });
+  const usRes = await db.collection(COLL.users).limit(50)
+    .field({ stats_cache: true }).get().catch(() => ({ data: [] }));
+  for (const u of (usRes.data || [])) {
+    const learned = perUser[String(u._id)] || 0;
+    const sc = u.stats_cache || {};
+    await db.collection(COLL.users).doc(u._id).update({
+      data: {
+        stats_cache: {
+          total_words: sc.total_words || 0,
+          learned_words: learned,
+          streak_days: sc.streak_days || 0,
+          last_active_date: sc.last_active_date || ''
+        }
+      }
+    }).catch(() => {});
+  }
+
+  return ok({
+    scannedLogs: rows.length,
+    distinctPairs: Object.keys(pairs).length,
+    created: created,
+    updated: updated,
+    dryRunSkipped: skipped,
+    learnedByUser: perUser,
+    writeFails: detail.slice(0, 10)
+  });
+}
+
 /** 全表诊断：不依赖任何用户身份，控制台"云端测试"可直接跑 */
 async function diagnoseAll(clean) {
   /* 设计：所有查询在同一瞬间串行发出，输出一份"同一时刻的快照"。
@@ -327,34 +434,35 @@ async function diagnoseAll(clean) {
   // ============ 拼快照文本 ============
 
   /* ---- 写入回路探针 + 哨兵：把"写不进"和"被外部删"当场分开 ----
-   * 背景：日志/云记账都证明 review.submit 跑成功了（状态写入在日志之前），
-   * 但状态表里该用户的记录是 0 条 —— 只剩两种可能：
-   *   a) set/add 在这个环境里假成功（写完读不回）
-   *   b) 写成功后，两次诊断之间有外部删除（控制台手工清数据等）
-   * 探针当场写读删验证 a；哨兵跨诊断存活检查验证 b。 */
+   * v1 探针曾当场抓到根因：set 的 data 带 _id 必抛 -501007"不能更新_id的值"，
+   * 而兜底 update 对不存在的文档静默 updated:0 被当成功 —— 新词永远进不了状态表。
+   * 现在探针按修复后的契约（data 不带 _id）验证写路径是否健康。 */
   const probeOut = [];
   const now2 = Date.now();
   const pid1 = 'diagprobe-set-' + now2;
   const pdoc = { user_id: 'diagprobe', word_id: 'probe', stage: 0, created_at: now2 };
   try {
-    await db.collection(COLL.state).doc(pid1).set({ data: Object.assign({ _id: pid1 }, pdoc) });
+    await db.collection(COLL.state).doc(pid1).set({ data: pdoc });
     const rb = await db.collection(COLL.state).doc(pid1).get()
       .then((r) => !!r.data).catch(() => false);
     probeOut.push('set→回读:' + (rb ? '在' : '⚠不在'));
   } catch (e) {
-    probeOut.push('set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 60) + ')');
+    probeOut.push('set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 80) + ')');
   }
   const pid2 = 'diagprobe-add-' + now2;
   try {
-    await db.collection(COLL.state).add({ data: Object.assign({ _id: pid2 }, pdoc) });
-    const rb2 = await db.collection(COLL.state).doc(pid2).get()
-      .then((r) => !!r.data).catch(() => false);
+    await db.collection(COLL.state).add({ data: Object.assign({}, pdoc, { word_id: 'probe2' }) });
+    const rb2 = await db.collection(COLL.state)
+      .where({ user_id: 'diagprobe', word_id: 'probe2' }).limit(1).get()
+      .then((r) => !!(r.data && r.data.length)).catch(() => false);
     probeOut.push('add→回读:' + (rb2 ? '在' : '⚠不在'));
   } catch (e) {
-    probeOut.push('add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 60) + ')');
+    probeOut.push('add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 80) + ')');
   }
   await db.collection(COLL.state).doc(pid1).remove().catch(() => {});
-  await db.collection(COLL.state).doc(pid2).remove().catch(() => {});
+  await db.collection(COLL.state)
+    .where({ user_id: 'diagprobe', word_id: 'probe2' }).remove()
+    .catch(() => {});
 
   const SENTRY_ID = 'diagprobe-sentinel';
   const prevSent = await db.collection(COLL.state).doc(SENTRY_ID).get()

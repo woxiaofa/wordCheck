@@ -247,6 +247,14 @@ var api = {
     return call('review', 'diagnose', { all: all !== false, clean: !!clean });
   },
 
+  /**
+   * 历史数据修复：从学习日志回填缺失的状态记录、重建云记账。
+   * v2 写入器事故（set 带 _id 报 -501007）期间的学习明细都在日志里，可无损找回。
+   */
+  repairHistory: function () {
+    return call('review', 'repair', {});
+  },
+
   /* ------------- 班级（家长/老师端，批次 1） ------------- */
 
   /** 建班级（幂等：重复调用返回同一班级） */

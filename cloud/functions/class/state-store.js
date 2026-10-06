@@ -8,15 +8,15 @@
  *
  * 演进：
  *   v1（已废弃）：add → 撞唯一键 → 清脏 → 回读 → 重试 add。
- *     线上仍偶发失败：回读 where({user_id, word_id}) 命中不了"存在但字段缺失/
- *     类型不一致"的历史文档，二次 add 同样被唯一键挡下 → STATE_CONFLICT。
- *   v2（当前）：不再走 add。
- *     文档 _id 固定为 `${user_id}:${word_id}`，直接 doc(_id).set() ——
- *     云端行为是"有则替换、无则新建"，压根不经过唯一索引的插入路径，
- *     脏文档、并发重放、旧 _id 残留都挡不住这次写入。
+ *   v2（已废弃，2026-10-06 探针实锤）：doc(_id).set({data}) 的 data 里带了 _id
+ *     → 云端必抛 -501007"不能更新_id的值"；兜底 doc(_id).update() 对"不存在
+ *     的文档"会静默返回 updated:0 被当成成功 —— 结果新词永远进不了状态表，
+ *     而日志/云记账照写，表现就是"作业恒 0/N、统计越学越假"。
+ *   v3（当前）：set 的 data 里绝不带 _id；update 必须真更新到行（stats.updated>0）
+ *     才算成功；add 不带 _id（自动主键），靠唯一索引 (user_id, word_id) 防重。
  *
  * 兜底链（每一步都留日志，失败原因不看猜）：
- *   set → update（文档已在）→ where 回读后 update（老 _id 的历史记录）→ add
+ *   set(无_id) → update(校验行数) → where 回读后 update（老 _id 的历史记录）→ add(无_id)
  * 返回 null 表示写入成功，字符串为错误码。
  */
 
@@ -38,12 +38,13 @@ function stateDocId(userId, wordId) {
 async function upsertState(db, collName, userId, wordId, doc, now) {
   const coll = db.collection(collName);
   const _id = stateDocId(userId, wordId);
+  // ⚠ set/add 的 data 里都不能带 _id：set 带 _id 必抛 -501007（不能更新_id的值）
   const payload = Object.assign(
-    { _id: _id, user_id: userId, word_id: wordId, created_at: now },
+    { user_id: userId, word_id: wordId, created_at: now },
     doc
   );
 
-  // ① 首选：按确定性 _id 直接 set —— 云端 upsert，不经过插入路径
+  // ① 首选：按确定性 _id 直接 set（data 不含 _id）—— 云端 upsert，有则替换无则新建
   try {
     await coll.doc(_id).set({ data: payload });
     return null;
@@ -52,10 +53,11 @@ async function upsertState(db, collName, userId, wordId, doc, now) {
       String(e && (e.errMsg || e.message)).slice(0, 200));
   }
 
-  // ② 兜底 1：文档已存在 → update（覆盖业务字段，不动 _id）
+  // ② 兜底 1：文档已存在 → update。云端对"不存在的文档"update 会静默返回
+  //    updated:0，必须检查行数，否则新词写入会被骗成成功（v2 的事故根源）
   try {
-    await coll.doc(_id).update({ data: doc });
-    return null;
+    const r = await coll.doc(_id).update({ data: doc });
+    if (r && r.stats && Number(r.stats.updated) > 0) return null;
   } catch (e) { /* 继续兜底 */ }
 
   // ③ 兜底 2：老版本留下的自动 _id 文档 → 回读后更新
@@ -64,16 +66,18 @@ async function upsertState(db, collName, userId, wordId, doc, now) {
   const hit = again && again.data && again.data[0];
   if (hit) {
     try {
-      await coll.doc(hit._id).update({ data: doc });
-      return null;
+      const r2 = await coll.doc(hit._id).update({ data: doc });
+      if (!r2 || !r2.stats || Number(r2.stats.updated) > 0) return null;
     } catch (e) { /* 继续兜底 */ }
   }
 
-  // ④ 兜底 3：最后再试一次 add（干净库里这条路一定成功）
+  // ④ 兜底 3：add（不带 _id，自动主键）。唯一索引 (user_id, word_id) 防重，
+  //    并发下撞唯一键说明文档已存在，同样视为成功
   try {
     await coll.add({ data: payload });
     return null;
   } catch (e2) {
+    if (isDupErr(e2)) return null;
     console.error('[state-store] 全部写入路径均失败:', wordId,
       String(e2 && (e2.errMsg || e2.message)).slice(0, 200));
     return 'STATE_WRITE_FAIL';
