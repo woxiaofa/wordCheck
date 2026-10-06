@@ -75,6 +75,20 @@
     <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 检验真实水平</button>
   </view>
 
+  <!-- 班级作业入口：老师/家长布置的词单，没学过的优先，学了几个算几个 -->
+  <view class="card cls-assign" wx:if="{{clsAssign}}">
+    <view class="row-between">
+      <text class="card-title">📌 {{clsAssign.name}}</text>
+      <text class="muted">{{clsAssign.done}}/{{clsAssign.count}}</text>
+    </view>
+    <view class="progress mt-s">
+      <view class="progress-inner" style="width:{{clsAssign.count ? clsAssign.done * 100 / clsAssign.count : 0}}%"></view>
+    </view>
+    <button class="btn sm mt-s {{clsAssign.finished ? 'ghost' : 'ok'}}" bindtap="goClassAssign">
+      {{clsAssign.finished ? '已完成，再去巩固' : '继续学 · 从没学的词开始'}}
+    </button>
+  </view>
+
   <view class="grid-3">
     <view class="kpi">
       <view class="num">{{streak}}</view>

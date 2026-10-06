@@ -315,8 +315,20 @@ Page({
   },
 
   /** 去做作业：暂跳学习页（词级联动待批次 2，先保证闭环能跑） */
-  goStudyAssignment: function () {
-    wx.redirectTo({ url: '/pages/study/study' });
+  /** 去做这份作业：把作业词单带给学习页，按"没学过的优先"续学，而不是从头再来 */
+  goStudyAssignment: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var a = (this.data.myAssignments || [])[idx] || {};
+    var ids = (a.word_ids || []).join(',');
+    if (!ids) {
+      // 旧版服务端不下发词单：退回普通学习页，至少有得学
+      wx.redirectTo({ url: '/pages/study/study' });
+      return;
+    }
+    var name = a.note || (a.tag ? a.tag + '作业' : '班级作业');
+    wx.redirectTo({
+      url: '/pages/study/study?ids=' + encodeURIComponent(ids) + '&name=' + encodeURIComponent(name)
+    });
   },
 
   /** 云自检：把"云函数活着吗 / 库里有数据吗"直接摊在页面上，不靠猜 */

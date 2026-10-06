@@ -6,6 +6,12 @@
     <text class="muted" wx:if="{{queue.length}}">{{index < queue.length ? index + 1 : queue.length}} / {{queue.length}}</text>
   </view>
 
+  <!-- 班级作业模式：让孩子（和家长）随时看到这份作业学到哪了 -->
+  <view wx:if="{{assignName}}" class="assign-bar">
+    <text class="assign-name">📌 {{assignName}}</text>
+    <text class="assign-num {{assignDone >= assignTotal ? 'done' : ''}}">{{assignDone}}/{{assignTotal}}</text>
+  </view>
+
   <view class="progress">
     <view class="progress-inner" style="width:{{progressPct}}%"></view>
   </view>

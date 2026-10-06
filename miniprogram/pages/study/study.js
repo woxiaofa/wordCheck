@@ -64,15 +64,28 @@ Page({
      * 队列是否在装配中（云端 task.today 冷启动 1~2 秒）。
      * 装配期间不渲染"学完了"空状态——否则新号第一次打开会先闪一下"再学一轮"。
      */
-    queueLoading: true
+    queueLoading: true,
+
+    /** 班级作业模式：作业名 + 词单进度（assignName 为空表示普通学习） */
+    assignName: '',
+    assignDone: 0,
+    assignTotal: 0
   },
 
   /** @type {Object} 本地 SRS 状态镜像：{ [word]: {stage,last_feedback,next_review_at,correct_count,wrong_count} } */
   mirror: {},
 
-  onLoad: function () {
+  onLoad: function (options) {
     this.mirror = wx.getStorageSync(STORAGE_KEY) || {};
     this._extraRound = false;
+    // 班级作业模式：URL 带 ids（作业词单）时，队列只从这份词单里出，
+    // 没学过的优先 —— 这就是"继续学"的断点续学能力
+    if (options && options.ids) {
+      this._assign = {
+        ids: String(options.ids).split(',').filter(function (s) { return s; }),
+        name: options.name ? decodeURIComponent(options.name) : '班级作业'
+      };
+    }
     this.buildQueue(false);
   },
 
@@ -110,6 +123,12 @@ Page({
       queueLoading: true
     });
 
+    // 作业模式：不查今日任务，队列 = 作业词单（没学过的在前）
+    if (this._assign && this._assign.ids.length) {
+      this.setQueue(this.assignmentQueue(), false);
+      return;
+    }
+
     api.todayTask(this.loadedDate).then(function (data) {
       var words = (data && data.words) || [];
       if (!words.length) throw new Error('EMPTY');
@@ -121,8 +140,46 @@ Page({
     });
   },
 
-  /** 本地队列：到期复习词优先，其次错词，最后新词（与文档 6.3 的组装顺序一致） */
-  localQueue: function (force) {
+  /**
+   * 作业队列：词单里没学过的词按原顺序排前面（这就是"继续学"——
+   * 学过的不会再从头来一遍），学过的按到期时间排后面做巩固。
+   */
+  assignmentQueue: function () {
+    var byName = {};
+    for (var i = 0; i < WORDS.length; i++) byName[WORDS[i].word] = WORDS[i];
+    var fresh = [], seen = [], missing = 0;
+    for (var j = 0; j < this._assign.ids.length; j++) {
+      var id = this._assign.ids[j];
+      var w = byName[id];
+      if (!w) { missing++; continue; }          // 词单里有、词库里没有：跳过不渲染
+      if (this.mirror[id]) seen.push(w); else fresh.push(w);
+    }
+    var now = Date.now();
+    seen.sort(function (a, b) {
+      return ((this.mirror[a.word] || {}).next_review_at || now) -
+             ((this.mirror[b.word] || {}).next_review_at || now);
+    }.bind(this));
+    if (missing) {
+      console.warn('[study] 作业词单里有', missing, '个词不在当前词库，已跳过');
+    }
+    return fresh.concat(seen);
+  },
+
+  /** 作业进度条数据：词单里已经学过（有状态记录）的词数 */
+  updateAssignProgress: function () {
+    if (!this._assign) return;
+    var done = 0;
+    for (var i = 0; i < this._assign.ids.length; i++) {
+      if (this.mirror[this._assign.ids[i]]) done++;
+    }
+    this.setData({
+      assignName: this._assign.name,
+      assignDone: done,
+      assignTotal: this._assign.ids.length
+    });
+  },
+
+  /** 本地队列：到期复习词优先，其次错词，最后新词（与文档 6.3 的组装顺序一致） */  localQueue: function (force) {
     var now = Date.now();
     // 只从当前词书取词：用户在首页选了"中考"，学习页就不该冒出四级词
     var pool = books.getWords(books.getKey());
@@ -183,6 +240,7 @@ Page({
       extraRound: !!this._extraRound,
       queueLoading: false
     });
+    this.updateAssignProgress();
 
     // 队列为空必须明确说明原因。曾经这里直接走进 showCurrent 的 !w 分支，
     // 界面只留一个"这一轮学完了"和一个空白，真机上被当成"程序没数据"。
@@ -309,6 +367,7 @@ Page({
     };
     this.mirror[w.word] = localSt;
     wx.setStorageSync(STORAGE_KEY, this.mirror);
+    if (this._assign) this.updateAssignProgress();   // 作业进度实时 +1
 
     // 2) 本轮统计 + 今日活跃计数（首页的打卡进度读这个）
     //    统计放在 data 里（不是实例字段）：实例字段在"未经过 buildQueue"的路径上不存在，

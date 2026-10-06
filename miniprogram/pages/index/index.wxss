@@ -71,3 +71,6 @@
   background: #131c27; border-radius: 16rpx;
   font-size: 24rpx; color: #8fa3b7; line-height: 1.7;
 }
+
+/* 班级作业入口卡：紫色描边和作业模式的学习页进度条同一色系 */
+.cls-assign { border: 1rpx solid rgba(124, 92, 255, .35); }

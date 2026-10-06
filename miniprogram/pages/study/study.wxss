@@ -4,6 +4,21 @@
 .bar { margin-bottom: 12rpx; }
 .tag-line { font-size: 26rpx; color: #8fa3b7; }
 
+/* 班级作业模式：顶部一条轻量进度（不打断"一屏一卡"的沉浸） */
+.assign-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12rpx 20rpx;
+  margin-bottom: 12rpx;
+  border-radius: 14rpx;
+  background: rgba(124, 92, 255, .12);
+  border: 1rpx solid rgba(124, 92, 255, .35);
+}
+.assign-name { font-size: 24rpx; color: #b9a8ff; }
+.assign-num { font-size: 24rpx; color: #e8eef5; font-weight: 600; }
+.assign-num.done { color: #2fd07a; }
+
 /* 卡片区：上下留白，让卡片看上去像"一屏一卡"。
    高度配合卡片本身的 min-height(680rpx)：卡片越高，上滑的可操作区域越大，
    手势才落在拇指/食指的自然范围内。

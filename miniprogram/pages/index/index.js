@@ -13,6 +13,7 @@ var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var books = require('../../utils/books');
+var cloud = require('../../utils/cloud');
 
 var STORAGE_KEY = 'word_state_mirror';
 /** 首次引导卡：点"开始学"或关闭后写入，之后永不再现 */
@@ -50,12 +51,49 @@ Page({
     bookKey: 'all',
     bookName: '全部',
     bookDesc: '',
-    bookCount: 0
+    bookCount: 0,
+
+    /** 班级作业入口：{name, done, count, ids, finished}；不在班级/没作业时为 null */
+    clsAssign: null
   },
 
   onShow: function () {
     this.refresh();
     this.maybeShowIntro();
+    this.loadClassAssignment();
+  },
+
+  /** 首页的班级作业入口：孩子不用再翻到"班级"页找作业 */
+  loadClassAssignment: function () {
+    var self = this;
+    cloud.api.myAssignments().then(function (r) {
+      var list = (r && r.assignments) || [];
+      if (!list.length) { self.setData({ clsAssign: null }); return; }
+      var a = list[0];                     // 只展示最近一份，多的在班级页看
+      var done = a.done || 0;
+      var count = a.count || 0;
+      var ids = (a.word_ids || []).join(',');
+      self.setData({
+        clsAssign: {
+          name: a.note || (a.tag ? a.tag + '作业' : '班级作业'),
+          done: done,
+          count: count,
+          ids: ids,
+          finished: count > 0 && done >= count
+        }
+      });
+    }).catch(function (err) {
+      // 首页的辅助入口，失败不打扰主流程，但必须留线索
+      console.warn('[index] 班级作业加载失败：', (err && (err.errMsg || err.message)) || err);
+    });
+  },
+
+  goClassAssign: function () {
+    var a = this.data.clsAssign;
+    if (!a || !a.ids) return;
+    wx.redirectTo({
+      url: '/pages/study/study?ids=' + encodeURIComponent(a.ids) + '&name=' + encodeURIComponent(a.name)
+    });
   },
 
   /** 首次打开（本地没有任何学习记录且从未关闭过）约 1 秒后浮出引导卡 */

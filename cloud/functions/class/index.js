@@ -583,8 +583,9 @@ async function progressByStudent(studentIds, wordIds) {
     .get();
   const map = {};
   (res.data || []).forEach(s => {
-    const learned = s.correct_count > 0 || s.stage > 0;
-    if (!learned) return;
+    // 完成定义 = 学过（见过并评价过，无论对错）。对错由 SRS 安排后续复习，
+    // 不该在这里二次设卡 —— 旧口径（correct_count>0 或 stage>0）会把
+    // 认真学完但选了"模糊"的孩子判成 0 进度，家长看到的就是假的。
     if (!map[s.user_id]) map[s.user_id] = { user_id: s.user_id, done: 0 };
     map[s.user_id].done++;
   });
@@ -623,10 +624,12 @@ function publicAssignment(a) {
     count: a.count,
     deadline: a.deadline || '',
     note: a.note || '',
+    // 词单必须下发：客户端"继续学"要按这份词单组装队列（跳过已学的词）
+    word_ids: a.word_ids || [],
     created_at: a.created_at
   };
 }
 
-const VERSION = 'class-20261006-nudge';
+const VERSION = 'class-20261006-progress';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
