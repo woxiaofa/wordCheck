@@ -215,7 +215,9 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId }) {
     .orderBy('freq', 'asc')
     .limit(LIMITS.WORDS_FETCH_MAX)
     .get();
-  const wordIds = (wordsRes.data || []).slice(0, count).map(w => w._id);
+  // 关键：存 word 文本而非 _id —— user_word_state.word_id / task snapshot /
+  // 客户端本地词库匹配全都用文本，进度查询与"继续学"队列才能对上
+  const wordIds = (wordsRes.data || []).slice(0, count).map(w => w.word);
   if (wordIds.length < LIMITS.ASSIGN_COUNT_MIN) {
     return fail('WORDS_EMPTY', '该词库暂无可布置的单词');
   }
@@ -304,6 +306,11 @@ async function onMyAssignments(openid) {
     return ok({ assignments: [] });
   }
 
+  // 词单先归一成文本（兼容旧 _id 格式），后面进度查询和下发全用文本
+  for (const a of assignments) {
+    a.word_ids = await toWordTexts(a.word_ids);
+  }
+
   const wordAll = [];
   assignments.forEach(a => (a.word_ids || []).forEach(w => wordAll.push(w)));
 
@@ -320,7 +327,9 @@ async function onMyAssignments(openid) {
     let done = 0;
     const words = (a.word_ids || []).map(id => {
       const s = stateMap[id];
-      const learned = !!(s && (s.correct_count > 0 || s.stage > 0));
+      // 完成定义 = 学过即算（有学习记录就算），与教练端 progressByStudent 同口径。
+      // 旧口径（correct_count>0 || stage>0）会把选了"模糊"的孩子判成 0 —— 已实锤踩坑。
+      const learned = !!s;
       if (learned) done++;
       return { word_id: id, learned };
     });
@@ -577,8 +586,11 @@ async function requireCoach(openid) {
  */
 async function progressByStudent(studentIds, wordIds) {
   if (!studentIds.length || !wordIds || !wordIds.length) return [];
+  // 词单兼容两种历史格式：words._id（初版实锤对不上学习状态表，进度恒 0）
+  // 或 word 文本（与 user_word_state.word_id 一致的正确格式）。统一转成文本再查。
+  const texts = await toWordTexts(wordIds);
   const res = await db.collection(COLL.state)
-    .where({ user_id: _.in(studentIds), word_id: _.in(wordIds) })
+    .where({ user_id: _.in(studentIds), word_id: _.in(texts) })
     .limit(1000)
     .get();
   const map = {};
@@ -590,6 +602,26 @@ async function progressByStudent(studentIds, wordIds) {
     map[s.user_id].done++;
   });
   return studentIds.map(id => map[id] || { user_id: id, done: 0 });
+}
+
+/**
+ * 作业词单 ID 归一：把可能存在的 words._id 翻译成 word 文本。
+ * user_word_state.word_id 存的是文本（review/task 全链路如此），
+ * 作业若存 _id 则永远查不到学习记录 —— 2026-10-06 截图实锤（作业恒 0/10）。
+ * 新建作业已改为直接存文本，这里兜底翻译云上残留的旧格式作业。
+ */
+async function toWordTexts(ids) {
+  if (!ids || !ids.length) return [];
+  const res = await db.collection('words')
+    .where({ _id: _.in(ids) })
+    .limit(1000)
+    .field({ word: true })
+    .get()
+    .catch(() => ({ data: [] }));
+  if (!(res.data || []).length) return ids;   // 一个都没命中：说明本来就是文本
+  const map = {};
+  res.data.forEach(w => { map[w._id] = w.word; });
+  return ids.map(id => map[id] || id);
 }
 
 function genCode() {
@@ -630,6 +662,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261006-progress';
+const VERSION = 'class-20261006-wordid';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

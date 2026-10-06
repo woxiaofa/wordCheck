@@ -81,8 +81,39 @@ ok('⑦ 首页：作业未完成时取代任务卡，不再两份任务并排（
   // 旧的双重展示（无条件 clsAssign 卡）必须消失
   assert.ok(/wx:if="\{\{clsAssign\}\}"/.test(wxml) === false,
     '不得再无条件渲染作业卡（会和任务卡并排打架）');
-  // 让位说明：孩子得知道每日任务去哪了
-  assert.ok(wxml.indexOf('完成作业后') >= 0, '作业卡上应说明任务会在完成后继续');
+  // 今日进度卡同步让位：两个进度条并排会被当成"数字错了"（同日用户反馈）
+  var heroEnd = wxml.indexOf('cls-assign');
+  assert.ok(wxml.slice(0, heroEnd).indexOf('今日进度') === -1 ||
+    /今日进度[\s\S]*?wx:if="\{\{!clsAssign/.test(wxml) ||
+    wxml.indexOf('<!-- 今日进度：作业进行中时隐藏') >= 0,
+    '今日进度卡在作业进行中应隐藏');
+});
+
+ok('⑧ 云端：作业词单全链路用 word 文本，不用 words._id（进度恒 0 的根因）', function () {
+  var src = read('cloud/functions/class/index.js');
+  // 新建作业直接存文本
+  assert.ok(/map\(w => w\.word\)/.test(src), '新建作业应存 word 文本');
+  // 兼容旧 _id 格式：必须有归一翻译
+  assert.ok(src.indexOf('async function toWordTexts') >= 0, '应有 toWordTexts 归一');
+  assert.ok(/progressByStudent[\s\S]{0,400}toWordTexts/.test(src),
+    'progressByStudent 查询前应归一词单');
+  // 学生端自查进度的口径必须与教练端一致：学过即算
+  var region = src.slice(src.indexOf('async function onMyAssignments'),
+    src.indexOf('教练端：学员列表'));
+  assert.ok(region.indexOf('correct_count > 0') === -1,
+    'onMyAssignments 不得再用旧口径（上次漏改导致学生端恒 0/10）');
+  assert.ok(region.indexOf('const learned = !!s') >= 0,
+    'onMyAssignments 应学过即算');
+});
+
+ok('⑨ 同步时机：班级页/首页 onShow 先补传再拉云端数据', function () {
+  var cls = read('miniprogram/pages/class/class.js');
+  var idx = read('miniprogram/pages/index/index.js');
+  assert.ok(/onShow[\s\S]{0,500}flushPending/.test(cls), '班级页 onShow 应先 flushPending');
+  assert.ok(/onShow[\s\S]{0,500}flushPending/.test(idx), '首页 onShow 应先 flushPending');
+  // 补传不能卡死页面：必须有超时兜底
+  assert.ok(cls.indexOf('Promise.race') >= 0, '班级页补传应有超时兜底');
+  assert.ok(idx.indexOf('Promise.race') >= 0, '首页补传应有超时兜底');
 });
 
 console.log('\n全部通过：' + pass + ' 项 ✓');

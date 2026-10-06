@@ -36,19 +36,13 @@
 
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->
   <view class="card hero cls-hero" wx:if="{{clsAssign && !clsAssign.finished}}">
-    <view class="hero-label">📌 {{clsAssign.name}}（班级作业）</view>
+    <view class="hero-label">📌 {{clsAssign.name}}</view>
     <view class="hero-num">{{clsAssign.done}}<text class="hero-unit"> / {{clsAssign.count}} 个词</text></view>
-    <view class="hero-sub">
-      {{clsAssign.done ? '已学 ' + clsAssign.done + ' 个，接着从没学的词开始' : '还没开始，第一课就在下面'}}
-    </view>
     <view class="progress mt-s">
       <view class="progress-inner" style="width:{{clsAssign.count ? clsAssign.done * 100 / clsAssign.count : 0}}%"></view>
     </view>
-    <button class="btn ok mt" bindtap="goClassAssign">继续学 · 从没学的词开始</button>
-    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 检验真实水平</button>
-    <view class="muted center mt-s" style="font-size:24rpx" wx:if="{{totalCount}}">
-      完成作业后，今天的 {{totalCount}} 个词任务会接着等你
-    </view>
+    <button class="btn ok mt" bindtap="goClassAssign">继续学</button>
+    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查</button>
   </view>
 
   <!-- 任务卡：量 + 构成 + 每一项"为什么是它"。作业没完成时让位（见上） -->
@@ -121,7 +115,9 @@
     </view>
   </view>
 
-  <view class="card mt">
+  <!-- 今日进度：作业进行中时隐藏——作业卡上的进度条就是当前唯一的进度，
+       两个进度条并排（20/20 完成 vs 作业 0/10）只会让人觉得数字错了 -->
+  <view class="card mt" wx:if="{{!clsAssign || clsAssign.finished}}">
     <view class="row-between">
       <text class="card-title">今日进度</text>
       <text class="muted">{{done}} / {{target}}</text>

@@ -60,7 +60,12 @@ Page({
   onShow: function () {
     this.refresh();
     this.maybeShowIntro();
-    this.loadClassAssignment();
+    // 作业进度读的是云端学习记录：先补传本地积压的（最多等 1.2 秒），
+    // 再拉作业，孩子学完几个词切回首页，进度条立刻跟上
+    var self = this;
+    var flushed = cloud.flushPending().catch(function () {});
+    Promise.race([flushed, new Promise(function (r) { setTimeout(r, 1200); })])
+      .then(function () { self.loadClassAssignment(); });
   },
 
   /** 首页的班级作业入口：孩子不用再翻到"班级"页找作业 */

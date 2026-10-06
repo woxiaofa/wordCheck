@@ -50,7 +50,12 @@ Page({
 
   onShow: function () {
     this.setData({ today: time.getLocalDate(Date.now()) });
-    this.reload();
+    // 先补传本地积压的学习记录，再拉云端数据——教练看到的进度才包含
+    // 孩子刚学的内容。补传最多等 1.5 秒（网络慢时不再多等，页面照常加载）
+    var self = this;
+    var flushed = cloud.flushPending().catch(function () {});
+    Promise.race([flushed, new Promise(function (r) { setTimeout(r, 1500); })])
+      .then(function () { self.reload(); });
   },
 
   /** 下拉手动同步：家长想看最新进度时不用退出重进 */
