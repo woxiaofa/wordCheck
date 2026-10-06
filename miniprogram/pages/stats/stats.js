@@ -9,12 +9,20 @@
 var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
+var report = require('../../utils/report');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
 var TARGET_PER_DAY = 20;
 var CHECKIN_RATIO = 0.8;
 var HEAT_LEVELS = ['#1e2a38', '#1d4f74', '#2b7fb8', '#3ea6ff', '#7c5cff'];
+
+/** 日报 / 周报 / 月报三档；区间长度就是报告口径 */
+var RANGES = [
+  { key: 'day', name: '日报', days: 1 },
+  { key: 'week', name: '周报', days: 7 },
+  { key: 'month', name: '月报', days: 30 }
+];
 
 Page({
   data: {
@@ -24,11 +32,47 @@ Page({
     wrongCount: 0,
     wrongList: [],
     heat: [],
-    heatSum: 0
+    heatSum: 0,
+
+    /* ---- 日报 / 周报 / 月报 ---- */
+    ranges: RANGES,
+    range: 'week',
+    rpt: null
   },
 
   onShow: function () {
     this.refresh();
+  },
+
+  /** 切换日报/周报/月报 */
+  onRange: function (e) {
+    var key = e.currentTarget.dataset.key;
+    this.setData({ range: key });
+    this.buildReport(key);
+  },
+
+  buildReport: function (key) {
+    var r = null;
+    for (var i = 0; i < RANGES.length; i++) if (RANGES[i].key === key) r = RANGES[i];
+    if (!r) return;
+    this.setData({ rpt: report.build(r.days, this.defOf()) });
+  },
+
+  /** 词 → 中文释义（错词榜要显示释义） */
+  defOf: function () {
+    var map = {};
+    for (var i = 0; i < WORDS.length; i++) map[WORDS[i].word] = WORDS[i].def_cn;
+    return function (w) { return map[w] || ''; };
+  },
+
+  /** 点趋势条：告诉家长这天具体练了多少 */
+  onBarTap: function (e) {
+    var d = e.currentTarget.dataset.date;
+    var t = e.currentTarget.dataset.total;
+    wx.showToast({
+      title: d + '：' + t + ' 题' + (Number(t) === 0 ? '（这天没练）' : ''),
+      icon: 'none'
+    });
   },
 
   refresh: function () {
@@ -63,6 +107,8 @@ Page({
       heat: this.buildHeat(activity),
       heatSum: this.sumHeat(activity)
     });
+
+    this.buildReport(this.data.range);
   },
 
   calcStreak: function (activity) {

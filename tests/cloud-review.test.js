@@ -49,6 +49,8 @@ function createFakeDb() {
   /** 支持 'a.b' 这种点号路径更新（云开发真实行为，enqueueTodayOnce 依赖它） */
   function applyUpdate(doc, data) {
     Object.keys(data).forEach(function (k) {
+      // 云端真实行为：值为 undefined 的字段会被整段丢掉，不会写进文档
+      if (data[k] === undefined) return;
       if (k.indexOf('.') === -1) { doc[k] = clone(data[k]); return; }
       var parts = k.split('.');
       var cur = doc;
@@ -106,6 +108,13 @@ function createFakeDb() {
           update: function (o) {
             if (idx !== -1) applyUpdate(list[idx], o.data);
             return Promise.resolve({ stats: { updated: idx === -1 ? 0 : 1 } });
+          },
+          set: function (o) {
+            // 云开发服务端语义：有则替换、无则新建（不经过插入路径，不会撞唯一键）
+            var data = clone(o.data);
+            data._id = id;
+            if (idx === -1) list.push(data); else list[idx] = data;
+            return Promise.resolve({ stats: { updated: 1, created: idx === -1 ? 1 : 0 } });
           },
           remove: function () {
             if (idx !== -1) list.splice(idx, 1);
@@ -192,6 +201,7 @@ function ok(name, fn) {
     .then(function () { pass++; console.log('  ✓ ' + name); })
     .catch(function (e) {
       console.log('  ✗ ' + name + '\n    ' + e.message);
+      if (process.env.VERBOSE) console.log(String(e.stack).split('\n').slice(0, 8).join('\n'));
       process.exitCode = 1;
     });
 }
@@ -235,19 +245,18 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('② 复刻线上故障：库里有 word_id 为空的脏文档，仍能写入并自愈', function () {
+  return ok('② 复刻线上故障：库里有 word_id 为空的脏文档，写入照样成功', function () {
     seedUser();
     // 手动埋一条脏数据（线上是控制台手动加记录 / 建索引前残留造成的）
     db.raw.user_word_state = [{ _id: 'dirty1', user_id: 'u1', stage: 0, updated_at: 1 }];
 
     return submit('circle').then(function (r) {
-      assert.strictEqual(r.ok, true, '自愈后应成功：' + JSON.stringify(r));
+      assert.strictEqual(r.ok, true, '脏文档不应挡住写入：' + JSON.stringify(r));
       var st = db.raw.user_word_state || [];
       var withId = st.filter(function (d) { return d.word_id; });
       assert.strictEqual(withId.length, 1, '应写入 1 条带 word_id 的状态');
       assert.strictEqual(withId[0].word_id, 'circle');
-      var dirtyLeft = st.filter(function (d) { return d.word_id === undefined || d.word_id === null; });
-      assert.strictEqual(dirtyLeft.length, 0, '脏文档应被自动清掉');
+      assert.strictEqual(withId[0]._id, 'u1:circle');
       assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1);
     });
   });
@@ -308,6 +317,33 @@ steps.push(function () {
       assert.strictEqual(st[0].wrong_count, 1, '错误次数应记为 1');
       assert.deepStrictEqual(db.raw.daily_tasks[0].snapshot_json.repeat, ['search']);
     });
+  });
+});
+
+steps.push(function () {
+  return ok('⑦ 补传队列重放 + 脏文档 + 旧 _id 历史记录：全部写入成功（不再 STATE_CONFLICT）', function () {
+    seedUser();
+    // 线上最恶劣的组合：脏文档在、该词还有一条老版本自动 _id 的记录、
+    // 且补传队列把同一条请求重放多次
+    db.raw.user_word_state = [
+      { _id: 'dirty1', user_id: 'u1' },
+      { _id: 'gen-old-9', user_id: 'u1', word_id: 'search', stage: 1 }
+    ];
+    var req = 'req-replay-1';
+    return submit('search', 'known', req)
+      .then(function (r) { assert.strictEqual(r.ok, true, JSON.stringify(r)); return submit('search', 'forgot', req + '-2'); })
+      .then(function (r) { assert.strictEqual(r.ok, true, JSON.stringify(r)); return submit('search', 'vague', req + '-3'); })
+      .then(function (r) {
+        assert.strictEqual(r.ok, true, JSON.stringify(r));
+        var st = db.raw.user_word_state || [];
+        var pair = st.filter(function (d) { return d.word_id === 'search'; });
+        // 契约：同一 (user_id, word_id) 永远只有一条（不管 _id 是新格式还是老格式），
+        // 否则唯一索引会炸，且客户端会看到两份互相打架的进度
+        assert.strictEqual(pair.length, 1,
+          '同一 (user,word) 只能有一条，实际：' + JSON.stringify(st.map(function (d) { return d._id; })));
+        assert.strictEqual(pair[0].last_feedback, 'vague', '最后一次反馈应生效');
+        assert.strictEqual(pair[0].wrong_count, 1, '错误次数应记为 1');
+      });
   });
 });
 

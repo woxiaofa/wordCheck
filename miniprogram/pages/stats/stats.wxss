@@ -10,6 +10,148 @@
 .badge.hi { background: rgba(255, 92, 114, .18); color: #ff8a9b; border: 1rpx solid rgba(255, 92, 114, .4); }
 .badge.lo { background: rgba(255, 176, 32, .16); color: #ffc861; border: 1rpx solid rgba(255, 176, 32, .35); }
 
+/* ===== 日报 / 周报 / 月报 ===== */
+.rpt-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+.rpt-tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: 28rpx;
+  color: #8fa3b7;
+  background: #18222e;
+  border: 1rpx solid #2b3949;
+  border-radius: 999rpx;
+}
+.rpt-tab.on {
+  color: #e8eef5;
+  background: rgba(62, 166, 255, .16);
+  border-color: #3ea6ff;
+  font-weight: 600;
+}
+
+.rpt-kpis {
+  display: flex;
+  margin-top: 24rpx;
+  border-top: 1rpx solid #2b3949;
+  padding-top: 24rpx;
+}
+.rpt-kpi {
+  flex: 1;
+  text-align: center;
+}
+.rpt-kpi .n {
+  font-size: 48rpx;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.rpt-kpi .l {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #8fa3b7;
+}
+.rpt-kpi .d {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: #8fa3b7;
+}
+.rpt-kpi .d.up { color: #2fd07a; }
+.rpt-kpi .d.down { color: #ff8a9b; }
+
+/* 日报：今日构成的堆叠条 */
+.rpt-split { margin-top: 28rpx; }
+.rpt-split-bar {
+  display: flex;
+  height: 26rpx;
+  border-radius: 999rpx;
+  overflow: hidden;
+  background: #1e2a38;
+}
+.rpt-split-bar .seg { height: 100%; }
+.seg.known { background: #2fd07a; }
+.seg.vague { background: #ffc861; }
+.seg.forgot { background: #ff5c72; }
+.rpt-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #8fa3b7;
+}
+.dot {
+  display: inline-block;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-right: 8rpx;
+}
+.dot.known { background: #2fd07a; }
+.dot.vague { background: #ffc861; }
+.dot.forgot { background: #ff5c72; }
+
+/* 周/月报：逐日趋势条 */
+.rpt-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8rpx;
+  margin-top: 28rpx;
+}
+.rpt-bar { flex: 1; }
+.rpt-bar-track {
+  height: 180rpx;
+  display: flex;
+  align-items: flex-end;
+  background: #18222e;
+  border-radius: 10rpx;
+  overflow: hidden;
+}
+.rpt-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #3ea6ff, #1d4f74);
+  border-radius: 10rpx;
+}
+.rpt-bar-fill.empty { background: #1e2a38; }
+.rpt-bar-day {
+  display: block;
+  margin-top: 8rpx;
+  text-align: center;
+  font-size: 18rpx;
+  color: #8fa3b7;
+}
+
+.rpt-note {
+  margin-top: 24rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 16rpx;
+  background: #18222e;
+  border: 1rpx solid #2b3949;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+.rpt-subtitle {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #e8eef5;
+}
+.rpt-wrong { margin-top: 28rpx; }
+.rpt-wrong-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #2b3949;
+}
+.rpt-wrong-line:last-child { border-bottom: none; }
+.rpt-wrong-mid { display: flex; flex-direction: column; }
+.rpt-parent {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #2b3949;
+}
+
 /* 30 天热力图：10 列 × 3 行 */
 .heat {
   display: grid;

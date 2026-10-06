@@ -30,12 +30,13 @@
   margin: 24rpx 0;
 }
 
-/* 选项 */
+/* 选项：默认无边框（只要底色，避免四个选项都套一个"框"显得像表单控件），
+   选中/判对/判错时才描边 —— 状态色是答案出来后才有的信息，不该预先画出来 */
 .qopt {
   margin-top: 16rpx;
   padding: 24rpx 26rpx;
   background: #1e2a38;
-  border: 2rpx solid #2b3949;
+  border: 2rpx solid transparent;
   border-radius: 20rpx;
   font-size: 30rpx;
 }

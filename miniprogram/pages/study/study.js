@@ -18,6 +18,7 @@ var time = require('../../utils/time');
 var WORDS = require('../../data/words');
 var books = require('../../utils/books');
 var tts = require('../../utils/tts');
+var report = require('../../utils/report');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -319,6 +320,9 @@ Page({
     var today = time.getLocalDate();
     log[today] = (log[today] || 0) + 1;
     wx.setStorageSync('activity_log', log);
+
+    // 日报/周报/月报的本地明细：先落本地再上云，云上出问题报告也不会空白
+    report.record(w.word, fb);
 
     // 3) 异步提交云端（幂等 ID 保证重试安全）
     api.submitReview({

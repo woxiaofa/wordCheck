@@ -34,7 +34,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261005-state-id';
+const VERSION = 'rev-20261006-upsert';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -93,20 +93,20 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
     next_review_at: next.nextReviewAt,
     correct_count: (prev ? prev.correct_count : 0) + (feedback === 'known' ? 1 : 0),
     wrong_count: (prev ? prev.wrong_count : 0) + (feedback === 'forgot' ? 1 : 0),
-    last_wrong_type: feedback === 'forgot' ? (mode || null) : (prev ? prev.last_wrong_type : null),
+    // 必须是 null 而不是 undefined：字段值为 undefined 时云端更新会把它整个丢掉/报错
+    last_wrong_type: feedback === 'forgot' ? (mode || null) : ((prev && prev.last_wrong_type) || null),
     updated_at: now
   };
 
   if (prev) {
     await db.collection(COLL.state).doc(prev._id).update({ data: doc });
   } else {
-    // 新词进入 SRS：撞唯一键时由 state-store 自愈（清理 word_id 为空的
-    // 脏文档 → 回读 → 重试），脏数据导致的"进度恒 0"在这里自动恢复
+    // 新词进入 SRS。写入器按确定性 _id 直接 upsert，
+    // 脏文档/并发重放/历史 _id 残留都不会再挡住这次写入
     const errCode = await upsertState(db, COLL.state, user._id, wordId, doc, now);
     if (errCode) {
-      return fail('STATE_CONFLICT',
-        '学习状态写入冲突：请在云控制台 user_word_state 集合删除 word_id 为空的记录' +
-        '（云函数日志有现场）；若反复出现请把日志发开发');
+      return fail('STATE_WRITE_FAIL',
+        '学习状态写入失败（云函数日志有完整现场，请把日志发开发）');
     }
   }
 

@@ -17,6 +17,7 @@ var time = require('../../utils/time');
 var WORDS = require('../../data/words');
 var books = require('../../utils/books');
 var tts = require('../../utils/tts');
+var report = require('../../utils/report');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -422,6 +423,9 @@ Page({
     var today = time.getLocalDate();
     log[today] = (log[today] || 0) + questions.length;
     wx.setStorageSync(ACTIVITY_KEY, log);
+
+    // 日报/周报/月报的本地明细：每题一笔（答错记 forgot），云上出问题报告也不会空白
+    details.forEach(function (d) { report.record(d.wordId, d.ok ? 'known' : 'forgot'); });
 
     // 同步云端（幂等 ID；未部署时静默失败）
     api.submitQuiz({

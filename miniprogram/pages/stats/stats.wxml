@@ -1,6 +1,90 @@
 <!-- 数据看板与错词本 -->
 <view class="page">
-  <view class="grid-2">
+
+  <!-- ===== 日报 / 周报 / 月报 ===== -->
+  <view class="rpt-tabs">
+    <view
+      wx:for="{{ranges}}"
+      wx:key="key"
+      class="rpt-tab {{range === item.key ? 'on' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onRange"
+    >{{item.name}}</view>
+  </view>
+
+  <view wx:if="{{rpt}}" class="card rpt">
+    <view class="row-between">
+      <text class="card-title">{{rpt.rangeLabel}}</text>
+      <text class="muted" wx:if="{{rpt.bestDay}}">最多 {{rpt.bestDay.total}} 题</text>
+    </view>
+    <view class="muted mt-s">{{rpt.subLabel}}</view>
+
+    <view class="rpt-kpis">
+      <view class="rpt-kpi">
+        <view class="n">{{rpt.total}}</view>
+        <view class="l">练习题数</view>
+      </view>
+      <view class="rpt-kpi">
+        <view class="n">{{rpt.rate}}%</view>
+        <view class="l">答对率</view>
+        <view wx:if="{{rpt.delta !== null}}" class="d {{rpt.deltaUp ? 'up' : 'down'}}">{{rpt.deltaText}}</view>
+      </view>
+      <view class="rpt-kpi">
+        <view class="n">{{rpt.activeDays}}</view>
+        <view class="l">活跃天数</view>
+        <view class="d">/ {{rpt.days}} 天</view>
+      </view>
+    </view>
+
+    <!-- 日报：看今天的构成；周/月报：看逐日趋势 -->
+    <view wx:if="{{rpt.days === 1}}" class="rpt-split">
+      <view class="rpt-split-bar">
+        <view class="seg known" style="width:{{rpt.known / (rpt.total || 1) * 100}}%"></view>
+        <view class="seg vague" style="width:{{rpt.vague / (rpt.total || 1) * 100}}%"></view>
+        <view class="seg forgot" style="width:{{rpt.forgot / (rpt.total || 1) * 100}}%"></view>
+      </view>
+      <view class="rpt-legend">
+        <text><text class="dot known"></text>答对 {{rpt.known}}</text>
+        <text><text class="dot vague"></text>模糊 {{rpt.vague}}</text>
+        <text><text class="dot forgot"></text>忘了 {{rpt.forgot}}</text>
+      </view>
+    </view>
+    <view wx:else class="rpt-bars">
+      <view
+        wx:for="{{rpt.series}}"
+        wx:key="date"
+        class="rpt-bar"
+        data-date="{{item.date}}"
+        data-total="{{item.total}}"
+        bindtap="onBarTap"
+      >
+        <view class="rpt-bar-track">
+          <view class="rpt-bar-fill {{item.total ? '' : 'empty'}}" style="height:{{item.height}}%"></view>
+        </view>
+        <text class="rpt-bar-day">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view class="rpt-note">{{rpt.headline}}</view>
+
+    <view wx:if="{{rpt.topWrong.length}}" class="rpt-wrong">
+      <text class="rpt-subtitle">高频错词</text>
+      <view wx:for="{{rpt.topWrong}}" wx:key="word" class="rpt-wrong-line">
+        <view class="rpt-wrong-mid">
+          <text class="wrong-word">{{item.word}}</text>
+          <text class="muted">{{item.def}}</text>
+        </view>
+        <text class="badge {{item.wrong >= 3 ? 'hi' : 'lo'}}">错 {{item.wrong}} 次</text>
+      </view>
+    </view>
+
+    <view class="rpt-parent">
+      <text class="rpt-subtitle">给家长看的一句话</text>
+      <view class="muted mt-s">{{rpt.parentLine}}</view>
+    </view>
+  </view>
+
+  <view class="grid-2 mt">
     <view class="kpi"><view class="num">{{mastery}}%</view><view class="label">掌握率（档位≥5）</view></view>
     <view class="kpi"><view class="num">{{streak}}</view><view class="label">连续打卡</view></view>
   </view>
