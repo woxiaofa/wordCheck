@@ -343,14 +343,29 @@ Page({
     var self = this;
     this.setData({ diagnoseText: '自检中…' });
     cloud.api.diagnose(true).then(function (r) {
-      self.setData({
-        diagnoseText:
-          '云函数版本 ' + (r.version || '未带版本戳（旧代码）') + '\n' +
-          '状态记录 ' + r.stateTotal + ' 条 / 覆盖 ' + r.usersWithState + ' 人\n' +
-          '脏记录 ' + r.dirty + ' 条\n' +
-          '学习日志 ' + r.reviewLogTotal + ' 条\n' +
-          (r.hint || '')
+      var lines = [
+        '云函数版本 ' + (r.version || '未带版本戳（旧代码）'),
+        '状态记录 ' + r.stateTotal + ' 条 / 覆盖 ' + r.usersWithState + ' 人',
+        '脏记录 ' + r.dirty + ' 条 · 学习日志 ' + r.reviewLogTotal + ' 条'
+      ];
+      // 作业诊断：0/10 的原因直接摊开（词单格式 / 学员命中数）
+      (r.assignments || []).forEach(function (a) {
+        lines.push('── 作业《' + a.name + '》' + a.count + ' 词');
+        if (a.idHits > 0) {
+          lines.push('  ⚠ 仍是旧 _id 格式（命中 ' + a.idHits + ' 个），依赖云端自动翻译');
+        }
+        lines.push('  词单: ' + (a.normHead || []).join(', ') + ((a.count > 6) ? ' …' : ''));
+        if (!(a.perStudent || []).length) {
+          lines.push('  学员: 没有任何学习记录同步到云端');
+        } else {
+          (a.perStudent || []).forEach(function (p) {
+            lines.push('  ' + p.who + ': 命中 ' + p.learned + '/' + a.count +
+              '（学的词如: ' + (p.sample || []).join(',') + '）');
+          });
+        }
       });
+      lines.push(r.hint || '');
+      self.setData({ diagnoseText: lines.join('\n') });
     }).catch(function (err) {
       self.setData({ diagnoseText: '自检失败：' + ((err && (err.errMsg || err.message)) || err) });
     });

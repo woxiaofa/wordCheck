@@ -26,7 +26,9 @@ const COLL = {
   logs: 'review_logs',
   requests: 'request_dedup',
   tasks: 'daily_tasks',
-  users: 'users'
+  users: 'users',
+  assignments: 'assignments',
+  words: 'words'
 };
 
 /**
@@ -34,7 +36,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-upsert';
+const VERSION = 'rev-20261006-asgdiag';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -267,6 +269,58 @@ async function diagnoseAll(clean) {
   const logCount = await db.collection(COLL.logs).count()
     .catch(() => ({ total: -1 }));
 
+  /* ---- 作业诊断：回答"为什么作业进度是 0/10" ----
+   * 三个可能断点各自留下不同的证据：
+   *   a) 作业还是旧 words._id 格式（idHits>0）—— 归一逻辑应已兜底，但要看命中数
+   *   b) 学员的词与作业词单零交集 —— 孩子学的是任务词/本地词，不是作业词
+   *   c) 学员根本没有学习记录（perUserCounts 为空）—— 同步链路问题
+   */
+  const wordsByUser = {};
+  allRows.forEach((d) => {
+    if (d.user_id && d.word_id) {
+      if (!wordsByUser[String(d.user_id)]) wordsByUser[String(d.user_id)] = [];
+      wordsByUser[String(d.user_id)].push(d.word_id);
+    }
+  });
+
+  const nickMap = {};
+  const uRes = await db.collection(COLL.users).limit(50).field({ nickname: true, role: true })
+    .get().catch(() => ({ data: [] }));
+  (uRes.data || []).forEach((u) => { nickMap[String(u._id)] = u.nickname || ''; });
+
+  const asgRes = await db.collection(COLL.assignments)
+    .orderBy('created_at', 'desc').limit(5).get().catch(() => ({ data: [] }));
+  const assignments = [];
+  for (const a of (asgRes.data || [])) {
+    const raw = a.word_ids || [];
+    const idToWord = {};
+    if (raw.length) {
+      const wr = await db.collection(COLL.words).where({ _id: _.in(raw) })
+        .limit(1000).field({ word: true }).get().catch(() => ({ data: [] }));
+      (wr.data || []).forEach((w) => { idToWord[String(w._id)] = w.word; });
+    }
+    const texts = raw.map((id) => idToWord[String(id)] || id);
+    const per = Object.keys(wordsByUser).map((uid) => {
+      const set = {};
+      wordsByUser[uid].forEach((w) => { set[w] = 1; });
+      const hit = texts.filter((w) => set[w]).length;
+      return {
+        who: nickMap[uid] || uid.slice(-6),
+        learned: hit,
+        sample: wordsByUser[uid].slice(0, 6)
+      };
+    });
+    assignments.push({
+      id: a._id,
+      name: a.note || (a.tag ? a.tag + '作业' : '作业'),
+      count: a.count || raw.length,
+      idHits: Object.keys(idToWord).length,   // >0 = 作业还是旧 _id 格式
+      rawHead: raw.slice(0, 6),
+      normHead: texts.slice(0, 6),
+      perStudent: per
+    });
+  }
+
   return ok({
     scope: 'all',
     version: VERSION,
@@ -277,10 +331,11 @@ async function diagnoseAll(clean) {
     dirtyIds: dirty.slice(0, 10).map((d) => String(d._id)),
     cleaned: cleaned,
     reviewLogTotal: logCount.total,
-    hint: dirty.length
+    assignments: assignments,
+    hint: (dirty.length
       ? '全表存在 word_id 为空的脏记录（' + dirty.length + ' 条）。' +
         (clean ? '已清理 ' + cleaned + ' 条。' : '加 "clean":true 可自动清理。')
-      : '状态表干净。当前写入器用确定性 _id（user_id:word_id），脏数据也挡不住新写入。'
+      : '状态表干净。当前写入器用确定性 _id（user_id:word_id），脏数据也挡不住新写入。')
   });
 }
 

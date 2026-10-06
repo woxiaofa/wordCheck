@@ -202,15 +202,21 @@ Page({
 
     if (allDone) progressNote = '今天的词都记在计划里了，去抽查检验一下真实水平';
 
+    // 云端统计兜底：清缓存/换设备后本地镜像为空，但云端 stats_cache 是真值。
+    // 两个都算然后取大——本地新学的还没上云时本地大，清缓存后云端大。
+    var cloudStats = wx.getStorageSync('cloud_stats') || {};
+    var learnedFinal = Math.max(learned, cloudStats.learned_words || 0);
+    var streakFinal = Math.max(this.calcStreak(activity), cloudStats.streak_days || 0);
+
     this.setData({
       totalCount: total,
       dueCount: due,
       wrongCount: wrong,
       newCount: newToday,
       minutes: Math.max(1, Math.round(total * SECONDS_PER_WORD / 60)),
-      streak: this.calcStreak(activity),
+      streak: streakFinal,
       mastery: learned ? Math.round(mastered / learned * 100) : 0,
-      learned: learned,
+      learned: learnedFinal,
       done: done,
       target: target,
       progressPct: progressPct,

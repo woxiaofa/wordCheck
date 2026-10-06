@@ -39,6 +39,11 @@ App({
     var self = this;
     cloud.api.login().then(function (res) {
       self.globalData.user = res.user;
+      // 云端统计落一份在本地：清缓存/换设备后，首页"已学词/打卡天数"
+      // 不至于归零（云端 stats_cache 是真值，本地镜像只是缓存）
+      if (res.user && res.user.stats) {
+        wx.setStorageSync('cloud_stats', res.user.stats);
+      }
       // 登录成功说明云端可达：趁机把上次失败的学习/抽查记录补传上去
       self.flushPending();
     }).catch(function (err) {
@@ -59,6 +64,15 @@ App({
     cloud.flushPending().then(function (r) {
       if (r.done || r.left) {
         console.log('[app] 补传结果：成功 ' + r.done + ' 条，剩余 ' + r.left + ' 条');
+      }
+      if (r.done > 0) {
+        // 补传改变了云端统计：重拉一次 login 刷新 cloud_stats，
+        // 首页"已学词/打卡天数"才能跟上（下次 refresh 直接读）
+        cloud.api.login().then(function (res) {
+          if (res && res.user && res.user.stats) {
+            wx.setStorageSync('cloud_stats', res.user.stats);
+          }
+        }).catch(function () { /* 刷新失败无所谓，下次登录再更 */ });
       }
     }).catch(function () { /* 补传失败不影响使用，下次再试 */ });
   },
