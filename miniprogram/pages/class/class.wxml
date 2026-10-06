@@ -166,6 +166,12 @@
         </view>
       </block>
     </view>
+
+    <!-- 数据对不上时的自证入口：平时低调，需要时一页看全云端事实 -->
+    <view class="card">
+      <button class="btn ghost sm" bindtap="runDiagnose">云自检 · 数据对不上时点我</button>
+      <view wx:if="{{diagnoseText}}" class="raw-err mt-s">{{diagnoseText}}</view>
+    </view>
   </block>
 
   <!-- ===== 学生端 ===== -->
@@ -207,6 +213,8 @@
 
     <view class="card">
       <button class="btn ghost sm" bindtap="leaveConfirm">退出班级（换班用）</button>
+      <button class="btn ghost sm mt-s" bindtap="runDiagnose">云自检 · 作业进度对不上时点我</button>
+      <view wx:if="{{diagnoseText}}" class="raw-err mt-s">{{diagnoseText}}</view>
     </view>
   </block>
 
