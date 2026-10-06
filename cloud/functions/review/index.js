@@ -28,7 +28,8 @@ const COLL = {
   tasks: 'daily_tasks',
   users: 'users',
   assignments: 'assignments',
-  words: 'words'
+  words: 'words',
+  classes: 'classes'
 };
 
 /**
@@ -36,7 +37,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-asgdiag';
+const VERSION = 'rev-20261006-fulldiag';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -245,18 +246,18 @@ async function onDiagnose(openid, { clean, all }) {
 
 /** 全表诊断：不依赖任何用户身份，控制台"云端测试"可直接跑 */
 async function diagnoseAll(clean) {
+  /* 设计：所有查询在同一瞬间串行发出，输出一份"同一时刻的快照"。
+   * 之前吃过亏：教师页学员卡和自检各自查询，中间数据被人动过，
+   * 两个数字互相矛盾却都"没查错" —— 快照式输出就是为了消灭这种时间差。 */
+  const lines = [];
+
+  // ---- 状态表 ----
   const res = await db.collection(COLL.state)
     .limit(1000)
     .field({ user_id: true, word_id: true })
     .get().catch(() => ({ data: [] }));
   const allRows = res.data || [];
   const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
-
-  const byUser = {};
-  allRows.forEach((d) => {
-    const k = String(d.user_id);
-    byUser[k] = (byUser[k] || 0) + 1;
-  });
 
   let cleaned = 0;
   if (clean) {
@@ -266,8 +267,97 @@ async function diagnoseAll(clean) {
     }
   }
 
-  const logCount = await db.collection(COLL.logs).count()
-    .catch(() => ({ total: -1 }));
+  const byUser = {};
+  allRows.forEach((d) => {
+    const k = String(d.user_id);
+    (byUser[k] = byUser[k] || []).push(d.word_id);
+  });
+  const wordsByUser = {};
+  allRows.forEach((d) => {
+    if (d.user_id && d.word_id) {
+      const k = String(d.user_id);
+      (wordsByUser[k] = wordsByUser[k] || []).push(d.word_id);
+    }
+  });
+
+  // ---- 学习日志（谁真的提交过、什么时候、提交的什么词）----
+  const dayStart = getLocalDayStart(Date.now());
+  const logRes = await db.collection(COLL.logs)
+    .orderBy('created_at', 'desc').limit(1000)
+    .field({ user_id: true, word_id: true, feedback: true, created_at: true })
+    .get().catch(() => ({ data: [] }));
+  const logRows = logRes.data || [];
+  const logsByUser = {};
+  logRows.forEach((l) => {
+    const k = String(l.user_id);
+    const m = logsByUser[k] || (logsByUser[k] = { total: 0, today: 0, words: {}, last: null });
+    m.total++;
+    if (l.created_at >= dayStart) m.today++;
+    if (l.word_id) m.words[l.word_id] = 1;
+    if (!m.last) m.last = { at: l.created_at, word: l.word_id, feedback: l.feedback };
+  });
+
+  // ---- 用户表（stats_cache 是"云函数自己记的账"）----
+  const uRes = await db.collection(COLL.users).limit(50)
+    .field({ nickname: true, role: true, stats_cache: true, last_seen_at: true })
+    .get().catch(() => ({ data: [] }));
+  const users = uRes.data || [];
+  const nickMap = {};
+  users.forEach((u) => { nickMap[String(u._id)] = u.nickname || ''; });
+
+  // ---- 班级名册（谁在班里、谁是教练）----
+  const clsRes = await db.collection(COLL.classes).limit(10)
+    .field({ name: true, code: true, owner_id: true, student_ids: true })
+    .get().catch(() => ({ data: [] }));
+  const classes = clsRes.data || [];
+
+  const who = (uid) => {
+    const s = String(uid);
+    return (nickMap[s] || '?') + '(' + s.slice(-6) + ')';
+  };
+  const hm = (ts) => {
+    if (!ts) return '?';
+    return new Date(Number(ts) + 8 * 3600000).toISOString().slice(11, 16);
+  };
+
+  // ============ 拼快照文本 ============
+  lines.push('【状态表 user_word_state】' + allRows.length + ' 条 · 覆盖 ' + Object.keys(byUser).length + ' 人');
+  if (!Object.keys(byUser).length) {
+    lines.push('  （空：没有任何学习状态同步到云端）');
+  }
+  Object.keys(byUser).forEach((uid) => {
+    const ws = byUser[uid];
+    lines.push('  ' + who(uid) + ': ' + ws.length + ' 词 · 如 ' + ws.slice(0, 5).join(','));
+  });
+
+  lines.push('【学习日志 review_logs】' + logRows.length + ' 条 · 今日 ' +
+    logRows.filter((l) => l.created_at >= dayStart).length + ' 条');
+  if (!Object.keys(logsByUser).length) {
+    lines.push('  （空：没有任何提交到达云端）');
+  }
+  Object.keys(logsByUser).forEach((uid) => {
+    const m = logsByUser[uid];
+    const nWords = Object.keys(m.words).length;
+    lines.push('  ' + who(uid) + ': 共 ' + m.total + ' · 今日 ' + m.today +
+      ' · 词数 ' + nWords + ' · 最近 ' + hm(m.last.at) + ' ' + m.last.word + ' (' + m.last.feedback + ')');
+  });
+
+  lines.push('【用户 users】' + users.length + ' 人');
+  users.forEach((u) => {
+    const sc = u.stats_cache || {};
+    lines.push('  ' + who(u._id) + ' ' + (u.role || 'student') +
+      ' · 云记账已学=' + (sc.learned_words || 0) + ' · 连续=' + (sc.streak_days || 0) +
+      ' · 最近学习日=' + (sc.last_active_date || '?') +
+      ' · seen=' + (u.last_seen_at ? hm(u.last_seen_at) : '?'));
+  });
+
+  lines.push('【班级】' + classes.length + ' 个');
+  classes.forEach((c) => {
+    const ids = c.student_ids || [];
+    lines.push('  ' + (c.name || '?') + '(' + (c.code || '?') + ') 教练=' +
+      who(c.owner_id) + ' 学员(' + ids.length + ')=' +
+      (ids.map(who).join(', ') || '无'));
+  });
 
   /* ---- 作业诊断：回答"为什么作业进度是 0/10" ----
    * 三个可能断点各自留下不同的证据：
@@ -275,19 +365,6 @@ async function diagnoseAll(clean) {
    *   b) 学员的词与作业词单零交集 —— 孩子学的是任务词/本地词，不是作业词
    *   c) 学员根本没有学习记录（perUserCounts 为空）—— 同步链路问题
    */
-  const wordsByUser = {};
-  allRows.forEach((d) => {
-    if (d.user_id && d.word_id) {
-      if (!wordsByUser[String(d.user_id)]) wordsByUser[String(d.user_id)] = [];
-      wordsByUser[String(d.user_id)].push(d.word_id);
-    }
-  });
-
-  const nickMap = {};
-  const uRes = await db.collection(COLL.users).limit(50).field({ nickname: true, role: true })
-    .get().catch(() => ({ data: [] }));
-  (uRes.data || []).forEach((u) => { nickMap[String(u._id)] = u.nickname || ''; });
-
   const asgRes = await db.collection(COLL.assignments)
     .orderBy('created_at', 'desc').limit(5).get().catch(() => ({ data: [] }));
   const assignments = [];
@@ -319,18 +396,39 @@ async function diagnoseAll(clean) {
       normHead: texts.slice(0, 6),
       perStudent: per
     });
+    lines.push('【作业】《' + (a.note || a.tag || '作业') + '》' + (a.count || raw.length) + ' 词 · 旧_id翻译 ' +
+      Object.keys(idToWord).length + '/' + raw.length);
+    lines.push('  词单: ' + texts.slice(0, 6).join(', ') + (raw.length > 6 ? ' …' : ''));
+    per.forEach((p) => {
+      lines.push('  ' + p.who + ': 命中 ' + p.learned + '/' + texts.length);
+    });
   }
+
+  lines.push(dirty.length
+    ? '⚠ 全表存在 word_id 为空的脏记录 ' + dirty.length + ' 条。' +
+      (clean ? '已清理 ' + cleaned + ' 条。' : '加 "clean":true 可自动清理。')
+    : '状态表干净（无 word_id 为空的脏记录）。');
 
   return ok({
     scope: 'all',
     version: VERSION,
+    lines: lines,
     stateTotal: allRows.length,
     usersWithState: Object.keys(byUser).length,
     perUserCounts: byUser,
     dirty: dirty.length,
     dirtyIds: dirty.slice(0, 10).map((d) => String(d._id)),
     cleaned: cleaned,
-    reviewLogTotal: logCount.total,
+    reviewLogTotal: logRows.length,
+    logUsers: logsByUser,
+    usersInfo: users.map((u) => ({
+      id: u._id, nickname: u.nickname || '', role: u.role || 'student',
+      stats_cache: u.stats_cache || null
+    })),
+    classesInfo: classes.map((c) => ({
+      id: c._id, name: c.name, code: c.code,
+      owner_id: c.owner_id, student_ids: c.student_ids || []
+    })),
     assignments: assignments,
     hint: (dirty.length
       ? '全表存在 word_id 为空的脏记录（' + dirty.length + ' 条）。' +

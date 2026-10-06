@@ -343,8 +343,16 @@ Page({
     var self = this;
     this.setData({ diagnoseText: '自检中…' });
     cloud.api.diagnose(true).then(function (r) {
+      // 新版：云函数把"同一瞬间的全库快照"拼成文本行，端上只负责展示。
+      // 好处：状态表/日志/用户/班级四路查询在服务端一次拉齐，
+      // 不会再出现"学员卡一个数、自检另一个数"的时间差假矛盾。
+      if (r.lines && r.lines.length) {
+        var head = ['云函数版本 ' + (r.version || '未带版本戳（旧代码）')];
+        self.setData({ diagnoseText: head.concat(r.lines).join('\n') });
+        return;
+      }
+      // 旧版云函数兜底：没有 lines 字段时按老格式渲染
       var lines = [
-        '云函数版本 ' + (r.version || '未带版本戳（旧代码）'),
         '状态记录 ' + r.stateTotal + ' 条 / 覆盖 ' + r.usersWithState + ' 人',
         '脏记录 ' + r.dirty + ' 条 · 学习日志 ' + r.reviewLogTotal + ' 条'
       ];
