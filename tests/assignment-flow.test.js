@@ -67,4 +67,22 @@ ok('⑥ 首页：有班级作业入口，能直接跳去续学', function () {
     '首页应有作业卡和入口按钮');
 });
 
+ok('⑦ 首页：作业未完成时取代任务卡，不再两份任务并排（2026-10-06 用户反馈）', function () {
+  var wxml = read('miniprogram/pages/index/index.wxml');
+  // 作业未完成 → 占据 hero 位置
+  assert.ok(wxml.indexOf('clsAssign && !clsAssign.finished') >= 0,
+    '未完成作业应渲染在 hero 主卡位');
+  // 每日任务卡必须让位：只在无作业或作业已完成时出现
+  assert.ok(wxml.indexOf('!clsAssign || clsAssign.finished') >= 0,
+    '任务卡应加让位条件');
+  // 已完成的作业降级为普通入口
+  assert.ok(wxml.indexOf('clsAssign && clsAssign.finished') >= 0,
+    '已完成作业应有降级展示');
+  // 旧的双重展示（无条件 clsAssign 卡）必须消失
+  assert.ok(/wx:if="\{\{clsAssign\}\}"/.test(wxml) === false,
+    '不得再无条件渲染作业卡（会和任务卡并排打架）');
+  // 让位说明：孩子得知道每日任务去哪了
+  assert.ok(wxml.indexOf('完成作业后') >= 0, '作业卡上应说明任务会在完成后继续');
+});
+
 console.log('\n全部通过：' + pass + ' 项 ✓');
