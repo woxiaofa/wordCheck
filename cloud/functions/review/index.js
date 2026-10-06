@@ -37,7 +37,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-fulldiag';
+const VERSION = 'rev-20261006-probe';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -256,7 +256,9 @@ async function diagnoseAll(clean) {
     .limit(1000)
     .field({ user_id: true, word_id: true })
     .get().catch(() => ({ data: [] }));
-  const allRows = res.data || [];
+  // 排除诊断自身的探针/哨兵文档，不污染真实数据
+  const isProbeRow = (d) => String((d && d.user_id) || '').indexOf('diagprobe') === 0;
+  const allRows = (res.data || []).filter((d) => !isProbeRow(d));
   const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
 
   let cleaned = 0;
@@ -290,10 +292,12 @@ async function diagnoseAll(clean) {
   const logsByUser = {};
   logRows.forEach((l) => {
     const k = String(l.user_id);
-    const m = logsByUser[k] || (logsByUser[k] = { total: 0, today: 0, words: {}, last: null });
+    const m = logsByUser[k] || (logsByUser[k] = { total: 0, today: 0, words: {}, modes: {}, last: null });
     m.total++;
     if (l.created_at >= dayStart) m.today++;
     if (l.word_id) m.words[l.word_id] = 1;
+    const mk = l.mode || 'review';
+    m.modes[mk] = (m.modes[mk] || 0) + 1;
     if (!m.last) m.last = { at: l.created_at, word: l.word_id, feedback: l.feedback };
   });
 
@@ -321,14 +325,61 @@ async function diagnoseAll(clean) {
   };
 
   // ============ 拼快照文本 ============
+
+  /* ---- 写入回路探针 + 哨兵：把"写不进"和"被外部删"当场分开 ----
+   * 背景：日志/云记账都证明 review.submit 跑成功了（状态写入在日志之前），
+   * 但状态表里该用户的记录是 0 条 —— 只剩两种可能：
+   *   a) set/add 在这个环境里假成功（写完读不回）
+   *   b) 写成功后，两次诊断之间有外部删除（控制台手工清数据等）
+   * 探针当场写读删验证 a；哨兵跨诊断存活检查验证 b。 */
+  const probeOut = [];
+  const now2 = Date.now();
+  const pid1 = 'diagprobe-set-' + now2;
+  const pdoc = { user_id: 'diagprobe', word_id: 'probe', stage: 0, created_at: now2 };
+  try {
+    await db.collection(COLL.state).doc(pid1).set({ data: Object.assign({ _id: pid1 }, pdoc) });
+    const rb = await db.collection(COLL.state).doc(pid1).get()
+      .then((r) => !!r.data).catch(() => false);
+    probeOut.push('set→回读:' + (rb ? '在' : '⚠不在'));
+  } catch (e) {
+    probeOut.push('set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 60) + ')');
+  }
+  const pid2 = 'diagprobe-add-' + now2;
+  try {
+    await db.collection(COLL.state).add({ data: Object.assign({ _id: pid2 }, pdoc) });
+    const rb2 = await db.collection(COLL.state).doc(pid2).get()
+      .then((r) => !!r.data).catch(() => false);
+    probeOut.push('add→回读:' + (rb2 ? '在' : '⚠不在'));
+  } catch (e) {
+    probeOut.push('add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 60) + ')');
+  }
+  await db.collection(COLL.state).doc(pid1).remove().catch(() => {});
+  await db.collection(COLL.state).doc(pid2).remove().catch(() => {});
+
+  const SENTRY_ID = 'diagprobe-sentinel';
+  const prevSent = await db.collection(COLL.state).doc(SENTRY_ID).get()
+    .then((r) => r.data || null).catch(() => null);
+  await db.collection(COLL.state).doc(SENTRY_ID).set({
+    data: { _id: SENTRY_ID, user_id: 'diagprobe', word_id: 'sentinel', at: now2, created_at: now2 }
+  }).catch(() => {});
+  probeOut.push(prevSent
+    ? '哨兵(上轮 ' + hm(prevSent.at) + ')仍在 → 两轮诊断之间无外部删除'
+    : '本轮首次布置哨兵（下轮对比）');
+
   lines.push('【状态表 user_word_state】' + allRows.length + ' 条 · 覆盖 ' + Object.keys(byUser).length + ' 人');
+  lines.push('  探针: ' + probeOut.join(' · '));
   if (!Object.keys(byUser).length) {
     lines.push('  （空：没有任何学习状态同步到云端）');
   }
-  Object.keys(byUser).forEach((uid) => {
+  // 逐人 count() 交叉核对：防止 limit(1000) 扫描与 where 查询口径不一致
+  for (const uid of Object.keys(byUser)) {
+    const c = await db.collection(COLL.state).where({ user_id: uid }).count()
+      .catch(() => ({ total: -1 }));
     const ws = byUser[uid];
-    lines.push('  ' + who(uid) + ': ' + ws.length + ' 词 · 如 ' + ws.slice(0, 5).join(','));
-  });
+    const mark = (c.total === ws.length) ? '' : ' ⚠扫描与count不一致';
+    lines.push('  ' + who(uid) + ': ' + ws.length + ' 词(count=' + c.total + ')' + mark +
+      ' · 如 ' + ws.slice(0, 5).join(','));
+  }
 
   lines.push('【学习日志 review_logs】' + logRows.length + ' 条 · 今日 ' +
     logRows.filter((l) => l.created_at >= dayStart).length + ' 条');
@@ -338,8 +389,10 @@ async function diagnoseAll(clean) {
   Object.keys(logsByUser).forEach((uid) => {
     const m = logsByUser[uid];
     const nWords = Object.keys(m.words).length;
+    const modeStr = Object.keys(m.modes).map((k) => k + '×' + m.modes[k]).join('/');
     lines.push('  ' + who(uid) + ': 共 ' + m.total + ' · 今日 ' + m.today +
-      ' · 词数 ' + nWords + ' · 最近 ' + hm(m.last.at) + ' ' + m.last.word + ' (' + m.last.feedback + ')');
+      ' · 词数 ' + nWords + ' · 模式 ' + modeStr +
+      ' · 最近 ' + hm(m.last.at) + ' ' + m.last.word + ' (' + m.last.feedback + ')');
   });
 
   lines.push('【用户 users】' + users.length + ' 人');
