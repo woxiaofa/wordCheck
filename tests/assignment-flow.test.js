@@ -116,4 +116,28 @@ ok('⑨ 同步时机：班级页/首页 onShow 先补传再拉云端数据', fun
   assert.ok(idx.indexOf('Promise.race') >= 0, '首页补传应有超时兜底');
 });
 
+ok('⑩ 学习页：作业词单参数必须解码（0/1 + 进去就学完了的根因）', function () {
+  var js = read('miniprogram/pages/study/study.js');
+  // ids 是 encodeURIComponent 过的（逗号 → %2C），不解码整串就是一个"词"
+  var region = js.slice(js.indexOf('onLoad: function'), js.indexOf('onShow: function'));
+  assert.ok(/options\.ids[\s\S]{0,300}decodeURIComponent/.test(region),
+    'onLoad 里解析 ids 前必须 decodeURIComponent');
+  assert.ok(/split\(','\)/.test(region), '解码后按逗号拆分');
+  // 作业模式空队列的文案必须点名作业，不能说"300 个词全部学过"
+  assert.ok(js.indexOf('的词都学过了') >= 0 && js.indexOf('_assign.name') >= 0,
+    '作业空队列应有专属文案');
+});
+
+ok('⑪ 云端 task：每日新词优先清作业（数字互相矛盾的根治）', function () {
+  var src = read('cloud/functions/task/index.js');
+  assert.ok(src.indexOf('classAssignmentWords') >= 0, '应有作业词单拉取');
+  assert.ok(src.indexOf("assignments: 'assignments'") >= 0, '应查询作业集合');
+  // 作业词优先于词频顺序
+  var region = src.slice(src.indexOf('const assignmentWords'), src.indexOf('const snapshot'));
+  assert.ok(region.indexOf('assignmentWords') < region.indexOf('allWords.data'),
+    '新词挑选应先遍历作业词单');
+  // 老作业存 words._id：必须归一成文本
+  assert.ok(src.indexOf("map[id] || id") >= 0, '作业词单应兼容 _id 格式');
+});
+
 console.log('\n全部通过：' + pass + ' 项 ✓');

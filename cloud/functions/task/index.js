@@ -22,7 +22,8 @@ const COLL = {
   users: 'users',
   words: 'words',
   state: 'user_word_state',
-  tasks: 'daily_tasks'
+  tasks: 'daily_tasks',
+  assignments: 'assignments'
 };
 
 /** 每日新词数（与小程序本地默认一致） */
@@ -79,10 +80,19 @@ async function onToday(openid) {
     .limit(1000)
     .field({ word: true })
     .get();
+
+  // --- 作业优先：班级里有未完成的作业时，今日新词先清作业 ---
+  // 否则"每日任务学的词"和"作业的词"是两套独立挑选，孩子学了一堆、
+  // 作业进度却纹丝不动，家长看到的就是"学了 10 个词还剩 10 个"的自相矛盾。
+  const assignmentWords = await classAssignmentWords(user);
   const newIds = [];
+  for (const w of assignmentWords) {
+    if (newIds.length >= NEW_COUNT) break;
+    if (!learnedSet.has(w) && !newIds.includes(w)) newIds.push(w);
+  }
   for (const w of allWords.data) {
     if (newIds.length >= NEW_COUNT) break;
-    if (!learnedSet.has(w.word)) newIds.push(w.word);
+    if (!learnedSet.has(w.word) && !newIds.includes(w)) newIds.push(w);
   }
 
   const snapshot = {
@@ -170,6 +180,34 @@ function taskView(t) {
   };
 }
 
-const VERSION = 'task-20261005';
+/**
+ * 孩子所在班级的作业词单（归一成 word 文本，按作业布置顺序拼在一起）。
+ * 不在班级 / 没作业 / 查询失败都返回 []，任务组装逻辑不受影响。
+ * 注意词单 ID 兼容：老作业存的是 words._id，新作业直接存文本 —— 都要接住。
+ */
+async function classAssignmentWords(user) {
+  if (!user.class_id) return [];
+  const asgRes = await db.collection(COLL.assignments)
+    .where({ class_id: user.class_id })
+    .limit(20)
+    .get()
+    .catch(() => ({ data: [] }));
+  const rawIds = [];
+  (asgRes.data || []).forEach(a => (a.word_ids || []).forEach(w => rawIds.push(w)));
+  if (!rawIds.length) return [];
+
+  const wRes = await db.collection(COLL.words)
+    .where({ _id: _.in(rawIds) })
+    .limit(1000)
+    .field({ word: true })
+    .get()
+    .catch(() => ({ data: [] }));
+  if (!(wRes.data || []).length) return rawIds;   // 一个都没命中：本来就是文本
+  const map = {};
+  wRes.data.forEach(w => { map[w._id] = w.word; });
+  return rawIds.map(id => map[id] || id);
+}
+
+const VERSION = 'task-20261006-assign';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

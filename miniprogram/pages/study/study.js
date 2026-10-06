@@ -81,8 +81,13 @@ Page({
     // 班级作业模式：URL 带 ids（作业词单）时，队列只从这份词单里出，
     // 没学过的优先 —— 这就是"继续学"的断点续学能力
     if (options && options.ids) {
+      // class/首页发过来的是 encodeURIComponent 过的词单（逗号 → %2C）。
+      // 微信不会自动解码 options —— 不解码的话整串词单会被当成"一个词"，
+      // 实锤症状：进度条 0/1、"1 个词不在词库"、一进页面就"学完了"。
+      var rawIds = String(options.ids);
+      try { if (rawIds.indexOf('%') >= 0) rawIds = decodeURIComponent(rawIds); } catch (e) { /* 已是明文 */ }
       this._assign = {
-        ids: String(options.ids).split(',').filter(function (s) { return s; }),
+        ids: rawIds.split(',').filter(function (s) { return s; }),
         name: options.name ? decodeURIComponent(options.name) : '班级作业'
       };
     }
@@ -253,6 +258,19 @@ Page({
 
   /** 没有待学词汇时的解释性空状态（区别于"这一轮学完了"） */
   showEmptyState: function () {
+    // 作业模式下空队列 = 词单里的词都学过了，文案必须点明"作业"，
+    // 否则显示"共 300 个词已全部学过"会跟首页"作业 3/10"打架（实锤踩过）
+    if (this._assign && this._assign.ids.length) {
+      this.setData({
+        word: null,
+        isDemo: false,
+        roundDone: false,
+        emptyText: '「' + this._assign.name + '」的词都学过了',
+        emptySub: '作业词单里没有待学的词了，老师那边能看到你的进度。想再练可以去抽查。',
+        canExtra: false
+      });
+      return;
+    }
     var nextAt = this._nextDueAt || 0;
     var sub = nextAt
       ? '「' + books.currentName() + '」共 ' + books.getWords(books.getKey()).length +

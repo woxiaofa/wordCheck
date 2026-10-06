@@ -511,14 +511,17 @@ async function onNudge(openid, { studentId }) {
     .orderBy('created_at', 'desc')
     .limit(5)
     .get();
-  let line = '';
+  let assignLeft = null;   // { name, left, deadline }
   for (const a of (assignments.data || [])) {
     const per = await progressByStudent([studentId], a.word_ids);
     const done = per.length ? per[0].done : 0;
     const left = a.count - done;
     if (left > 0) {
-      line = '《' + (a.note || a.tag + '作业') + '》还剩 ' + left + ' 个词' +
-        (a.deadline ? '，' + a.deadline + ' 截止' : '');
+      assignLeft = {
+        name: a.note || a.tag + '作业',
+        left: left,
+        deadline: a.deadline || ''
+      };
       break;
     }
   }
@@ -537,21 +540,41 @@ async function onNudge(openid, { studentId }) {
     .catch(() => ({ total: 0 }));
   const todayCount = (todayRes && todayRes.total) || 0;
 
+  // 文案铁律：一段话里只讲一个故事。练了题 和 作业没动 两件事同时说，
+  // 必须点明它们的关系，否则"练了 10 题还剩 10 个"家长只会觉得数字错了。
   const parts = [];
   parts.push('【' + ctx.cls.name + '】' + (stu.nickname || '同学'));
-  if (todayCount > 0) {
-    parts.push('今天已经练了 ' + todayCount + ' 题' +
-      (stats.learned_words > 0 ? '，累计 ' + stats.learned_words + ' 词' : '') +
-      (stats.streak_days > 1 ? '，连续打卡 ' + stats.streak_days + ' 天' : '') + '，继续保持！');
-  } else if (seenRecent) {
-    parts.push('上次打开小程序是 ' + seenAgo + '，但今天还没开始学。花 5 分钟学第一课吧！');
-    // 孩子的手机上有补传队列：云端写入失败的学习记录会在下次打开时自动重放。
-    // 不写这条，家长看到"活跃了却 0 词"只会认定数据坏了。
-    parts.push('（如果孩子说学了但这里没数字：记录还在孩子手机里排队，下次打开小程序会自动补上）');
+  if (assignLeft) {
+    const tail = assignLeft.deadline ? '，' + assignLeft.deadline + ' 截止' : '';
+    if (todayCount > 0) {
+      parts.push('今天练了 ' + todayCount + ' 题，不错。不过这些是每日任务的词，' +
+        '作业《' + assignLeft.name + '》还没做——首页点「继续学」先把作业清了（还剩 ' +
+        assignLeft.left + ' 个词' + tail + '）。');
+    } else if (seenRecent) {
+      parts.push('上次打开小程序是 ' + seenAgo + '，今天还没学。' +
+        '作业《' + assignLeft.name + '》还剩 ' + assignLeft.left + ' 个词' + tail +
+        '，打开首页点「继续学」就能接着做。');
+      // 孩子的手机上有补传队列：云端写入失败的学习记录会在下次打开时自动重放。
+      // 不写这条，家长看到"活跃了却 0 词"只会认定数据坏了。
+      parts.push('（如果孩子说学了但这里没数字：记录还在孩子手机里排队，下次打开小程序会自动补上）');
+    } else {
+      parts.push('有一份作业《' + assignLeft.name + '》还剩 ' + assignLeft.left +
+        ' 个词' + tail + '，打开首页点「继续学」就能开始。');
+    }
   } else {
-    parts.push('单词之旅还没有开始，今天花 5 分钟学第一课吧！');
+    // 没有未完成作业：讲每日任务的故事
+    if (todayCount > 0) {
+      parts.push('今天已经练了 ' + todayCount + ' 题' +
+        (stats.learned_words > 0 ? '，累计 ' + stats.learned_words + ' 词' : '') +
+        (stats.streak_days > 1 ? '，连续打卡 ' + stats.streak_days + ' 天' : '') + '，继续保持！');
+    } else if (seenRecent) {
+      parts.push('上次打开小程序是 ' + seenAgo + '，但今天还没开始学。花 5 分钟学第一课吧！');
+      parts.push('（如果孩子说学了但这里没数字：记录还在孩子手机里排队，下次打开小程序会自动补上）');
+    } else {
+      parts.push('单词之旅还没有开始，今天花 5 分钟学第一课吧！');
+    }
+    parts.push('今天的任务：学 10 个新词 + 巩固到期复习，大约 3 分钟。');
   }
-  parts.push(line || '今天的任务：学 10 个新词 + 巩固到期复习，大约 3 分钟。');
   parts.push('（上次活跃：' + seenAgo + '）');
 
   return ok({ text: parts.join('\n') });
@@ -662,6 +685,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261006-wordid';
+const VERSION = 'class-20261006-cohere';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
