@@ -19,6 +19,8 @@ function createFakeDb() {
   var colls = {};
   var seq = 0;
   var counters = { adds: 0, dupErrors: 0 };
+  // 故障注入：复刻线上"假成功"形态——add 抛含 Duplicate 字样的 -502001，但实际没写入
+  var faults = { ghostAdd: false };
 
   function ensure(name) {
     if (!colls[name]) colls[name] = [];
@@ -121,6 +123,12 @@ function createFakeDb() {
               return Promise.reject(new Error(
                 'document.set:fail -501007 invalid parameter, 不能更新_id的值'));
             }
+            // 故障注入：集合级写入损坏形态——set 也抛 -502001（线上实测 set/add 双双失败）
+            if (name === 'user_word_state' && faults.ghost) {
+              return Promise.reject(new Error(
+                'document.set:fail -502001 database request fail. ' +
+                '[FailedOperation] multiple write errors'));
+            }
             // 云开发服务端语义：有则替换、无则新建（不经过插入路径，不会撞唯一键）
             var data = clone(o.data);
             data._id = id;
@@ -136,6 +144,14 @@ function createFakeDb() {
       add: function (o) {
         var data = clone(o.data);
         counters.adds++;
+        // 故障注入（v4 回归）：-502001 报错文本含 "Duplicate" 但文档没写入。
+        // v3 写入器会把它误判成"撞键=成功"，v4 必须回读拦截 —— 此测试确保不再复发
+        if (name === 'user_word_state' && faults.ghost) {
+          counters.dupErrors++;
+          return Promise.reject(new Error(
+            'collection.add:fail -502001 database request fail. ' +
+            '[FailedOperation] multiple write errors, bulk: Duplicate key...'));
+        }
         // 云端真实行为（探针实锤）：user_word_state 上 add 带 _id 报
         // "database request fail [FailedOp]" —— 写入器的 add 兜底必须不带 _id
         if (name === 'user_word_state' && data._id !== undefined) {
@@ -184,6 +200,7 @@ function createFakeDb() {
     collection: collection,
     command: command,
     counters: counters,
+    faults: faults,
     raw: colls,
     reset: function () {
       // 原地清空：db.raw 必须始终指向同一对象，否则测试里塞的种子数据会丢
@@ -403,6 +420,36 @@ steps.push(function () {
       var st = db.raw.user_word_state || [];
       assert.strictEqual(st.length, 1, '已有记录应被更新而不是新建，实际：' + JSON.stringify(st.map(function (d) { return d._id; })));
       assert.strictEqual(st[0]._id, 'gen-old-7', '老 _id 文档应原地更新');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑩ v4 回归：add 报 -502001 含 Duplicate 字样但没写入 → 必须报失败，不许假成功', function () {
+    seedUser();
+    db.faults.ghost = true;
+    return submit('ghost').then(function (r) {
+      db.faults.ghost = false;
+      // v3 的事故形态：所有路径抛错后被 isDupErr 误判成功。v4 要求：
+      // 提交必须如实失败（STATE_WRITE_FAIL），且状态表里绝不留"没有的文档"假象
+      assert.strictEqual(r.ok, false, '应如实报失败而不是假成功：' + JSON.stringify(r));
+      var st = (db.raw.user_word_state || []).filter(function (d) { return d.word_id === 'ghost'; });
+      assert.strictEqual(st.length, 0, 'ghost 词不应出现在状态表');
+    }).catch(function (e) {
+      db.faults.ghost = false;
+      throw e;
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑪ v4 回归：故障恢复后重新提交同一词，应成功写入（误伤可自愈）', function () {
+    seedUser();
+    return submit('recover').then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      var st = (db.raw.user_word_state || []).filter(function (d) { return d.word_id === 'recover'; });
+      assert.strictEqual(st.length, 1, '故障恢复后应正常写入');
+      assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1);
     });
   });
 });

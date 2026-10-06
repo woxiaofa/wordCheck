@@ -37,7 +37,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-fixset';
+const VERSION = 'rev-20261006-matrix';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -433,48 +433,103 @@ async function diagnoseAll(clean) {
 
   // ============ 拼快照文本 ============
 
-  /* ---- 写入回路探针 + 哨兵：把"写不进"和"被外部删"当场分开 ----
-   * v1 探针曾当场抓到根因：set 的 data 带 _id 必抛 -501007"不能更新_id的值"，
-   * 而兜底 update 对不存在的文档静默 updated:0 被当成功 —— 新词永远进不了状态表。
-   * 现在探针按修复后的契约（data 不带 _id）验证写路径是否健康。 */
+  /* ---- 写入判定矩阵：一次诊断把"环境坏 / 集合坏 / _id 格式坏 / 残留挡路"当场分开 ----
+   * v1 探针抓到过 -501007（data 带 _id）；本次升级起因：探针每次写固定
+   * (diagprobe, probe)，被唯一索引的上一轮残留挡住 → -502001 假象，且残留
+   * 被 isProbeRow 过滤器隐藏。矩阵全部用"每轮随机 key"，结果可复现可判读：
+   *   A 状态表 set(随机key)      失败 → 集合级写入坏（索引/存储损坏）
+   *   B 状态表 add(随机key)      失败 → 同上
+   *   C 冒号 _id set             失败而 A 成功 → 确定性 _id 的冒号是毒
+   *   D 白板集合 diag_scratch    失败而 A/B 成功 → 环境级问题
+   *   E 探针残留计数              >0 → 上轮清理失败，此前探针报错是假象 */
   const probeOut = [];
   const now2 = Date.now();
-  const pid1 = 'diagprobe-set-' + now2;
-  const pdoc = { user_id: 'diagprobe', word_id: 'probe', stage: 0, created_at: now2 };
+  const uni = String(now2).slice(-8); // 每轮唯一后缀，杜绝与历史残留相撞
+
+  // E) 先数残留：上一轮没清干净的探针文档（快照统计里被过滤，这里如实报告）
+  const leftover = await db.collection(COLL.state)
+    .where({ user_id: 'diagprobe' }).count()
+    .catch(() => ({ total: -1 }));
+  if (leftover.total > 0) probeOut.push('⚠探针残留 ' + leftover.total + ' 条（上轮清理失败，旧报错勿信）');
+
+  // A) 状态表 set，随机 key，data 不带 _id，成功后回读验证
+  const pid1 = 'diagprobe-set-' + uni;
   try {
-    await db.collection(COLL.state).doc(pid1).set({ data: pdoc });
+    await db.collection(COLL.state).doc(pid1).set({
+      data: { user_id: 'diagprobe', word_id: 'p' + uni, stage: 0, created_at: now2 }
+    });
     const rb = await db.collection(COLL.state).doc(pid1).get()
       .then((r) => !!r.data).catch(() => false);
-    probeOut.push('set→回读:' + (rb ? '在' : '⚠不在'));
+    probeOut.push('状态表set:' + (rb ? 'OK' : '⚠写入但读不回'));
   } catch (e) {
-    probeOut.push('set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 80) + ')');
+    probeOut.push('状态表set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
   }
-  const pid2 = 'diagprobe-add-' + now2;
-  try {
-    await db.collection(COLL.state).add({ data: Object.assign({}, pdoc, { word_id: 'probe2' }) });
-    const rb2 = await db.collection(COLL.state)
-      .where({ user_id: 'diagprobe', word_id: 'probe2' }).limit(1).get()
-      .then((r) => !!(r.data && r.data.length)).catch(() => false);
-    probeOut.push('add→回读:' + (rb2 ? '在' : '⚠不在'));
-  } catch (e) {
-    probeOut.push('add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 80) + ')');
-  }
-  await db.collection(COLL.state).doc(pid1).remove().catch(() => {});
-  await db.collection(COLL.state)
-    .where({ user_id: 'diagprobe', word_id: 'probe2' }).remove()
-    .catch(() => {});
 
+  // B) 状态表 add，随机 word_id，成功后按字段回读验证
+  try {
+    await db.collection(COLL.state).add({
+      data: { user_id: 'diagprobe', word_id: 'a' + uni, stage: 0, created_at: now2 }
+    });
+    const rb2 = await db.collection(COLL.state)
+      .where({ user_id: 'diagprobe', word_id: 'a' + uni }).limit(1).get()
+      .then((r) => !!(r.data && r.data.length)).catch(() => false);
+    probeOut.push('状态表add:' + (rb2 ? 'OK' : '⚠写入但读不回'));
+  } catch (e) {
+    probeOut.push('状态表add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
+  }
+
+  // C) 冒号 _id 测试：真实写入器用 "user:word" 当 _id，单独验证这种格式
+  try {
+    await db.collection(COLL.state).doc('diagprobe:colon-' + uni).set({
+      data: { user_id: 'diagprobe', word_id: 'c' + uni, stage: 0, created_at: now2 }
+    });
+    const rb3 = await db.collection(COLL.state).doc('diagprobe:colon-' + uni).get()
+      .then((r) => !!r.data).catch(() => false);
+    probeOut.push('冒号_id:' + (rb3 ? 'OK' : '⚠写入但读不回'));
+  } catch (e) {
+    probeOut.push('冒号_id:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
+  }
+
+  // D) 白板集合对照：隔离"环境问题"与"user_word_state 集合自身问题"
+  try {
+    await db.collection('diag_scratch').add({ data: { at: now2, note: 'probe' } });
+    const rb4 = await db.collection('diag_scratch')
+      .where({ at: now2 }).limit(1).get()
+      .then((r) => !!(r.data && r.data.length)).catch(() => false);
+    probeOut.push('白板集合:' + (rb4 ? 'OK' : '⚠写入但读不回'));
+  } catch (e) {
+    probeOut.push('白板集合:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
+  }
+
+  // 清理本轮全部探针文档（失败不再静默——残留会让下轮探针误报）
+  const probeWordIds = ['p' + uni, 'a' + uni, 'c' + uni];
+  for (const w of probeWordIds) {
+    await db.collection(COLL.state)
+      .where({ user_id: 'diagprobe', word_id: w }).remove()
+      .catch((e) => probeOut.push('⚠清理失败:' + w));
+  }
+
+  // 哨兵：跨诊断存活检查（检出两轮之间的外部删除）。data 不带 _id（v2 教训）
   const SENTRY_ID = 'diagprobe-sentinel';
   const prevSent = await db.collection(COLL.state).doc(SENTRY_ID).get()
     .then((r) => r.data || null).catch(() => null);
   await db.collection(COLL.state).doc(SENTRY_ID).set({
-    data: { _id: SENTRY_ID, user_id: 'diagprobe', word_id: 'sentinel', at: now2, created_at: now2 }
-  }).catch(() => {});
+    data: { user_id: 'diagprobe', word_id: 'sentinel', at: now2, created_at: now2 }
+  }).catch((e) => probeOut.push('⚠哨兵埋设失败:' + String((e && e.errMsg) || e).slice(0, 60)));
   probeOut.push(prevSent
-    ? '哨兵(上轮 ' + hm(prevSent.at) + ')仍在 → 两轮诊断之间无外部删除'
+    ? '哨兵(上轮 ' + hm(prevSent.at) + ')仍在 → 无外部删除'
     : '本轮首次布置哨兵（下轮对比）');
 
-  lines.push('【状态表 user_word_state】' + allRows.length + ' 条 · 覆盖 ' + Object.keys(byUser).length + ' 人');
+  // 隐形文档检测：count() 总数若明显大于"扫描数+探针残留+哨兵"，说明有文档
+  // 查询扫不到但占着唯一索引（存储损坏特征）—— 这正是"插入必报 duplicate"的元凶
+  const stateCount = await db.collection(COLL.state).count()
+    .catch(() => ({ total: -1 }));
+  const expected = allRows.length + Math.max(leftover.total, 0) + 1; // +1 哨兵
+  const ghost = (stateCount.total > expected) ? (stateCount.total - expected) : 0;
+
+  lines.push('【状态表 user_word_state】扫描 ' + allRows.length + ' 条 · count=' +
+    stateCount.total + ' 条 · 覆盖 ' + Object.keys(byUser).length + ' 人' +
+    (ghost > 0 ? ' · ⚠隐形文档 ' + ghost + ' 条（扫不到但占索引）' : ''));
   lines.push('  探针: ' + probeOut.join(' · '));
   if (!Object.keys(byUser).length) {
     lines.push('  （空：没有任何学习状态同步到云端）');
