@@ -8,6 +8,7 @@
  * 云失败时整页降级为提示 + 重试，绝不影响本地学习功能。
  */
 
+var assignParam = require('../../utils/assign');
 var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
@@ -332,7 +333,8 @@ Page({
     }
     var name = a.note || (a.tag ? a.tag + '作业' : '班级作业');
     wx.redirectTo({
-      url: '/pages/study/study?ids=' + encodeURIComponent(ids) + '&name=' + encodeURIComponent(name)
+      url: '/pages/study/study?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
+        '&name=' + encodeURIComponent(name)
     });
   },
 

@@ -386,7 +386,10 @@ async function onStudents(openid) {
   const statMap = {};
   (stRes.data || []).forEach((s) => {
     const m = statMap[s.user_id] || (statMap[s.user_id] = { learned: 0, wrong: 0, rated: 0 });
-    if ((s.correct_count || 0) > 0 || (s.stage || 0) > 0) m.learned++;
+    // 完成定义 = 学过即算，与 stats_cache.learned_words / 作业完成度同口径。
+    // 旧口径（correct_count>0 || stage>0）会让学员卡显示"累计 3 词"、
+    // 催学文案却说"累计 10 词" —— 同一个孩子两个数字，家长只会觉得数据坏了。
+    m.learned++;
     if ((s.wrong_count || 0) > 0) m.wrong++;
     m.rated++;
   });
@@ -685,6 +688,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261006-cohere';
+const VERSION = 'class-20261006-onestandard';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

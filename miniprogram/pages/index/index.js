@@ -9,6 +9,7 @@
  * 参见 docs/新手引导设计.md 第 1 段。
  */
 
+var assignParam = require('../../utils/assign');
 var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
@@ -77,7 +78,8 @@ Page({
       var a = list[0];                     // 只展示最近一份，多的在班级页看
       var done = a.done || 0;
       var count = a.count || 0;
-      var ids = (a.word_ids || []).join(',');
+      // 存编码后的串：跳转时原样带过去，由 utils/assign.js 的契约成对解码
+      var ids = assignParam.buildIdsParam(a.word_ids || []);
       self.setData({
         clsAssign: {
           name: a.note || (a.tag ? a.tag + '作业' : '班级作业'),
@@ -96,8 +98,10 @@ Page({
   goClassAssign: function () {
     var a = this.data.clsAssign;
     if (!a || !a.ids) return;
+    // 注意：a.ids 已经 buildIdsParam 编码过（含 %2C），这里不能再编码一次，
+    // 否则 %2C → %252C 双重编码，学习页解码后逗号回不来，整串又变成"一个词"
     wx.redirectTo({
-      url: '/pages/study/study?ids=' + encodeURIComponent(a.ids) + '&name=' + encodeURIComponent(a.name)
+      url: '/pages/study/study?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
     });
   },
 

@@ -19,6 +19,7 @@ var WORDS = require('../../data/words');
 var books = require('../../utils/books');
 var tts = require('../../utils/tts');
 var report = require('../../utils/report');
+var assignParam = require('../../utils/assign');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -84,10 +85,8 @@ Page({
       // class/首页发过来的是 encodeURIComponent 过的词单（逗号 → %2C）。
       // 微信不会自动解码 options —— 不解码的话整串词单会被当成"一个词"，
       // 实锤症状：进度条 0/1、"1 个词不在词库"、一进页面就"学完了"。
-      var rawIds = String(options.ids);
-      try { if (rawIds.indexOf('%') >= 0) rawIds = decodeURIComponent(rawIds); } catch (e) { /* 已是明文 */ }
       this._assign = {
-        ids: rawIds.split(',').filter(function (s) { return s; }),
+        ids: assignParam.parseIdsParam(options.ids),
         name: options.name ? decodeURIComponent(options.name) : '班级作业'
       };
     }
