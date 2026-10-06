@@ -516,11 +516,29 @@ async function onNudge(openid, { studentId }) {
 
   const stats = stu.stats_cache || {};
   const seenAgo = stu.last_seen_at ? fmtAgo(Date.now() - stu.last_seen_at) : '还没来过';
+  const seenRecent = stu.last_seen_at && (Date.now() - stu.last_seen_at < 12 * 3600000);
+
+  // 今天的练习量直接数 review_logs（写入即有的真值）。
+  // stats_cache 是冗余统计，可能滞后 —— 曾经出现过"孩子 28 分钟前活跃、
+  // 文案却说一个没学"的自相矛盾，家长会觉得数据是假的。
+  const today = getLocalDate(Date.now());
+  const todayRes = await db.collection(COLL.logs)
+    .where({ user_id: studentId, review_date: today })
+    .count()
+    .catch(() => ({ total: 0 }));
+  const todayCount = (todayRes && todayRes.total) || 0;
+
   const parts = [];
   parts.push('【' + ctx.cls.name + '】' + (stu.nickname || '同学'));
-  if (stats.learned_words > 0) {
-    parts.push('目前已经积累了 ' + stats.learned_words + ' 个词' +
+  if (todayCount > 0) {
+    parts.push('今天已经练了 ' + todayCount + ' 题' +
+      (stats.learned_words > 0 ? '，累计 ' + stats.learned_words + ' 词' : '') +
       (stats.streak_days > 1 ? '，连续打卡 ' + stats.streak_days + ' 天' : '') + '，继续保持！');
+  } else if (seenRecent) {
+    parts.push('上次打开小程序是 ' + seenAgo + '，但今天还没开始学。花 5 分钟学第一课吧！');
+    // 孩子的手机上有补传队列：云端写入失败的学习记录会在下次打开时自动重放。
+    // 不写这条，家长看到"活跃了却 0 词"只会认定数据坏了。
+    parts.push('（如果孩子说学了但这里没数字：记录还在孩子手机里排队，下次打开小程序会自动补上）');
   } else {
     parts.push('单词之旅还没有开始，今天花 5 分钟学第一课吧！');
   }
@@ -609,6 +627,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261005';
+const VERSION = 'class-20261006-nudge';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

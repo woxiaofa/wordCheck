@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "班级",
+  "enablePullDownRefresh": true,
   "usingComponents": {
     "footer-nav": "/components/footer-nav/index"
   }

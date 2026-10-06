@@ -53,6 +53,12 @@ Page({
     this.reload();
   },
 
+  /** 下拉手动同步：家长想看最新进度时不用退出重进 */
+  onPullDownRefresh: function () {
+    this.reload();
+    wx.stopPullDownRefresh();
+  },
+
   reload: function () {
     var self = this;
     self.setData({ loading: true, cloudError: '' });
@@ -184,7 +190,10 @@ Page({
   makeNudge: function (e) {
     var id = e.currentTarget.dataset.id;
     var self = this;
-    wx.showLoading({ title: '生成中…' });
+    wx.showLoading({ title: '同步数据中…' });
+    // 点击即刷新：学员卡和催学文案必须基于同一份最新数据。
+    // 否则会出现"卡片还是旧数字、文案却是刚生成的"这种自相矛盾
+    this.loadCoachData();
     cloud.api.nudgeText(id).then(function (r) {
       wx.hideLoading();
       wx.setClipboardData({
