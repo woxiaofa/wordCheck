@@ -2,7 +2,7 @@
  * review 云函数集成测试（假数据库）
  *
  * 为什么需要它：线上出过一次"教练端进度恒 0、报错是裸 E11000"的故障，
- * 根因是 user_word_state 里存在 word_id 为空的脏文档 + 唯一索引把"空"视为同值。
+ * 根因是 user_word_state_v2 里存在 word_id 为空的脏文档 + 唯一索引把"空"视为同值。
  * 这类问题光看代码看不出来，必须把"带唯一索引的数据库"搬到本地跑一遍。
  *
  * 这里的假数据库刻意实现了两个真实行为：
@@ -124,7 +124,7 @@ function createFakeDb() {
                 'document.set:fail -501007 invalid parameter, 不能更新_id的值'));
             }
             // 故障注入：集合级写入损坏形态——set 也抛 -502001（线上实测 set/add 双双失败）
-            if (name === 'user_word_state' && faults.ghost) {
+            if (name === 'user_word_state_v2' && faults.ghost) {
               return Promise.reject(new Error(
                 'document.set:fail -502001 database request fail. ' +
                 '[FailedOperation] multiple write errors'));
@@ -146,19 +146,19 @@ function createFakeDb() {
         counters.adds++;
         // 故障注入（v4 回归）：-502001 报错文本含 "Duplicate" 但文档没写入。
         // v3 写入器会把它误判成"撞键=成功"，v4 必须回读拦截 —— 此测试确保不再复发
-        if (name === 'user_word_state' && faults.ghost) {
+        if (name === 'user_word_state_v2' && faults.ghost) {
           counters.dupErrors++;
           return Promise.reject(new Error(
             'collection.add:fail -502001 database request fail. ' +
             '[FailedOperation] multiple write errors, bulk: Duplicate key...'));
         }
-        // 云端真实行为（探针实锤）：user_word_state 上 add 带 _id 报
+        // 云端真实行为（探针实锤）：user_word_state_v2 上 add 带 _id 报
         // "database request fail [FailedOp]" —— 写入器的 add 兜底必须不带 _id
-        if (name === 'user_word_state' && data._id !== undefined) {
+        if (name === 'user_word_state_v2' && data._id !== undefined) {
           return Promise.reject(new Error(
             'collection.add:fail database request fail. [FailedOp]'));
         }
-        if (name === 'user_word_state') {
+        if (name === 'user_word_state_v2') {
           // 复刻线上观测到的行为（不是教科书 Mongo 语义）：
           // 该用户名下只要存在 word_id 为空的脏文档，后续每一次插入都会撞唯一键，
           // 报错里 dup key 显示为 { user_id, word_id: null } —— 与内测环境完全一致。
@@ -169,7 +169,7 @@ function createFakeDb() {
           if (dirty) {
             counters.dupErrors++;
             return Promise.reject(new Error(
-              'E11000 duplicate key error collection: test.user_word_state ' +
+              'E11000 duplicate key error collection: test.user_word_state_v2 ' +
               'index: user_wordIndex dup key: { user_id + word_id: ' +
               String(data.user_id) + '|null }'));
           }
@@ -178,7 +178,7 @@ function createFakeDb() {
           if (exists) {
             counters.dupErrors++;
             return Promise.reject(new Error(
-              'E11000 duplicate key error collection: test.user_word_state ' +
+              'E11000 duplicate key error collection: test.user_word_state_v2 ' +
               'index: user_wordIndex dup key: { user_id + word_id: ' + k + ' }'));
           }
         }
@@ -267,7 +267,7 @@ steps.push(function () {
     seedUser();
     return submit('search').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
-      var st = db.raw.user_word_state || [];
+      var st = db.raw.user_word_state_v2 || [];
       assert.strictEqual(st.length, 1, '应写入 1 条状态');
       assert.strictEqual(st[0].word_id, 'search');
       assert.strictEqual(st[0].user_id, 'u1');
@@ -282,11 +282,11 @@ steps.push(function () {
   return ok('② 复刻线上故障：库里有 word_id 为空的脏文档，写入照样成功', function () {
     seedUser();
     // 手动埋一条脏数据（线上是控制台手动加记录 / 建索引前残留造成的）
-    db.raw.user_word_state = [{ _id: 'dirty1', user_id: 'u1', stage: 0, updated_at: 1 }];
+    db.raw.user_word_state_v2 = [{ _id: 'dirty1', user_id: 'u1', stage: 0, updated_at: 1 }];
 
     return submit('circle').then(function (r) {
       assert.strictEqual(r.ok, true, '脏文档不应挡住写入：' + JSON.stringify(r));
-      var st = db.raw.user_word_state || [];
+      var st = db.raw.user_word_state_v2 || [];
       var withId = st.filter(function (d) { return d.word_id; });
       assert.strictEqual(withId.length, 1, '应写入 1 条带 word_id 的状态');
       assert.strictEqual(withId[0].word_id, 'circle');
@@ -299,11 +299,11 @@ steps.push(function () {
 steps.push(function () {
   return ok('③ 脏文档存在时连续学 3 个词：全部写入成功（线上曾全量失败）', function () {
     seedUser();
-    db.raw.user_word_state = [{ _id: 'dirty1', user_id: 'u1' }];
+    db.raw.user_word_state_v2 = [{ _id: 'dirty1', user_id: 'u1' }];
     return submit('a').then(function () { return submit('b'); })
       .then(function () { return submit('c'); })
       .then(function () {
-        var st = db.raw.user_word_state || [];
+        var st = db.raw.user_word_state_v2 || [];
         var ids = st.filter(function (d) { return d.word_id; }).map(function (d) { return d.word_id; }).sort();
         assert.deepStrictEqual(ids, ['a', 'b', 'c'], '三个词都应写入，实际：' + ids.join(','));
         assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 3);
@@ -316,7 +316,7 @@ steps.push(function () {
     seedUser();
     return submit('search').then(function () { return submit('search', 'vague'); })
       .then(function () {
-        var st = db.raw.user_word_state || [];
+        var st = db.raw.user_word_state_v2 || [];
         assert.strictEqual(st.length, 1, '同一词只应有 1 条状态');
         assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1, '已学词数不应重复 +1');
       });
@@ -347,7 +347,7 @@ steps.push(function () {
     }];
     return submit('search', 'forgot').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
-      var st = db.raw.user_word_state || [];
+      var st = db.raw.user_word_state_v2 || [];
       assert.strictEqual(st[0].wrong_count, 1, '错误次数应记为 1');
       assert.deepStrictEqual(db.raw.daily_tasks[0].snapshot_json.repeat, ['search']);
     });
@@ -355,28 +355,28 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑦ 补传队列重放 + 脏文档 + 旧 _id 历史记录：全部写入成功（不再 STATE_CONFLICT）', function () {
+  return ok('⑦ 补传队列重放 + legacy 旧 _id 历史记录：写入成功且合并视图唯一（不再 STATE_CONFLICT）', function () {
     seedUser();
-    // 线上最恶劣的组合：脏文档在、该词还有一条老版本自动 _id 的记录、
-    // 且补传队列把同一条请求重放多次
+    // v5 真实形态：老版本自动 _id 的记录只存在于 legacy 旧集合；
+    // 补传队列把同一条请求重放多次
     db.raw.user_word_state = [
-      { _id: 'dirty1', user_id: 'u1' },
       { _id: 'gen-old-9', user_id: 'u1', word_id: 'search', stage: 1 }
     ];
+    db.raw.user_word_state_v2 = [];
     var req = 'req-replay-1';
     return submit('search', 'known', req)
       .then(function (r) { assert.strictEqual(r.ok, true, JSON.stringify(r)); return submit('search', 'forgot', req + '-2'); })
       .then(function (r) { assert.strictEqual(r.ok, true, JSON.stringify(r)); return submit('search', 'vague', req + '-3'); })
       .then(function (r) {
         assert.strictEqual(r.ok, true, JSON.stringify(r));
-        var st = db.raw.user_word_state || [];
-        var pair = st.filter(function (d) { return d.word_id === 'search'; });
-        // 契约：同一 (user_id, word_id) 永远只有一条（不管 _id 是新格式还是老格式），
-        // 否则唯一索引会炸，且客户端会看到两份互相打架的进度
-        assert.strictEqual(pair.length, 1,
-          '同一 (user,word) 只能有一条，实际：' + JSON.stringify(st.map(function (d) { return d._id; })));
-        assert.strictEqual(pair[0].last_feedback, 'vague', '最后一次反馈应生效');
-        assert.strictEqual(pair[0].wrong_count, 1, '错误次数应记为 1');
+        var v2 = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'search'; });
+        // 契约：v2 里同一 (user_id, word_id) 只有一条（确定性主键）；
+        // legacy 旧记录被合并读降权，不会再产生第二份"互相打架"的进度
+        assert.strictEqual(v2.length, 1,
+          'v2 里同一 (user,word) 只能有一条，实际：' + JSON.stringify(v2.map(function (d) { return d._id; })));
+        assert.strictEqual(v2[0]._id, 'u1:search');
+        assert.strictEqual(v2[0].last_feedback, 'vague', '最后一次反馈应生效');
+        assert.strictEqual(v2[0].wrong_count, 1, '错误次数应记为 1');
       });
   });
 });
@@ -390,10 +390,10 @@ steps.push(function () {
       { user_id: 'u1', word_id: 'search', feedback: 'known', mode: 'learn', created_at: now - 3600e3 },
       { user_id: 'u1', word_id: 'circle', feedback: 'forgot', mode: 'learn', created_at: now - 1800e3 }
     ];
-    db.raw.user_word_state = [];   // 事故现场：状态表空
+    db.raw.user_word_state_v2 = [];   // 事故现场：状态表空
     return review.main({ action: 'repair' }, {}).then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
-      var st = db.raw.user_word_state || [];
+      var st = db.raw.user_word_state_v2 || [];
       assert.strictEqual(st.length, 2, '应为两个词各回填一条状态，实际：' + JSON.stringify(st));
       var circle = st.filter(function (d) { return d.word_id === 'circle'; })[0];
       assert.ok(circle, 'circle 应被回填');
@@ -406,20 +406,29 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑨ 修复幂等：对已有状态记录的词只更新不重复新建', function () {
+  return ok('⑨ 修复幂等：legacy 已有记录的词，repair 迁移镜像到 v2 且重复执行结果稳定', function () {
     seedUser();
     var now = Date.now();
     db.raw.review_logs = [
       { user_id: 'u1', word_id: 'search', feedback: 'known', mode: 'learn', created_at: now - 3600e3 }
     ];
+    // 该词在 legacy 旧集合有一条老记录（v5 之前的形态）
     db.raw.user_word_state = [
       { _id: 'gen-old-7', user_id: 'u1', word_id: 'search', stage: 3, correct_count: 5 }
     ];
-    return review.main({ action: 'repair' }, {}).then(function (r) {
-      assert.strictEqual(r.ok, true, JSON.stringify(r));
-      var st = db.raw.user_word_state || [];
-      assert.strictEqual(st.length, 1, '已有记录应被更新而不是新建，实际：' + JSON.stringify(st.map(function (d) { return d._id; })));
-      assert.strictEqual(st[0]._id, 'gen-old-7', '老 _id 文档应原地更新');
+    db.raw.user_word_state_v2 = [];
+    return review.main({ action: 'repair' }, {}).then(function (r1) {
+      assert.strictEqual(r1.ok, true, JSON.stringify(r1));
+      return review.main({ action: 'repair' }, {}).then(function (r2) {
+        assert.strictEqual(r2.ok, true, JSON.stringify(r2));
+        var v2 = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'search'; });
+        assert.strictEqual(v2.length, 1, 'v2 应恰好有一条镜像，实际：' +
+          JSON.stringify((db.raw.user_word_state_v2 || []).map(function (d) { return d._id; })));
+        assert.strictEqual(v2[0]._id, 'u1:search', 'v2 镜像用确定性主键');
+        assert.strictEqual(v2[0].correct_count, 1, '回填按日志重算（legacy 旧账不混入）');
+        // legacy 原记录只读保留，合并读时被 v2 降权
+        assert.strictEqual((db.raw.user_word_state || []).length, 1);
+      });
     });
   });
 });
@@ -433,7 +442,7 @@ steps.push(function () {
       // v3 的事故形态：所有路径抛错后被 isDupErr 误判成功。v4 要求：
       // 提交必须如实失败（STATE_WRITE_FAIL），且状态表里绝不留"没有的文档"假象
       assert.strictEqual(r.ok, false, '应如实报失败而不是假成功：' + JSON.stringify(r));
-      var st = (db.raw.user_word_state || []).filter(function (d) { return d.word_id === 'ghost'; });
+      var st = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'ghost'; });
       assert.strictEqual(st.length, 0, 'ghost 词不应出现在状态表');
     }).catch(function (e) {
       db.faults.ghost = false;
@@ -447,9 +456,40 @@ steps.push(function () {
     seedUser();
     return submit('recover').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
-      var st = (db.raw.user_word_state || []).filter(function (d) { return d.word_id === 'recover'; });
+      var st = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'recover'; });
       assert.strictEqual(st.length, 1, '故障恢复后应正常写入');
       assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1);
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑫ v5 迁移兼容：legacy 旧集合的历史记录仍参与合并读，新写入只进 v2', function () {
+    seedUser();
+    // 旧集合里有一条 v5 之前的历史记录（老自动 _id），v2 为空
+    db.raw.user_word_state = [
+      { _id: 'gen-legacy-1', user_id: 'u1', word_id: 'apple', stage: 1,
+        correct_count: 2, wrong_count: 0, next_review_at: Date.now() - 1000, created_at: 1 }
+    ];
+    db.raw.user_word_state_v2 = [];
+    // 云记账在 legacy 时代已记过这笔账（真实历史状态）
+    db.raw.users[0].stats_cache.learned_words = 1;
+    // 1) 合并读：到期列表能看到 legacy 里的 apple
+    return review.main({ action: 'due' }, {}).then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      var dueWords = (r.data.due || []).map(function (d) { return d.word_id; });
+      assert.ok(dueWords.indexOf('apple') !== -1, 'legacy 记录应出现在到期列表：' + dueWords.join(','));
+      // 2) 提交同词：新状态写进 v2（带 legacy 累计的正误数），legacy 原样保留
+      return submit('apple', 'known');
+    }).then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      var v2 = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'apple'; });
+      assert.strictEqual(v2.length, 1, '新写入应落在 v2');
+      assert.strictEqual(v2[0]._id, 'u1:apple', 'v2 应用确定性主键');
+      assert.strictEqual(v2[0].correct_count, 3, '应继承 legacy 的累计答对数 2+1');
+      var legacy = db.raw.user_word_state || [];
+      assert.strictEqual(legacy.length, 1, 'legacy 原记录不动（只读兼容）');
+      assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1, '合并口径下已学词数=1');
     });
   });
 });

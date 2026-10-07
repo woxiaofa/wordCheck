@@ -19,10 +19,13 @@ const _ = db.command;
 
 const { nextState, REQ_ID_TTL_DAYS } = require('./srs');
 const { getLocalDate, getLocalDayStart } = require('./time');
-const { upsertState } = require('./state-store');
+const {
+  upsertState, queryStates, STATE_COLL, LEGACY_COLL
+} = require('./state-store');
 
 const COLL = {
-  state: 'user_word_state',
+  state: STATE_COLL,             // 读写都走新集合（无唯一索引，确定性 _id）
+  legacyState: LEGACY_COLL,      // 旧集合只读兼容：历史数据仍计入合并查询
   logs: 'review_logs',
   requests: 'request_dedup',
   tasks: 'daily_tasks',
@@ -37,7 +40,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261006-matrix';
+const VERSION = 'rev-20261007-v2coll';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -81,11 +84,9 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
   const now = Date.now();
   const today = getLocalDate(now);   // UTC+8 的 YYYY-MM-DD
 
-  // --- 读取当前状态（唯一索引 (user_id, word_id) 保证只有一条） ---
-  const stRes = await db.collection(COLL.state)
-    .where({ user_id: user._id, word_id: wordId })
-    .limit(1).get();
-  const prev = stRes.data && stRes.data[0] ? stRes.data[0] : null;
+  // --- 读取当前状态（v2+legacy 合并读，同词 v2 优先） ---
+  const prevRows = await queryStates(db, { user_id: user._id, word_id: wordId }, { limit: 1 });
+  const prev = prevRows[0] || null;
 
   // --- 用共享模块算新状态：算法只有一份，前后端不许各写一套 ---
   const next = nextState(prev, feedback, now);
@@ -103,16 +104,12 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
     updated_at: now
   };
 
-  if (prev) {
-    await db.collection(COLL.state).doc(prev._id).update({ data: doc });
-  } else {
-    // 新词进入 SRS。写入器按确定性 _id 直接 upsert，
-    // 脏文档/并发重放/历史 _id 残留都不会再挡住这次写入
-    const errCode = await upsertState(db, COLL.state, user._id, wordId, doc, now);
-    if (errCode) {
-      return fail('STATE_WRITE_FAIL',
-        '学习状态写入失败（云函数日志有完整现场，请把日志发开发）');
-    }
+  // 一律 upsert（v5 写入器 = 确定性 _id 全量 set，有则替换无则新建 + 回读验证）。
+  // 不再按 prev._id 分支：prev 可能来自 legacy 集合，其 _id 在 v2 上不存在，
+  // 对它 update 会静默 updated:0 —— 又一次"假成功"的隐患，直接绕开。
+  const errCode = await upsertState(db, user._id, wordId, doc, now);
+  if (errCode) {
+    return fail('STATE_WRITE_FAIL', '学习状态写入失败: ' + errCode);
   }
 
   // --- 记录明细（用于错词本与后续算法调优；保留策略见《设计约定》） ---
@@ -177,14 +174,15 @@ async function onDueList(openid, { limit }) {
   if (!user) return fail('NO_USER', '用户不存在');
 
   const cap = Math.min(Number(limit) || 100, 200);   // 一定要有上限，防全表扫
-  const res = await db.collection(COLL.state)
-    .where({ user_id: user._id, next_review_at: _.lte(Date.now()) })
-    .orderBy('next_review_at', 'asc')
-    .limit(cap)
-    .field({ word_id: true, stage: true, next_review_at: true })
-    .get();
+  const rows = await queryStates(
+    db,
+    { user_id: user._id, next_review_at: _.lte(Date.now()) },
+    { orderBy: { name: 'next_review_at', dir: 'asc' }, limit: cap,
+      field: { word_id: true, stage: true, next_review_at: true } }
+  );
+  const due = rows.slice(0, cap);
 
-  return ok({ due: res.data, truncated: res.data.length >= cap });
+  return ok({ due: due, truncated: due.length >= cap });
 }
 
 /* ------------------------------------------------------------------ */
@@ -210,12 +208,10 @@ async function onDiagnose(openid, { clean, all }) {
   const user = await getUser(openid);
   if (!user) return diagnoseAll(clean);
 
-  const res = await db.collection(COLL.state)
-    .where({ user_id: user._id })
-    .limit(1000)
-    .field({ word_id: true, stage: true, last_feedback: true })
-    .get();
-  const allRows = res.data || [];
+  const allRows = await queryStates(
+    db, { user_id: user._id },
+    { field: { word_id: true, stage: true, last_feedback: true } }
+  );
   const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
 
   let cleaned = 0;
@@ -300,26 +296,16 @@ async function onRepair(openid, { dryRun }) {
     };
     if (dryRun) { skipped++; continue; }
 
-    // 先按字段查（老版本自动 _id 的历史文档也要被更新而不是重复新建）
-    const found = await db.collection(COLL.state)
-      .where({ user_id: m.user_id, word_id: m.word_id }).limit(1).get()
-      .catch(() => null);
-    const hit = found && found.data && found.data[0];
-    if (hit) {
-      await db.collection(COLL.state).doc(hit._id).update({ data: doc }).catch(() => {});
-      updated++;
-    } else {
-      const err = await upsertState(db, COLL.state, m.user_id, m.word_id, doc, m.first_at);
-      if (err) { detail.push('写入失败:' + String(m.word_id)); continue; }
-      created++;
-    }
+    // v5：一律 upsert 到 v2（幂等，已存在自动变更新；legacy 旧记录会被合并读降权）
+    const err = await upsertState(db, m.user_id, m.word_id, doc, m.first_at);
+    if (err) { detail.push('写入失败:' + String(m.word_id) + '(' + err.slice(0, 80) + ')'); continue; }
+    created++;
   }
 
-  // 重建云记账：learned_words = 状态表里该用户的真实记录数
-  const stRes = await db.collection(COLL.state).limit(1000)
-    .field({ user_id: true }).get().catch(() => ({ data: [] }));
+  // 重建云记账：learned_words = 状态表（v2+legacy 合并）里该用户的真实记录数
+  const merged = await queryStates(db, {}, { limit: 1000, field: { user_id: true } });
   const perUser = {};
-  (stRes.data || []).forEach((d) => {
+  merged.forEach((d) => {
     const k = String(d.user_id);
     perUser[k] = (perUser[k] || 0) + 1;
   });
@@ -358,14 +344,20 @@ async function diagnoseAll(clean) {
    * 两个数字互相矛盾却都"没查错" —— 快照式输出就是为了消灭这种时间差。 */
   const lines = [];
 
-  // ---- 状态表 ----
-  const res = await db.collection(COLL.state)
-    .limit(1000)
-    .field({ user_id: true, word_id: true })
-    .get().catch(() => ({ data: [] }));
-  // 排除诊断自身的探针/哨兵文档，不污染真实数据
+  // ---- 状态表：v2（新家）+ legacy（旧家，只读）分别扫描 ----
   const isProbeRow = (d) => String((d && d.user_id) || '').indexOf('diagprobe') === 0;
-  const allRows = (res.data || []).filter((d) => !isProbeRow(d));
+  const scanColl = async (name) => {
+    const r = await db.collection(name).limit(1000)
+      .field({ user_id: true, word_id: true })
+      .get().catch(() => ({ data: [] }));
+    return (r.data || []).filter((d) => !isProbeRow(d));
+  };
+  const v2Rows = await scanColl(COLL.state);
+  const legacyRows = await scanColl(COLL.legacyState);
+  // 合并口径与 queryStates 一致：v2 优先，legacy 只补缺
+  const seenWord = {};
+  v2Rows.forEach((d) => { seenWord[String(d.user_id) + '\u0001' + String(d.word_id)] = 1; });
+  const allRows = v2Rows.concat(legacyRows.filter((d) => !seenWord[String(d.user_id) + '\u0001' + String(d.word_id)]));
   const dirty = allRows.filter((d) => d.word_id === null || d.word_id === undefined || d.word_id === '');
 
   let cleaned = 0;
@@ -433,50 +425,49 @@ async function diagnoseAll(clean) {
 
   // ============ 拼快照文本 ============
 
-  /* ---- 写入判定矩阵：一次诊断把"环境坏 / 集合坏 / _id 格式坏 / 残留挡路"当场分开 ----
-   * v1 探针抓到过 -501007（data 带 _id）；本次升级起因：探针每次写固定
-   * (diagprobe, probe)，被唯一索引的上一轮残留挡住 → -502001 假象，且残留
-   * 被 isProbeRow 过滤器隐藏。矩阵全部用"每轮随机 key"，结果可复现可判读：
-   *   A 状态表 set(随机key)      失败 → 集合级写入坏（索引/存储损坏）
-   *   B 状态表 add(随机key)      失败 → 同上
-   *   C 冒号 _id set             失败而 A 成功 → 确定性 _id 的冒号是毒
-   *   D 白板集合 diag_scratch    失败而 A/B 成功 → 环境级问题
-   *   E 探针残留计数              >0 → 上轮清理失败，此前探针报错是假象 */
+  /* ---- 写入判定矩阵 v5：新集合 user_word_state_v2 与旧集合对照测 ----
+   * 历史：v1 集合历经脏数据 + 唯一索引 + 多轮手工清理后，set/add 全路径
+   * -502001（同函数写 review_logs 却一直正常）→ v5 已整体迁移到无唯一索引的
+   * user_word_state_v2。矩阵现在双集合对照，证明"新家好、旧家坏"：
+   *   A/B/C  v2 的 set / add / 冒号_id   全 OK = 写入通道恢复
+   *   D      白板集合 diag_scratch      环境级对照
+   *   E      legacy 状态表 set          仍 FAIL = 坐实旧集合损坏（预期如此）
+   * 每轮随机 key，杜绝与历史残留相撞（v4 探针自撞的教训）。 */
   const probeOut = [];
   const now2 = Date.now();
   const uni = String(now2).slice(-8); // 每轮唯一后缀，杜绝与历史残留相撞
 
-  // E) 先数残留：上一轮没清干净的探针文档（快照统计里被过滤，这里如实报告）
-  const leftover = await db.collection(COLL.state)
-    .where({ user_id: 'diagprobe' }).count()
-    .catch(() => ({ total: -1 }));
-  if (leftover.total > 0) probeOut.push('⚠探针残留 ' + leftover.total + ' 条（上轮清理失败，旧报错勿信）');
+  // 探针单项：set 随机 _id + 回读验证
+  const probeSet = async (collName, label) => {
+    const pid = 'diagprobe-' + label + '-' + uni;
+    try {
+      await db.collection(collName).doc(pid).set({
+        data: { user_id: 'diagprobe', word_id: label + uni, stage: 0, created_at: now2 }
+      });
+      const rb = await db.collection(collName).doc(pid).get()
+        .then((r) => !!r.data).catch(() => false);
+      return label + ':' + (rb ? 'OK' : '⚠写入但读不回');
+    } catch (e) {
+      return label + ':FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 100) + ')';
+    }
+  };
 
-  // A) 状态表 set，随机 key，data 不带 _id，成功后回读验证
-  const pid1 = 'diagprobe-set-' + uni;
-  try {
-    await db.collection(COLL.state).doc(pid1).set({
-      data: { user_id: 'diagprobe', word_id: 'p' + uni, stage: 0, created_at: now2 }
-    });
-    const rb = await db.collection(COLL.state).doc(pid1).get()
-      .then((r) => !!r.data).catch(() => false);
-    probeOut.push('状态表set:' + (rb ? 'OK' : '⚠写入但读不回'));
-  } catch (e) {
-    probeOut.push('状态表set:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
-  }
-
-  // B) 状态表 add，随机 word_id，成功后按字段回读验证
-  try {
-    await db.collection(COLL.state).add({
-      data: { user_id: 'diagprobe', word_id: 'a' + uni, stage: 0, created_at: now2 }
-    });
-    const rb2 = await db.collection(COLL.state)
-      .where({ user_id: 'diagprobe', word_id: 'a' + uni }).limit(1).get()
-      .then((r) => !!(r.data && r.data.length)).catch(() => false);
-    probeOut.push('状态表add:' + (rb2 ? 'OK' : '⚠写入但读不回'));
-  } catch (e) {
-    probeOut.push('状态表add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
-  }
+  const A = await probeSet(COLL.state, 'v2set');
+  probeOut.push(A);
+  const B = await (async () => {
+    try {
+      await db.collection(COLL.state).add({
+        data: { user_id: 'diagprobe', word_id: 'a' + uni, stage: 0, created_at: now2 }
+      });
+      const rb2 = await db.collection(COLL.state)
+        .where({ user_id: 'diagprobe', word_id: 'a' + uni }).limit(1).get()
+        .then((r) => !!(r.data && r.data.length)).catch(() => false);
+      return 'v2add:' + (rb2 ? 'OK' : '⚠写入但读不回');
+    } catch (e) {
+      return 'v2add:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 100) + ')';
+    }
+  })();
+  probeOut.push(B);
 
   // C) 冒号 _id 测试：真实写入器用 "user:word" 当 _id，单独验证这种格式
   try {
@@ -487,10 +478,10 @@ async function diagnoseAll(clean) {
       .then((r) => !!r.data).catch(() => false);
     probeOut.push('冒号_id:' + (rb3 ? 'OK' : '⚠写入但读不回'));
   } catch (e) {
-    probeOut.push('冒号_id:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
+    probeOut.push('冒号_id:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 100) + ')');
   }
 
-  // D) 白板集合对照：隔离"环境问题"与"user_word_state 集合自身问题"
+  // D) 白板集合对照：隔离"环境问题"与"集合自身问题"
   try {
     await db.collection('diag_scratch').add({ data: { at: now2, note: 'probe' } });
     const rb4 = await db.collection('diag_scratch')
@@ -498,18 +489,21 @@ async function diagnoseAll(clean) {
       .then((r) => !!(r.data && r.data.length)).catch(() => false);
     probeOut.push('白板集合:' + (rb4 ? 'OK' : '⚠写入但读不回'));
   } catch (e) {
-    probeOut.push('白板集合:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 120) + ')');
+    probeOut.push('白板集合:FAIL(' + String((e && (e.errMsg || e.message)) || e).slice(0, 100) + ')');
   }
 
-  // 清理本轮全部探针文档（失败不再静默——残留会让下轮探针误报）
-  const probeWordIds = ['p' + uni, 'a' + uni, 'c' + uni];
+  // E) legacy 旧集合对照：预期仍 FAIL（这正是迁移的原因），留存证据用
+  probeOut.push(await probeSet(COLL.legacyState, '旧集合'));
+
+  // 清理本轮 v2 探针文档（失败不再静默——残留会让下轮探针误报）
+  const probeWordIds = ['v2set' + uni, 'a' + uni, 'c' + uni, '旧集合' + uni];
   for (const w of probeWordIds) {
     await db.collection(COLL.state)
       .where({ user_id: 'diagprobe', word_id: w }).remove()
       .catch((e) => probeOut.push('⚠清理失败:' + w));
   }
 
-  // 哨兵：跨诊断存活检查（检出两轮之间的外部删除）。data 不带 _id（v2 教训）
+  // 哨兵：跨诊断存活检查（检出两轮之间的外部删除）。data 不带 _id
   const SENTRY_ID = 'diagprobe-sentinel';
   const prevSent = await db.collection(COLL.state).doc(SENTRY_ID).get()
     .then((r) => r.data || null).catch(() => null);
@@ -520,27 +514,32 @@ async function diagnoseAll(clean) {
     ? '哨兵(上轮 ' + hm(prevSent.at) + ')仍在 → 无外部删除'
     : '本轮首次布置哨兵（下轮对比）');
 
-  // 隐形文档检测：count() 总数若明显大于"扫描数+探针残留+哨兵"，说明有文档
-  // 查询扫不到但占着唯一索引（存储损坏特征）—— 这正是"插入必报 duplicate"的元凶
+  // 隐形文档检测：count() 若明显大于扫描数+哨兵，说明有文档扫不到但占着资源
   const stateCount = await db.collection(COLL.state).count()
     .catch(() => ({ total: -1 }));
-  const expected = allRows.length + Math.max(leftover.total, 0) + 1; // +1 哨兵
+  const legacyCount = await db.collection(COLL.legacyState).count()
+    .catch(() => ({ total: -1 }));
+  const expected = v2Rows.length + 1; // +1 哨兵
   const ghost = (stateCount.total > expected) ? (stateCount.total - expected) : 0;
 
-  lines.push('【状态表 user_word_state】扫描 ' + allRows.length + ' 条 · count=' +
-    stateCount.total + ' 条 · 覆盖 ' + Object.keys(byUser).length + ' 人' +
-    (ghost > 0 ? ' · ⚠隐形文档 ' + ghost + ' 条（扫不到但占索引）' : ''));
+  lines.push('【状态表 v2】' + v2Rows.length + ' 条(共' + stateCount.total + ')' +
+    ' + 【旧表】' + legacyRows.length + ' 条(共' + legacyCount.total + ')' +
+    ' · 合并覆盖 ' + Object.keys(byUser).length + ' 人' +
+    (ghost > 0 ? ' · ⚠v2隐形文档 ' + ghost + ' 条' : ''));
   lines.push('  探针: ' + probeOut.join(' · '));
   if (!Object.keys(byUser).length) {
     lines.push('  （空：没有任何学习状态同步到云端）');
   }
-  // 逐人 count() 交叉核对：防止 limit(1000) 扫描与 where 查询口径不一致
+  // 逐人 count() 交叉核对（v2+legacy 求和）：防止扫描与计数口径不一致
   for (const uid of Object.keys(byUser)) {
-    const c = await db.collection(COLL.state).where({ user_id: uid }).count()
+    const c2 = await db.collection(COLL.state).where({ user_id: uid }).count()
       .catch(() => ({ total: -1 }));
+    const cl = await db.collection(COLL.legacyState).where({ user_id: uid }).count()
+      .catch(() => ({ total: 0 }));
+    const total = c2.total + Math.max(cl.total, 0);
     const ws = byUser[uid];
-    const mark = (c.total === ws.length) ? '' : ' ⚠扫描与count不一致';
-    lines.push('  ' + who(uid) + ': ' + ws.length + ' 词(count=' + c.total + ')' + mark +
+    const mark = (total === ws.length) ? '' : ' ⚠扫描与count不一致';
+    lines.push('  ' + who(uid) + ': ' + ws.length + ' 词(count=' + total + ')' + mark +
       ' · 如 ' + ws.slice(0, 5).join(','));
   }
 

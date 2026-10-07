@@ -19,12 +19,13 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 const { getLocalDate, getLocalDayStart } = require('./time');
+const { queryStates, STATE_COLL } = require('./state-store');
 
 const COLL = {
   users: 'users',
   classes: 'classes',
   assignments: 'assignments',
-  state: 'user_word_state',
+  state: STATE_COLL,           // v5：读走合并查询（v2+legacy），写不经本函数
   requests: 'request_dedup',
   logs: 'review_logs'
 };
@@ -330,13 +331,12 @@ async function onMyAssignments(openid) {
   const wordAll = [];
   assignments.forEach(a => (a.word_ids || []).forEach(w => wordAll.push(w)));
 
-  // 我对这些词的学习情况
-  const stateRes = await db.collection(COLL.state)
-    .where({ user_id: user._id, word_id: _.in(wordAll) })
-    .limit(1000)
-    .get();
+  // 我对这些词的学习情况（v2+legacy 合并读，v2 优先）
+  const stateRows = wordAll.length
+    ? await queryStates(db, { user_id: user._id, word_id: _.in(wordAll) })
+    : [];
   const stateMap = {};
-  (stateRes.data || []).forEach(s => { stateMap[s.word_id] = s; });
+  stateRows.forEach(s => { stateMap[s.word_id] = s; });
 
   const today = getLocalDate();
   const result = assignments.map(a => {
@@ -394,13 +394,14 @@ async function onStudents(openid) {
     else if (l.feedback === 'forgot') m.forgot++;
   });
 
-  const stRes = await db.collection(COLL.state)
-    .where({ user_id: _.in(ids) })
-    .limit(1000)
-    .field({ user_id: true, stage: true, correct_count: true, wrong_count: true })
-    .get().catch(() => ({ data: [] }));
+  const stRows = ids.length
+    ? await queryStates(
+        db, { user_id: _.in(ids) },
+        { field: { user_id: true, stage: true, correct_count: true, wrong_count: true } }
+      )
+    : [];
   const statMap = {};
-  (stRes.data || []).forEach((s) => {
+  stRows.forEach((s) => {
     const m = statMap[s.user_id] || (statMap[s.user_id] = { learned: 0, wrong: 0, rated: 0 });
     // 完成定义 = 学过即算，与 stats_cache.learned_words / 作业完成度同口径。
     // 旧口径（correct_count>0 || stage>0）会让学员卡显示"累计 3 词"、
@@ -631,12 +632,11 @@ async function progressByStudent(studentIds, wordIds) {
   // 词单兼容两种历史格式：words._id（初版实锤对不上学习状态表，进度恒 0）
   // 或 word 文本（与 user_word_state.word_id 一致的正确格式）。统一转成文本再查。
   const texts = await toWordTexts(wordIds);
-  const res = await db.collection(COLL.state)
-    .where({ user_id: _.in(studentIds), word_id: _.in(texts) })
-    .limit(1000)
-    .get();
+  const rows = (studentIds.length && texts.length)
+    ? await queryStates(db, { user_id: _.in(studentIds), word_id: _.in(texts) })
+    : [];
   const map = {};
-  (res.data || []).forEach(s => {
+  rows.forEach(s => {
     // 完成定义 = 学过（见过并评价过，无论对错）。对错由 SRS 安排后续复习，
     // 不该在这里二次设卡 —— 旧口径（correct_count>0 或 stage>0）会把
     // 认真学完但选了"模糊"的孩子判成 0 进度，家长看到的就是假的。
@@ -704,6 +704,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261006-rolegate';
+const VERSION = 'class-20261007-v2coll';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

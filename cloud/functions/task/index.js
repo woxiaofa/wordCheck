@@ -17,11 +17,12 @@ const db = cloud.database();
 const _ = db.command;
 
 const { getLocalDate } = require('./time');
+const { queryStates, STATE_COLL } = require('./state-store');
 
 const COLL = {
   users: 'users',
   words: 'words',
-  state: 'user_word_state',
+  state: STATE_COLL,           // v5：读走合并查询（v2+legacy），写不经本函数
   tasks: 'daily_tasks',
   assignments: 'assignments'
 };
@@ -58,21 +59,18 @@ async function onToday(openid) {
     return ok({ task: taskView(t), words, date: today });
   }
 
-  // --- 组装：到期复习词 + 未学过的新词 ---
-  const dueRes = await db.collection(COLL.state)
-    .where({ user_id: user._id, next_review_at: _.lte(now) })
-    .orderBy('next_review_at', 'asc')
-    .limit(DUE_LIMIT)
-    .field({ word_id: true })
-    .get();
-  const dueIds = dueRes.data.map((s) => s.word_id);
+  // --- 组装：到期复习词 + 未学过的新词（v2+legacy 合并读） ---
+  const dueRows = await queryStates(
+    db, { user_id: user._id, next_review_at: _.lte(now) },
+    { orderBy: { name: 'next_review_at', dir: 'asc' }, limit: DUE_LIMIT,
+      field: { word_id: true } }
+  );
+  const dueIds = dueRows.map((s) => s.word_id);
 
-  const learnedRes = await db.collection(COLL.state)
-    .where({ user_id: user._id })
-    .limit(1000)
-    .field({ word_id: true })
-    .get();
-  const learnedSet = new Set(learnedRes.data.map((s) => s.word_id));
+  const learnedRows = await queryStates(
+    db, { user_id: user._id }, { field: { word_id: true } }
+  );
+  const learnedSet = new Set(learnedRows.map((s) => s.word_id));
 
   // 词库按词频升序取新词（与本地 books.js 的排序策略一致）
   const allWords = await db.collection(COLL.words)
@@ -210,6 +208,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261006-rolegate';
+const VERSION = 'task-20261007-v2coll';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

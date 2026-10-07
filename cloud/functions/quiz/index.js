@@ -21,11 +21,13 @@ const _ = db.command;
 const quizLib = require('./quiz');
 const srs = require('./srs');
 const { getLocalDate } = require('./time');
-const { upsertState } = require('./state-store');
+const {
+  upsertState, queryStates, STATE_COLL
+} = require('./state-store');
 
 const COLL = {
   words: 'words',
-  state: 'user_word_state',
+  state: STATE_COLL,           // v5：读写都走新集合（无唯一索引）
   sessions: 'quiz_sessions',
   items: 'quiz_items',
   dedup: 'request_dedup',
@@ -97,15 +99,13 @@ async function buildWordPool(userId) {
     pool.push(w);
   };
 
-  // 1) 用户学过的词（带上 SRS 状态，供选题排序用）
-  const stRes = await db.collection(COLL.state)
-    .where({ user_id: userId })
-    .orderBy('next_review_at', 'asc')
-    .limit(POOL_LIMIT)
-    .get()
-    .catch(() => ({ data: [] }));
+  // 1) 用户学过的词（带上 SRS 状态，供选题排序用；v2+legacy 合并读）
+  const stRows = await queryStates(
+    db, { user_id: userId },
+    { orderBy: { name: 'next_review_at', dir: 'asc' }, limit: POOL_LIMIT }
+  );
 
-  const ids = (stRes.data || []).map((s) => s.word_id);
+  const ids = stRows.map((s) => s.word_id);
   if (ids.length) {
     // 云数据库单次 in 查询有上限，分批取
     for (let i = 0; i < ids.length; i += 50) {
@@ -289,13 +289,8 @@ async function loadWords(wordIds) {
 
 /** 按"没想起来"重置该词状态（与 review 云函数的规则一致） */
 async function applyForgot(userId, wordId, now, questionType) {
-  const res = await db.collection(COLL.state)
-    .where({ user_id: userId, word_id: wordId })
-    .limit(1)
-    .get()
-    .catch(() => ({ data: [] }));
-
-  const prev = res.data && res.data[0] ? res.data[0] : null;
+  const rows = await queryStates(db, { user_id: userId, word_id: wordId }, { limit: 1 });
+  const prev = rows[0] || null;
   const next = srs.nextState(prev, 'forgot', now);
 
   const doc = {
@@ -307,18 +302,13 @@ async function applyForgot(userId, wordId, now, questionType) {
     updated_at: now
   };
 
-  if (prev) {
-    await db.collection(COLL.state).doc(prev._id).update({ data: doc }).catch((e) => {
-      console.error('[quiz] 错词状态更新失败:', e && e.errMsg);
-    });
-  } else {
-    // 与 review 同一套自愈写入：撞唯一键自动清脏数据重试，不静默丢数据
-    const errCode = await upsertState(db, COLL.state, userId, wordId, doc, now).catch((e) => {
-      console.error('[quiz] 错词状态写入异常:', e && e.errMsg);
-      return 'STATE_STORE_ERROR';
-    });
-    if (errCode) console.error('[quiz] 错词状态未能写入（不影响交卷判分）:', wordId, errCode);
-  }
+  // 一律 upsert（同 review：prev 可能来自 legacy，其 _id 在 v2 上不存在，
+  // 对它 update 会静默 updated:0 假成功 —— 统一走确定性 _id 的全量 set）
+  const errCode = await upsertState(db, userId, wordId, doc, now).catch((e) => {
+    console.error('[quiz] 错词状态写入异常:', e && e.errMsg);
+    return 'STATE_STORE_ERROR';
+  });
+  if (errCode) console.error('[quiz] 错词状态未能写入（不影响交卷判分）:', wordId, errCode);
 }
 
 /* ------------------------------------------------------------------ */
@@ -358,6 +348,6 @@ async function getUser(openid) {
   return r.data && r.data[0] ? r.data[0] : null;
 }
 
-const VERSION = 'quiz-20261006-fixset';
+const VERSION = 'quiz-20261007-v2coll';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
