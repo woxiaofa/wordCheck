@@ -1,0 +1,9 @@
+{
+  "name": "rank",
+  "version": "1.0.0",
+  "description": "云函数：练词成绩、榜单与荣誉",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

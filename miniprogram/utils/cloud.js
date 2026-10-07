@@ -273,6 +273,27 @@ var api = {
     return call('class', 'summary', { studentId: studentId || '' });
   },
 
+  /* ------------- 成绩 / 荣誉 / 榜单 ------------- */
+
+  /**
+   * 上报一轮快刷成绩，换回排名与荣誉。
+   * key 决定和谁比：'book:wy4a' 只跟同一个词库比，'assign:xxx' 只跟同一份作业比 ——
+   * 拿中考词去跟小学教材词比速度没有意义。
+   */
+  drillScore: function (params) {
+    return call('rank', 'submit', params);
+  },
+
+  /** 榜单：某个 key 下的前 N 名（含我自己） */
+  drillBoard: function (key, limit) {
+    return call('rank', 'board', { key: key, limit: limit || 20 });
+  },
+
+  /** 保存昵称/头像（榜单展示用；用户不填也能正常练词） */
+  saveProfile: function (params) {
+    return call('rank', 'profile', params);
+  },
+
   /* ------------- 班级（家长/老师端，批次 1） ------------- */
 
   /** 建班级（幂等：重复调用返回同一班级） */

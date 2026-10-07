@@ -114,3 +114,64 @@
 }
 .wb-w { font-size: 30rpx; font-weight: 600; width: 240rpx; }
 .wb-d { font-size: 26rpx; color: #8fa3b7; flex: 1; }
+
+/* 「不会」诚实按钮：次要但不隐藏 —— 不会就该有地方说，而不是逼着瞎蒙 */
+.honest {
+  margin-top: 24rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 26rpx;
+  color: #8fa3b7;
+  background: transparent;
+  border: 2rpx dashed #3a4a5e;
+  border-radius: 16rpx;
+}
+.honest::after { border: none; }
+
+/* 键盘难度说明：让家长知道"变简单"是设计，不是坏了 */
+.kb-meta { margin-top: 12rpx; text-align: center; font-size: 22rpx; color: #7b8ea3; }
+
+/* 详情页跟读引导：只看不念记不住，这里明确鼓励多听几遍 */
+.read-guide {
+  margin-top: 24rpx; padding: 20rpx 22rpx;
+  background: #16202c; border-radius: 16rpx;
+  border-left: 6rpx solid #3ea6ff;
+}
+.rg-text { font-size: 28rpx; color: #cfe0f0; line-height: 1.6; }
+.rg-count { margin-top: 8rpx; font-size: 22rpx; color: #3ea6ff; }
+
+/* 荣誉 / 排名 */
+.honor {
+  margin-top: 20rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, #3a2f10, #2a2a1c);
+  border: 2rpx solid #7a6320;
+}
+.honor-badge { font-size: 34rpx; font-weight: 700; color: #ffd166; }
+.honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
+
+/* 昵称 / 头像（榜单展示用，用户自愿填） */
+.profile-card {
+  margin-top: 24rpx; padding: 20rpx;
+  background: #16202c; border-radius: 16rpx; text-align: left;
+}
+.prow { display: flex; align-items: center; margin-top: 16rpx; }
+.avatar-btn {
+  width: 96rpx; height: 96rpx; padding: 0; margin: 0;
+  border-radius: 50%; overflow: hidden;
+  background: #243040; border: 2rpx solid #3a4a5e;
+  display: flex; align-items: center; justify-content: center;
+}
+.avatar-btn::after { border: none; }
+.avatar-img { width: 96rpx; height: 96rpx; }
+.avatar-ph { font-size: 40rpx; color: #8fa3b7; }
+
+/* 宽屏：rpx 放大后收回 px */
+.wide .honest { margin-top: 12px; height: 38px; line-height: 38px; font-size: 13px; }
+.wide .kb-meta { font-size: 11px; }
+.wide .read-guide { padding: 12px; }
+.wide .rg-text { font-size: 15px; }
+.wide .honor { padding: 12px; }
+.wide .honor-badge { font-size: 18px; }
+.wide .avatar-btn, .wide .avatar-img { width: 52px; height: 52px; }

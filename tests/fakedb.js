@@ -38,6 +38,8 @@ function createFakeDb(opts) {
       var cond = q[k];
       var val = doc[k];
       if (cond && typeof cond === 'object' && cond.__op) {
+        if (cond.__op === 'lt' && !(val !== undefined && val < cond.v)) return false;
+        if (cond.__op === 'gt' && !(val !== undefined && val > cond.v)) return false;
         if (cond.__op === 'lte' && !(val !== undefined && val <= cond.v)) return false;
         if (cond.__op === 'gte' && !(val !== undefined && val >= cond.v)) return false;
         if (cond.__op === 'in' && cond.v.indexOf(val) === -1) return false;
@@ -54,6 +56,8 @@ function createFakeDb(opts) {
   }
 
   var command = {
+    lt: function (v) { return { __op: 'lt', v: v }; },
+    gt: function (v) { return { __op: 'gt', v: v }; },
     lte: function (v) { return { __op: 'lte', v: v }; },
     gte: function (v) { return { __op: 'gte', v: v }; },
     in: function (arr) { return { __op: 'in', v: arr }; }

@@ -1,17 +1,19 @@
 <!--
-  快刷页（背单词新流程）
-  首轮：单词 + 音标 + 自动读音 → 两个中文释义二选一 → 对就下一词，错/超时进详情
-  之后：没拿下的词进入循环轮次，用选义/拼写/听写反复测到全对
-  完成：本轮时长 + 错题本 + 继续学习 / 下一个任务
+  快刷页（背词 + 抽查合并后的主流程）
+    第 1 步「认」：读音 + 单词 + 音标 → 两个中文释义二选一（另有【不会】诚实按钮）
+    第 2 步「写」：读音 + 音标 + 中文 → 自绘键盘拼英文（键盘难度由简单到复杂）
+    第 3 步「巩固」：没拿下的词换抽查方式反复测到全对
+    完成：时长 + 错题本 + 荣誉/排名 + 分享 + 继续学习 / 下一个任务
+  答题中与答错看答案后，喇叭都无限次可点 —— 记单词不看读音频次等于只记一半。
 -->
 <view class="page drill {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
 
   <view class="bar row-between">
     <text class="tag-line">
       <block wx:if="{{assignName}}">📌 {{assignName}}</block>
-      <block wx:else>{{phase === 'binary' ? '第 1 轮 · 快刷' : '第 ' + round + ' 轮 · 巩固'}}</block>
+      <block wx:else>{{stepText}}</block>
     </text>
-    <text class="muted">{{state === 'done' ? '完成' : (idx + 1) + ' / ' + words.length}}</text>
+    <text class="muted">{{state === 'done' ? '完成' : typeLabel}}</text>
   </view>
   <view class="progress">
     <view class="progress-inner" style="width:{{progressPct}}%"></view>
@@ -20,16 +22,17 @@
   <!-- ============ 答题 ============ -->
   <block wx:if="{{state === 'run' && q}}">
     <view class="card qcard {{judgedOk ? 'flash' : ''}}">
-      <!-- 题干：选义显示单词；拼写绝不显示单词（否则答案就在题面上）；听写只给喇叭 -->
+      <!-- 题干：认=显示单词；写=只给中文+音标（单词绝不出现在题面上） -->
       <view class="qword-row" bindtap="onSpeak">
-        <text class="qword {{q.type !== 'meaning' && q.type !== 'binary' ? 'qword-hint' : ''}}">{{q.type === 'listen' ? '🔊 听写' : (q.type === 'spell' ? '✏️ 拼写' : q.wordId)}}</text>
+        <text class="qword {{q.type === 'binary' || q.type === 'meaning' ? '' : 'qword-hint'}}">{{q.type === 'listen' ? '🔊 听写' : (q.type === 'spell' ? '✏️ 拼写' : (q.type === 'dictation' ? '✏️ 拼写' : q.wordId))}}</text>
         <text class="speaker" wx:if="{{q.type !== 'spell'}}">🔊</text>
       </view>
-      <view class="qph" wx:if="{{q.type === 'meaning' || q.type === 'binary'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
+      <view class="qph" wx:if="{{q.type !== 'spell'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
+      <view class="qstem" wx:if="{{q.type === 'dictation' || q.type === 'spell'}}">{{q.stem}}</view>
 
       <!-- 选项/键盘区：贴到卡片底部，视线不用往上够 -->
       <view class="qbody">
-        <!-- 选择题：首轮只有两个选项，循环轮是四个 -->
+        <!-- 选择题：第 1 步两个选项，巩固轮四个 -->
         <block wx:if="{{q.options}}">
           <view
             wx:for="{{q.options}}"
@@ -40,13 +43,14 @@
           >{{item}}</view>
         </block>
 
-        <!-- 拼写 / 听写：键盘输入 -->
+        <!-- 写：自绘键盘拼英文。难度由简单到复杂，拼错自动降回最简单 -->
         <block wx:else>
-          <view class="qstem">{{q.type === 'listen' ? '把听到的单词拼出来' : q.stem}}</view>
           <view class="typed {{kbText ? 'typed-full' : ''}}">{{kbText || '…'}}</view>
+          <view class="kb-meta" wx:if="{{kbLevelLabel}}">键盘难度：{{kbLevelLabel}}（拼错会自动变简单）</view>
           <letter-keyboard
             class="mt"
             length="{{q.length || 0}}"
+            level="{{kbLevel}}"
             word="{{q.wordId || ''}}"
             value="{{kbValue}}"
             confirm-label="确定"
@@ -54,6 +58,9 @@
             bind:confirm="onKeyConfirm"
           />
         </block>
+
+        <!-- 不会就说不会：只给选项时，不会的孩子只能瞎蒙，蒙对了系统会真当他学会了 -->
+        <button class="btn ghost honest" bindtap="onDontKnow">不会，直接看答案</button>
 
         <view class="slow-hint" wx:if="{{slowHint && pickedIdx < 0 && !q.options}}">
           想不起来也没关系 —— 拼一个试试，看完详情记得更牢
@@ -65,11 +72,11 @@
     </view>
 
     <view class="muted center mt-s">
-      选对了立刻跳下一个词；答错或超过 10 秒没选，会先看一眼这个词
+      答对了立刻跳下一个词；答错或点「不会」，会先看一眼这个词
     </view>
   </block>
 
-  <!-- ============ 答错/超时：词详情 ============ -->
+  <!-- ============ 答错 / 不会 / 超时：词详情（引导跟读） ============ -->
   <block wx:if="{{state === 'detail' && detail}}">
     <view class="card detail-card">
       <view class="dflag bad">{{detail.fbLabel}}</view>
@@ -91,9 +98,14 @@
         你选的是「{{detail.yourPick}}」，正确的是「{{detail.answer}}」
       </view>
 
-      <!-- 按钮钉在卡片底部：视线落在释义上，手在下面等 -->
+      <!-- 跟读引导：只看不念记不住，这里是唯一鼓励"多听几遍"的地方 -->
+      <view class="read-guide">
+        <view class="rg-text">🗣 {{detail.guide}}</view>
+        <view class="rg-count" wx:if="{{detail.speakCount}}">已跟着念 {{detail.speakCount}} 遍</view>
+      </view>
+
       <view class="detail-bottom">
-        <button class="btn" bindtap="onDetailNext">记住了，继续</button>
+        <button class="btn" bindtap="onDetailNext">跟着念完了，继续</button>
         <view class="muted center mt-s">
           这个词等下还会再考你一次，直到答对为止
         </view>
@@ -109,6 +121,15 @@
       <view class="done-sub">
         {{result.assignName ? result.assignName + ' · ' : ''}}用时 {{elapsedText}}，
         {{result.mastered}}/{{result.total}} 个词已拿下
+      </view>
+
+      <!-- 荣誉 / 排名：比的是同一个词库或同一份作业 -->
+      <view class="honor" wx:if="{{honor && (honor.badge || honor.beat)}}">
+        <view class="honor-badge">{{honor.badge}}</view>
+        <view class="honor-detail" wx:if="{{honor.detail}}">{{honor.detail}}</view>
+        <view class="honor-detail" wx:if="{{honor.beat && honor.total > 1}}">
+          你打败了 {{honor.beat}}% 的人（第 {{honor.rank}}/{{honor.total}} 名）
+        </view>
       </view>
 
       <view class="kpi-row mt">
@@ -128,9 +149,25 @@
         </view>
       </view>
 
+      <!-- 昵称 / 头像：只在没设置时出现，用于榜单显示（微信不允许静默获取） -->
+      <view class="profile-card" wx:if="{{!me.nickname}}">
+        <view class="muted" style="font-size:24rpx">
+          想在榜单里显示你的名字？设一个昵称和头像（随时可改，不设也不影响练词）
+        </view>
+        <view class="prow">
+          <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+            <image wx:if="{{me.avatar}}" src="{{me.avatar}}" mode="aspectFill" class="avatar-img" />
+            <text wx:else class="avatar-ph">＋</text>
+          </button>
+          <input class="input grow" type="nickname" value="{{me.nickname}}"
+                 placeholder="点这里填昵称" maxlength="16" bindblur="onNicknameInput" />
+        </view>
+      </view>
+
       <button class="btn mt" bindtap="onAgain">
         {{result.left.length ? '把剩下的 ' + result.left.length + ' 个再练一轮' : '再来一轮'}}
       </button>
+      <button class="btn ghost mt-s" open-type="share">分享这个成绩</button>
       <button class="btn ghost mt-s" bindtap="onNextTask">下一个任务</button>
       <button class="btn ghost mt-s" wx:if="{{result.wrongBook.length}}" bindtap="onWrongBook">看错词本</button>
     </view>
