@@ -282,7 +282,24 @@ async function onAssignments(openid) {
 async function onMyAssignments(openid) {
   const user = await getUser(openid);
   if (!user) return fail('NO_USER', '用户不存在，请先 login');
-  if (!user.class_id) return ok({ assignments: [] });
+  if (!user.class_id) return ok({ assignments: [], role: user.role || '' });
+
+  const clsRes0 = await db.collection(COLL.classes).doc(user.class_id).get().catch(() => null);
+  const cls0 = clsRes0 && clsRes0.data ? clsRes0.data : null;
+  const isOwner = !!(cls0 && cls0.owner_id === user._id);
+
+  /* 身份闸门：作业是布置给学生的，不是给布置者的。
+   * 内测实锤：家长（班级 owner）自己也有 class_id，于是首页把《hhh》当成"我的作业"
+   * 弹出来，家长一脸问号。教练要看的是学员进度（走 progressByStudent），
+   * 不是自己去做 10 个词 —— 这里直接不给作业，同时把身份回给前端。 */
+  if (user.role === 'coach' || isOwner) {
+    return ok({
+      assignments: [],
+      role: 'coach',
+      reason: 'COACH_NO_TASK',
+      class: cls0 ? publicClass(cls0) : null
+    });
+  }
 
   const list = await db.collection(COLL.assignments)
     .where({ class_id: user.class_id })
@@ -294,16 +311,15 @@ async function onMyAssignments(openid) {
     // 自诊断：学生说"看不到作业"时，先分清"老师真没布置"还是"加错了班"。
     // 若老师名下（created_by）存在任何作业、却不挂在本班 → 大概率存在同名班级，
     // 学生凭旧码/记错的码进了另一个班。给前端明确 hint，别只回空数组。
-    const clsRes = await db.collection(COLL.classes).doc(user.class_id).get().catch(() => null);
-    const ownerId = clsRes && clsRes.data ? clsRes.data.owner_id : '';
+    const ownerId = cls0 ? cls0.owner_id : '';
     if (ownerId) {
       const any = await db.collection(COLL.assignments)
         .where({ created_by: ownerId }).limit(1).get().catch(() => null);
       if (any && any.data && any.data.length) {
-        return ok({ assignments: [], hint: 'TEACHER_HAS_OTHER_CLASS' });
+        return ok({ assignments: [], role: 'student', hint: 'TEACHER_HAS_OTHER_CLASS' });
       }
     }
-    return ok({ assignments: [] });
+    return ok({ assignments: [], role: 'student' });
   }
 
   // 词单先归一成文本（兼容旧 _id 格式），后面进度查询和下发全用文本
@@ -339,7 +355,7 @@ async function onMyAssignments(openid) {
       expired: !!(a.deadline && a.deadline < today)
     });
   });
-  return ok({ assignments: result });
+  return ok({ assignments: result, role: 'student' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -688,6 +704,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261006-onestandard';
+const VERSION = 'class-20261006-rolegate';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

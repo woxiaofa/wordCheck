@@ -164,5 +164,40 @@
     </view>
   </view>
 
+  <!-- 教练/家长（班级创建者）：只给"看学员进度"的入口，不给他们发作业卡 -->
+  <view class="card cls-assign" wx:if="{{coachCls}}">
+    <view class="row-between">
+      <text class="card-title">👨‍👩‍👧 {{coachCls.name}}</text>
+      <text class="muted">我是布置作业的人</text>
+    </view>
+    <view class="muted mt-s">你自己背单词按默认词库走，班级作业不会占用你的今日任务。</view>
+    <button class="btn ghost sm mt-s" bindtap="goClass">去看学员进度</button>
+  </view>
+
+  <!-- 学习流水：把"我做了什么 → 进度有没有往前走"逐条摆出来，不靠猜 -->
+  <view class="card mt">
+    <view class="row-between">
+      <text class="card-title">学习流水</text>
+      <text class="link" bindtap="copyLearnLog">复制</text>
+    </view>
+    <view class="muted mt-s" bindtap="toggleRule">
+      进度口径：学过即算 —— 每个词评价一次（认识/模糊/忘了都算）就计入作业完成，抽查对错不影响。
+      <text class="link">{{ruleOpen ? '收起' : '举例'}}</text>
+    </view>
+    <view class="muted mt-s" wx:if="{{ruleOpen}}">
+      例：作业 10 个词，点"继续学"后每个词翻面 + 任选一个评价 = 该词完成，10 个词都评价过就是 10/10。
+      流水里出现"云端✗"表示这次评分还没同步上云（会自动补传），进度条要等补传成功才会动。
+    </view>
+
+    <view wx:if="{{!learnLog.length}}" class="muted mt-s">还没有学习记录。去学几个词，这里会逐条显示云端是否确认。</view>
+    <view wx:for="{{learnLog}}" wx:key="id" class="log-row">
+      <text class="log-time">{{item.time}}</text>
+      <text class="log-word">{{item.word}}</text>
+      <text class="log-mode">{{item.mode}}<text wx:if="{{item.assign}}">·{{item.assign}}</text></text>
+      <text class="log-fb">{{item.feedback}}</text>
+      <text class="log-cloud {{item.cloud}}">{{item.cloudTxt}}</text>
+    </view>
+  </view>
+
   <footer-nav active="index" />
 </view>

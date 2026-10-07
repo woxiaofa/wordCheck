@@ -186,7 +186,9 @@ function taskView(t) {
  * 注意词单 ID 兼容：老作业存的是 words._id，新作业直接存文本 —— 都要接住。
  */
 async function classAssignmentWords(user) {
-  if (!user.class_id) return [];
+  // 教练/家长是布置作业的人：自己的"今日任务"不该被班级作业词单占用，
+  // 自己背单词就按默认词库走（内测实锤：家长首页被作业卡占满）。
+  if (!user.class_id || user.role === 'coach') return [];
   const asgRes = await db.collection(COLL.assignments)
     .where({ class_id: user.class_id })
     .limit(20)
@@ -208,6 +210,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261006-assign';
+const VERSION = 'task-20261006-rolegate';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

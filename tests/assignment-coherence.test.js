@@ -428,6 +428,32 @@ ok('⑩ 学员卡"累计 N 词" = stats_cache.learned_words（催学文案读的
   });
 });
 
+// ---- ⑪ 身份闸门：家长/教练不是做作业的人，首页不该收到作业 ----
+ok('⑪ 教练（班级创建者）调 myAssignments：不返回作业，role=coach', function () {
+  seed({ learned: WORD_TEXTS.slice(0, 3), feedback: 'vague' });
+  return as(COACH_OPENID, function () {
+    return classFn.main({ action: 'myAssignments' });
+  }).then(function (r) {
+    assert.strictEqual(r.ok, true, JSON.stringify(r));
+    assert.strictEqual(r.data.role, 'coach', '应回传身份，前端据此渲染');
+    assert.deepStrictEqual(r.data.assignments, [],
+      '内测实锤：教练自己也有 class_id，不给作业才不会在家长首页弹出作业卡');
+    assert.ok(r.data.class && r.data.class.name, '应回传班级，供首页给"看学员进度"入口');
+  });
+});
+
+// ---- ⑫ 学生身份不受影响：帽子不能扣错人 ----
+ok('⑫ 学生调 myAssignments：照常拿到作业，role=student', function () {
+  seed({ learned: WORD_TEXTS.slice(0, 3), feedback: 'vague' });
+  return as(STU_OPENID, function () {
+    return classFn.main({ action: 'myAssignments' });
+  }).then(function (r) {
+    assert.strictEqual(r.data.role, 'student');
+    assert.strictEqual(r.data.assignments.length, 1, '学生必须能看到作业');
+    assert.strictEqual(r.data.assignments[0].done, 3);
+  });
+});
+
 steps.reduce(function (p, fn) { return p.then(fn); }, Promise.resolve())
   .then(function () {
     console.log(process.exitCode ? '\n有问题，见上方 ✗\n' : '\n全部通过\n');

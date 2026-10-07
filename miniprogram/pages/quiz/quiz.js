@@ -18,6 +18,7 @@ var WORDS = require('../../data/words');
 var books = require('../../utils/books');
 var tts = require('../../utils/tts');
 var report = require('../../utils/report');
+var learnlog = require('../../utils/learnlog');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -427,17 +428,33 @@ Page({
     // 日报/周报/月报的本地明细：每题一笔（答错记 forgot），云上出问题报告也不会空白
     details.forEach(function (d) { report.record(d.wordId, d.ok ? 'known' : 'forgot'); });
 
+    // 流水：抽查也逐题记一笔（作业完成度不受抽查影响，但"学过没有"必须有据可查）
+    var quizReqId = 'quiz-' + srs.newReqId();
+    var quizLogIds = details.map(function (d) {
+      return learnlog.push({
+        word: d.wordId,
+        mode: 'quiz',
+        feedback: d.ok ? 'known' : 'forgot',
+        reqId: quizReqId
+      });
+    });
+
     // 同步云端（幂等 ID；未部署时静默失败）
     api.submitQuiz({
       answers: questions.map(function (q, i) {
         var a = answers[i];
         return { wordId: q.wordId, type: q.type, answer: Array.isArray(a) ? a.join('') : a };
       }),
-      clientReqId: 'quiz-' + srs.newReqId()
+      clientReqId: quizReqId
+    }).then(function (res) {
+      var errCode = (res && res.ok === false) ? (res.code || 'CLOUD_FAIL') : '';
+      quizLogIds.forEach(function (id) { learnlog.patch(id, errCode ? 'fail' : 'ok', errCode); });
+      console.log('[learn] 抽查 ' + details.length + ' 题 → 云端' + (errCode ? '失败 ' + errCode : '已确认'));
     }).catch(function (err) {
       // 不完全静默：抽查成绩没上云时，教练端作业进度会停在 0，必须留下线索
-      console.warn('[cloud] submitQuiz 失败，这次抽查成绩没有同步到云端：',
-        (err && (err.errMsg || err.message)) || err);
+      var msg = (err && (err.errMsg || err.message)) || String(err);
+      quizLogIds.forEach(function (id) { learnlog.patch(id, 'fail', msg); });
+      console.warn('[cloud] submitQuiz 失败，这次抽查成绩没有同步到云端：', msg);
     });
 
     var total = questions.length;

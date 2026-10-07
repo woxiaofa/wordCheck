@@ -20,6 +20,7 @@ var books = require('../../utils/books');
 var tts = require('../../utils/tts');
 var report = require('../../utils/report');
 var assignParam = require('../../utils/assign');
+var learnlog = require('../../utils/learnlog');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -401,16 +402,34 @@ Page({
     report.record(w.word, fb);
 
     // 3) 异步提交云端（幂等 ID 保证重试安全）
+    //    流水：先开一笔"本地已记 / 云端待确认"，云端回来再回填状态。
+    //    这样"我到底学了没有"不再靠猜 —— 首页的流水卡可以逐条对质。
+    var isAssign = !!(this._assign && this._assign.ids.length);
+    var reqId = CACHE_PREFIX + srs.newReqId();
+    var logId = learnlog.push({
+      word: w.word,
+      mode: isAssign ? 'assign' : 'task',
+      assign: isAssign ? this._assign.name : '',
+      feedback: fb,
+      reqId: reqId
+    });
     api.submitReview({
       wordId: w.word,
       feedback: fb,
       mode: 'learn',
-      clientReqId: CACHE_PREFIX + srs.newReqId()
+      clientReqId: reqId
+    }).then(function (res) {
+      var errCode = (res && res.ok === false) ? (res.code || 'CLOUD_FAIL') : '';
+      learnlog.patch(logId, errCode ? 'fail' : 'ok', errCode);
+      console.log('[learn] ' + w.word + ' · ' + fb +
+        ' · ' + (isAssign ? '作业' : '任务') +
+        ' → 云端' + (errCode ? '失败 ' + errCode : '已确认'));
     }).catch(function (err) {
       // 不静默：学习记录没上云时，教练端进度会永远是 0，必须留下线索。
       // submitReview 内部已把这条请求压进补传队列，启动/回前台会自动重放。
-      console.warn('[cloud] submitReview 失败（已进补传队列，稍后自动重试）：',
-        (err && (err.errMsg || err.message)) || err);
+      var msg = (err && (err.errMsg || err.message)) || String(err);
+      learnlog.patch(logId, 'fail', msg);
+      console.warn('[cloud] submitReview 失败（已进补传队列，稍后自动重试）：', msg);
     });
 
     // 4) 下一个词

@@ -113,6 +113,8 @@ function humanError(err) {
   return err.message || '操作失败';
 }
 
+var learnlog = require('./learnlog');
+
 /* ---------------- 失败补传队列 ---------------- */
 
 /**
@@ -169,7 +171,15 @@ function flushPending() {
   return chain.then(function () {
     var rest = [];
     list.forEach(function (item, i) {
-      if (results[i]) return;                       // 成功，出队
+      var reqId = item.payload && item.payload.clientReqId;
+      if (results[i]) {
+        // 重放成功：把学习流水里那条从"云端…"改成"已确认"，家长能亲眼看到补上了
+        if (reqId && learnlog.patchByReq(reqId, 'ok')) {
+          console.log('[cloud] 补传成功并已回写流水：', item.payload && item.payload.wordId);
+        }
+        return;                                     // 成功，出队
+      }
+      if (reqId) learnlog.patchByReq(reqId, 'fail', '补传仍失败');
       item.fails = (item.fails || 0) + 1;
       if (item.fails >= PENDING_MAX_FAIL) {
         console.warn('[cloud] 补传放弃（已重试 ' + item.fails + ' 次）：', item.payload &&

@@ -76,3 +76,20 @@
 .cls-assign { border: 1rpx solid rgba(124, 92, 255, .35); }
 /* 作业取代任务卡时的主卡样式：带一点紫色描边表明"这是老师布置的" */
 .cls-hero { border: 1rpx solid rgba(124, 92, 255, .45); }
+
+/* ---- 学习流水：一行一条，"我做了什么 + 云端确认没有" ---- */
+.log-row {
+  display: flex; align-items: center;
+  padding: 12rpx 0; font-size: 24rpx;
+  border-top: 1rpx dashed #26313f;
+}
+.log-time { width: 140rpx; color: #8fa3b7; }
+.log-word { flex: 1; font-weight: 600; color: #e8eef5; }
+.log-mode { color: #8fa3b7; margin-right: 12rpx; font-size: 22rpx; }
+.log-fb { color: #8fa3b7; margin-right: 12rpx; }
+.log-cloud {
+  padding: 4rpx 14rpx; border-radius: 999rpx;
+  font-size: 22rpx; color: #8fa3b7; background: #131c27;
+}
+.log-cloud.ok { color: #4cd08a; background: rgba(76, 208, 138, .14); }
+.log-cloud.fail { color: #ff7b7b; background: rgba(255, 123, 123, .14); }

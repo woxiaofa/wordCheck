@@ -15,6 +15,7 @@ var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var books = require('../../utils/books');
 var cloud = require('../../utils/cloud');
+var learnlog = require('../../utils/learnlog');
 
 var STORAGE_KEY = 'word_state_mirror';
 /** 首次引导卡：点"开始学"或关闭后写入，之后永不再现 */
@@ -54,13 +55,21 @@ Page({
     bookDesc: '',
     bookCount: 0,
 
-    /** 班级作业入口：{name, done, count, ids, finished}；不在班级/没作业时为 null */
-    clsAssign: null
+    /** 班级作业入口：{name, done, count, ids, finished}；非学生或没作业时为 null */
+    clsAssign: null,
+    /** 教练/家长（班级创建者）在首页只给"看学员进度"的入口，不给作业卡 */
+    coachCls: null,
+    /** 学习流水：最近若干条"我学了什么 → 云端有没有确认"，进度对不上时用它对质 */
+    learnLog: [],
+    /** "什么算进度"的说明是否展开 */
+    ruleOpen: false
   },
 
   onShow: function () {
     this.refresh();
     this.maybeShowIntro();
+    // 学习流水：每次进首页都刷新一次，孩子刚学的那几条立刻可见（含云端是否确认）
+    this.setData({ learnLog: learnlog.lines(8) });
     // 作业进度读的是云端学习记录：先补传本地积压的（最多等 1.2 秒），
     // 再拉作业，孩子学完几个词切回首页，进度条立刻跟上
     var self = this;
@@ -73,14 +82,27 @@ Page({
   loadClassAssignment: function () {
     var self = this;
     cloud.api.myAssignments().then(function (r) {
+      var role = (r && r.role) || '';
       var list = (r && r.assignments) || [];
-      if (!list.length) { self.setData({ clsAssign: null }); return; }
+
+      // 身份闸门：家长/老师是布置作业的人，不是做作业的人。
+      // 他们自己背单词就走默认词库 + 今日任务，首页只给一条"去看学员进度"的入口。
+      if (role === 'coach') {
+        self.setData({
+          clsAssign: null,
+          coachCls: { name: (r.class && r.class.name) || '我的班级' }
+        });
+        return;
+      }
+
+      if (!list.length) { self.setData({ clsAssign: null, coachCls: null }); return; }
       var a = list[0];                     // 只展示最近一份，多的在班级页看
       var done = a.done || 0;
       var count = a.count || 0;
       // 存编码后的串：跳转时原样带过去，由 utils/assign.js 的契约成对解码
       var ids = assignParam.buildIdsParam(a.word_ids || []);
       self.setData({
+        coachCls: null,
         clsAssign: {
           name: a.note || (a.tag ? a.tag + '作业' : '班级作业'),
           done: done,
@@ -103,6 +125,28 @@ Page({
     wx.redirectTo({
       url: '/pages/study/study?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
     });
+  },
+
+  /** 教练/家长：去班级页看学员进度（不是去做作业） */
+  goClass: function () {
+    wx.navigateTo({ url: '/pages/class/class' });
+  },
+
+  /** "什么算进度"的说明：一句话讲清口径，避免"我到底学没学"的猜疑 */
+  toggleRule: function () {
+    this.setData({ ruleOpen: !this.data.ruleOpen });
+  },
+
+  /** 一键复制学习流水：进度对不上时，家长把这段发出来就能当场判责 */
+  copyLearnLog: function () {
+    var text = learnlog.toText(30);
+    wx.setClipboardData({
+      data: text,
+      success: function () {
+        wx.showToast({ title: '流水已复制', icon: 'none' });
+      }
+    });
+    console.log('[learnlog]\n' + text);
   },
 
   /** 首次打开（本地没有任何学习记录且从未关闭过）约 1 秒后浮出引导卡 */
