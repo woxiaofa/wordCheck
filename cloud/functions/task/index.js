@@ -17,6 +17,7 @@ const db = cloud.database();
 const _ = db.command;
 
 const { getLocalDate } = require('./time');
+const { wordsForStudent } = require('./personal');
 const { queryStates, STATE_COLL } = require('./state-store');
 
 const COLL = {
@@ -193,7 +194,14 @@ async function classAssignmentWords(user) {
     .get()
     .catch(() => ({ data: [] }));
   const rawIds = [];
-  (asgRes.data || []).forEach(a => (a.word_ids || []).forEach(w => rawIds.push(w)));
+  for (const a of (asgRes.data || [])) {
+    // 个性化作业：读"我"的专属词单（没有就当场生成并固化），
+    // 否则今日任务会把全班词单塞给这个孩子，和他自己的作业对不上
+    const texts = a.personalized
+      ? await wordsForStudent(db, a, user._id)
+      : (a.word_ids || []);
+    texts.forEach(w => rawIds.push(w));
+  }
   if (!rawIds.length) return [];
 
   const wRes = await db.collection(COLL.words)
@@ -208,6 +216,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261007-v2coll';
+const VERSION = 'task-20261007-personal';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

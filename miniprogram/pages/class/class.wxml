@@ -79,8 +79,15 @@
         <input class="grow input" value="{{form.note}}" placeholder="如：周末之前过一遍（可选）"
                maxlength="30" bindinput="inputNote" />
       </view>
+      <view class="form-row">
+        <view class="grow">
+          <text class="form-label">按孩子程度个性化</text>
+          <view class="muted" style="font-size:22rpx">易错词优先、已掌握的词跳过；每人词单不同</view>
+        </view>
+        <switch checked="{{form.personalized}}" bindchange="togglePersonal" color="#7c5cff" />
+      </view>
       <button class="btn ok mt" loading="{{assigning}}" disabled="{{assigning}}" bindtap="submitAssign">
-        布置 {{form.count}} 个词{{form.tag === '全部' ? '' : '（' + form.tag + '）'}}
+        布置 {{form.count}} 个词{{form.tag === '全部' ? '' : '（' + form.tag + '）'}}{{form.personalized ? ' · 个性化' : ''}}
       </button>
     </view>
 
@@ -97,7 +104,7 @@
           <text class="muted" style="font-size:24rpx">{{item.finished}}/{{item.total_students}} 人完成</text>
         </view>
         <view class="muted" style="font-size:24rpx">
-          {{item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}
+          {{item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}{{item.personalized ? ' · 个性化' : ''}}
         </view>
         <view class="bar"><view class="bar-in" style="width:{{item.total_students ? item.finished * 100 / item.total_students : 0}}%"></view></view>
       </view>

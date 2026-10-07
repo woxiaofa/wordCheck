@@ -27,7 +27,7 @@ Page({
 
     // 教练端
     tags: TAGS,
-    form: { tag: '全部', count: 10, deadline: '', note: '' },
+    form: { tag: '全部', count: 10, deadline: '', note: '', personalized: false },
     assigning: false,
     assignments: [],
     students: [],
@@ -171,6 +171,11 @@ Page({
     this.setData({ 'form.note': e.detail.value });
   },
 
+  /** 个性化开关：勾上后每个孩子的词单按各自程度裁剪（易错优先、已掌握跳过） */
+  togglePersonal: function (e) {
+    this.setData({ 'form.personalized': !!e.detail.value });
+  },
+
   submitAssign: function () {
     var self = this;
     var f = this.data.form;
@@ -182,10 +187,15 @@ Page({
       count: f.count,
       deadline: f.deadline,
       note: f.note,
+      personalized: !!f.personalized,
       clientReqId: 'assign:' + srs.newReqId()
-    }).then(function () {
+    }).then(function (r) {
       self.setData({ assigning: false, 'form.note': '' });
-      wx.showToast({ title: '已布置', icon: 'success' });
+      var n = (r && r.data && r.data.personalized) ? (r.data.student_count || 0) : 0;
+      wx.showToast({
+        title: n ? ('已布置 · ' + n + ' 人各自词单') : '已布置',
+        icon: 'success'
+      });
       self.loadCoachData();
     }).catch(function (err) {
       self.setData({ assigning: false });

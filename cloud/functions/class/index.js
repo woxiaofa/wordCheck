@@ -19,12 +19,14 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 const { getLocalDate, getLocalDayStart } = require('./time');
-const { queryStates, STATE_COLL } = require('./state-store');
+const { queryStates, STATE_COLL, ensureCollection } = require('./state-store');
 
 const COLL = {
   users: 'users',
   classes: 'classes',
   assignments: 'assignments',
+  /** 个性化作业的学员词单快照：{assignment_id, user_id, word_ids} */
+  asgStudents: 'assignment_students',
   state: STATE_COLL,           // v5：读走合并查询（v2+legacy），写不经本函数
   requests: 'request_dedup',
   logs: 'review_logs'
@@ -38,7 +40,9 @@ const LIMITS = {
   ASSIGN_COUNT_MIN: 3,
   ASSIGN_COUNT_MAX: 30,
   NOTE_MAX: 60,
-  WORDS_FETCH_MAX: 50           // 选词时最多拉取的候选数（freq 升序）
+  WORDS_FETCH_MAX: 50,         // 选词时最多拉取的候选数（freq 升序）
+  /** 个性化作业时，候选池 = 词数 × 该倍数（给"跳过已掌握"留出挑选空间） */
+  PERSONAL_POOL_FACTOR: 3
 };
 
 // 邀请码 → 班级 文档的缓存有效期（沿用 request_dedup 的清理思路，靠 TTL 惰性过期）
@@ -180,7 +184,7 @@ async function onMyClass(openid) {
 /* ------------------------------------------------------------------ */
 /* 布置任务（教练端）                                                    */
 /* ------------------------------------------------------------------ */
-async function onAssign(openid, { tag, count, deadline, note, clientReqId }) {
+async function onAssign(openid, { tag, count, deadline, note, clientReqId, personalized }) {
   if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
 
   const ctx = await requireCoach(openid);
@@ -210,15 +214,21 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId }) {
     if (prev && prev.data) return ok({ assignment: publicAssignment(prev.data), dedup: true });
   }
 
-  // --- 选词：按词频升序取前 count 个（简单可解释，学生先学高频词） ---
+  // --- 选词：按词频升序取前 count 个（简单可解释，学生先学高频词）---
+  // 个性化作业要多拉一些候选：好让"已掌握的词跳过、易错词补进来"有挑选余地
+  const personal = personalized === true;
+  const fetchMax = personal
+    ? Math.min(LIMITS.WORDS_FETCH_MAX, count * LIMITS.PERSONAL_POOL_FACTOR)
+    : Math.min(LIMITS.WORDS_FETCH_MAX, count);
   const wordsRes = await db.collection('words')
     .where(tag === '全部' ? {} : { tags: tag })
     .orderBy('freq', 'asc')
-    .limit(LIMITS.WORDS_FETCH_MAX)
+    .limit(fetchMax)
     .get();
   // 关键：存 word 文本而非 _id —— user_word_state.word_id / task snapshot /
   // 客户端本地词库匹配全都用文本，进度查询与"继续学"队列才能对上
-  const wordIds = (wordsRes.data || []).slice(0, count).map(w => w.word);
+  const poolTexts = (wordsRes.data || []).map(w => w.word).slice(0, fetchMax);
+  const wordIds = poolTexts.slice(0, count);   // 基础词单（全班默认 / 教师端展示用）
   if (wordIds.length < LIMITS.ASSIGN_COUNT_MIN) {
     return fail('WORDS_EMPTY', '该词库暂无可布置的单词');
   }
@@ -232,21 +242,46 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId }) {
       count: wordIds.length,
       deadline,
       note,
+      personalized: personal,
+      // 个性化取词范围：只有个性化作业才存，非个性化保持老结构不变
+      pool_ids: personal ? poolTexts : [],
       created_by: ctx.user._id,
       created_at: now
     }
   });
 
   // 记录幂等映射（含引用，重复请求直接返回同一份作业）
+  // ⚠ 必须 data 包裹：cloud-review 的假库忠实复刻云端后立刻抓到过同类 bug ——
+  // 写成 add({_id,...}) 云端直接抛错，被下面的 catch 静默吞掉，
+  // 结果幂等映射从来没落过库，"重复点击布置"就会真的布置出两份作业。
   await db.collection(COLL.requests).add({
-    _id: ctx.user._id + ':assign:' + clientReqId,
-    ref: addRes._id,
-    created_at: now,
-    expire_at: now + REQ_TTL_MS
-  }).catch(() => {});
+    data: {
+      _id: ctx.user._id + ':assign:' + clientReqId,
+      ref: addRes._id,
+      created_at: now,
+      expire_at: now + REQ_TTL_MS
+    }
+  }).catch((e) => {
+    console.error('[class] 幂等映射写入失败（重复点击可能布置出两份作业）:',
+      String((e && (e.errMsg || e.message)) || e).slice(0, 120));
+  });
 
   const created = await db.collection(COLL.assignments).doc(addRes._id).get();
-  return ok({ assignment: publicAssignment(created.data), dedup: false });
+
+  // 个性化作业：当场给每位在班学员固化专属词单（后加入的学员首次打开时再生成）
+  if (personal) {
+    const sids = ctx.cls.student_ids || [];
+    for (const sid of sids) {
+      await wordsForStudent(created.data, sid).catch(() => {});
+    }
+  }
+
+  return ok({
+    assignment: publicAssignment(created.data),
+    dedup: false,
+    personalized: personal,
+    student_count: personal ? (ctx.cls.student_ids || []).length : 0
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -267,9 +302,9 @@ async function onAssignments(openid) {
   const studentIds = ctx.cls.student_ids || [];
   const withProgress = [];
   for (const a of assignments) {
-    const per = await progressByStudent(studentIds, a.word_ids);
+    const per = await progressForAssignment(a, studentIds);
     withProgress.push(Object.assign(publicAssignment(a), {
-      finished: per.filter(p => p.done >= a.count).length,
+      finished: per.filter(p => p.count > 0 && p.done >= p.count).length,
       total_students: studentIds.length,
       per_student: per
     }));
@@ -323,9 +358,9 @@ async function onMyAssignments(openid) {
     return ok({ assignments: [], role: 'student' });
   }
 
-  // 词单先归一成文本（兼容旧 _id 格式），后面进度查询和下发全用文本
+  // 词单先归一成文本（兼容旧 _id 格式）；个性化作业换成"我的专属词单"
   for (const a of assignments) {
-    a.word_ids = await toWordTexts(a.word_ids);
+    a.word_ids = await wordsForStudent(a, user._id);
   }
 
   const wordAll = [];
@@ -486,9 +521,13 @@ async function onStudentDetail(openid, { studentId }) {
     .get();
   const withProgress = [];
   for (const a of (assignments.data || [])) {
-    const per = await progressByStudent([studentId], a.word_ids);
+    const texts = await wordsForStudent(a, studentId);
+    const per = await progressByStudent([studentId], texts);
     withProgress.push(Object.assign(publicAssignment(a), {
-      done: per.length ? per[0].done : 0
+      done: per.length ? per[0].done : 0,
+      // 个性化作业下每个孩子的总数可能不同（已掌握的词被跳过），以他的为准
+      count: texts.length || a.count,
+      personalized: !!a.personalized
     }));
   }
 
@@ -533,16 +572,18 @@ async function onNudge(openid, { studentId }) {
     .get();
   let assignLeft = null;   // { name, left, done, count, wordIds, deadline }
   for (const a of (assignments.data || [])) {
-    const per = await progressByStudent([studentId], a.word_ids);
+    const texts = await wordsForStudent(a, studentId);
+    const per = await progressByStudent([studentId], texts);
     const done = per.length ? per[0].done : 0;
-    const left = a.count - done;
+    const total = texts.length || a.count;
+    const left = total - done;
     if (left > 0) {
       assignLeft = {
         name: a.note || a.tag + '作业',
         left: left,
         done: done,
-        count: a.count,
-        wordIds: a.word_ids || [],
+        count: total,
+        wordIds: texts,
         deadline: a.deadline || ''
       };
       break;
@@ -647,6 +688,29 @@ async function requireCoach(openid) {
  * 按学生统计作业词的完成数。
  * 完成定义：user_word_state 里该词存在且 correct_count>0 或 stage>0（学过并至少答对一次/进入复习流程）。
  */
+/**
+ * 个性化取词与学员词单：规则只有一份真相（shared/personal.js），
+ * class 与 task 共用，避免"作业说剩 3 个、今日任务塞另外 5 个"的接缝错位。
+ */
+const personal = require('./personal');
+/** 适配成本函数的两参调用形态（共享模块需要显式传 db） */
+const wordsForStudent = (a, userId) => personal.wordsForStudent(db, a, userId);
+
+/** 一份作业的逐学员进度（各自词单、各自 count） */
+async function progressForAssignment(a, studentIds) {
+  const out = [];
+  for (const sid of studentIds) {
+    const texts = await wordsForStudent(a, sid);
+    const per = await progressByStudent([sid], texts);
+    out.push({
+      user_id: sid,
+      done: per.length ? per[0].done : 0,
+      count: texts.length
+    });
+  }
+  return out;
+}
+
 async function progressByStudent(studentIds, wordIds) {
   if (!studentIds.length || !wordIds || !wordIds.length) return [];
   // 词单兼容两种历史格式：words._id（初版实锤对不上学习状态表，进度恒 0）
@@ -720,10 +784,12 @@ function publicAssignment(a) {
     note: a.note || '',
     // 词单必须下发：客户端"继续学"要按这份词单组装队列（跳过已学的词）
     word_ids: a.word_ids || [],
-    created_at: a.created_at
+    created_at: a.created_at,
+    // 个性化作业：前端要标注"每人词单不同"，别让家长以为两份进度对不上是 bug
+    personalized: !!a.personalized
   };
 }
 
-const VERSION = 'class-20261007-nudge';
+const VERSION = 'class-20261007-personal';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
