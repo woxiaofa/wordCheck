@@ -35,6 +35,8 @@ Page({
     minutes: 5,
     streak: 0,
     mastery: 0,
+    /** 掌握率口径说明：学过词但 0% 掌握时显示，避免"已学 5 个却 0% 掌握"像 bug */
+    masteryNote: '',
     learned: 0,
     done: 0,
     target: TARGET_PER_DAY,
@@ -252,6 +254,12 @@ Page({
     var learnedFinal = Math.max(learned, cloudStats.learned_words || 0);
     var streakFinal = Math.max(this.calcStreak(activity), cloudStats.streak_days || 0);
 
+    // 口径说明：掌握 = SRS 档位 ≥5（复习间隔 15 天+），刚学的词档位低，
+    // "已学 5 个、掌握 0%" 数据上没错，但不解释家长只会当成 bug
+    var masteryNote = (learnedFinal > 0 && mastered === 0)
+      ? '掌握 = 复习间隔拉到 15 天以上的词；刚学的词要多轮巩固才会计入'
+      : '';
+
     this.setData({
       totalCount: total,
       dueCount: due,
@@ -260,6 +268,7 @@ Page({
       minutes: Math.max(1, Math.round(total * SECONDS_PER_WORD / 60)),
       streak: streakFinal,
       mastery: learned ? Math.round(mastered / learned * 100) : 0,
+      masteryNote: masteryNote,
       learned: learnedFinal,
       done: done,
       target: target,

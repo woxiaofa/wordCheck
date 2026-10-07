@@ -531,7 +531,7 @@ async function onNudge(openid, { studentId }) {
     .orderBy('created_at', 'desc')
     .limit(5)
     .get();
-  let assignLeft = null;   // { name, left, deadline }
+  let assignLeft = null;   // { name, left, done, count, wordIds, deadline }
   for (const a of (assignments.data || [])) {
     const per = await progressByStudent([studentId], a.word_ids);
     const done = per.length ? per[0].done : 0;
@@ -540,6 +540,9 @@ async function onNudge(openid, { studentId }) {
       assignLeft = {
         name: a.note || a.tag + '作业',
         left: left,
+        done: done,
+        count: a.count,
+        wordIds: a.word_ids || [],
         deadline: a.deadline || ''
       };
       break;
@@ -556,9 +559,12 @@ async function onNudge(openid, { studentId }) {
   const today = getLocalDate(Date.now());
   const todayRes = await db.collection(COLL.logs)
     .where({ user_id: studentId, review_date: today })
-    .count()
-    .catch(() => ({ total: 0 }));
-  const todayCount = (todayRes && todayRes.total) || 0;
+    .limit(200)
+    .field({ word_id: true })
+    .get()
+    .catch(() => ({ data: [] }));
+  const todayLogs = todayRes.data || [];
+  const todayCount = todayLogs.length;
 
   // 文案铁律：一段话里只讲一个故事。练了题 和 作业没动 两件事同时说，
   // 必须点明它们的关系，否则"练了 10 题还剩 10 个"家长只会觉得数字错了。
@@ -566,10 +572,24 @@ async function onNudge(openid, { studentId }) {
   parts.push('【' + ctx.cls.name + '】' + (stu.nickname || '同学'));
   if (assignLeft) {
     const tail = assignLeft.deadline ? '，' + assignLeft.deadline + ' 截止' : '';
-    if (todayCount > 0) {
-      parts.push('今天练了 ' + todayCount + ' 题，不错。不过这些是每日任务的词，' +
-        '作业《' + assignLeft.name + '》还没做——首页点「继续学」先把作业清了（还剩 ' +
-        assignLeft.left + ' 个词' + tail + '）。');
+    // 归因必须有据：先数今天练的词里有几个是作业词，再决定怎么说。
+    // 实锤教训：孩子练的明明是作业词，文案却硬说"这些是每日任务的词，
+    // 作业还没做"——家长拿它和作业进度一对照，只会认定数据是假的。
+    let assignHits = 0;
+    if (todayCount > 0 && assignLeft.wordIds.length) {
+      const texts = await toWordTexts(assignLeft.wordIds);
+      const asgSet = {};
+      texts.forEach((w) => { asgSet[w] = 1; });
+      todayLogs.forEach((l) => { if (asgSet[l.word_id]) assignHits++; });
+    }
+    if (todayCount > 0 && assignHits > 0) {
+      parts.push('今天练了 ' + todayCount + ' 题，其中 ' + assignHits +
+        ' 个就是作业《' + assignLeft.name + '》的词（已完成 ' + assignLeft.done + '/' +
+        assignLeft.count + '）——首页点「继续学」把剩下的 ' + assignLeft.left +
+        ' 个清完' + tail + '。');
+    } else if (todayCount > 0) {
+      parts.push('今天练了 ' + todayCount + ' 题是每日任务的词，作业《' + assignLeft.name +
+        '》还没动——首页点「继续学」先做作业（还剩 ' + assignLeft.left + ' 个词' + tail + '）。');
     } else if (seenRecent) {
       parts.push('上次打开小程序是 ' + seenAgo + '，今天还没学。' +
         '作业《' + assignLeft.name + '》还剩 ' + assignLeft.left + ' 个词' + tail +
@@ -704,6 +724,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261007-v2coll';
+const VERSION = 'class-20261007-nudge';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

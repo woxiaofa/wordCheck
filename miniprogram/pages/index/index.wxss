@@ -93,3 +93,9 @@
 }
 .log-cloud.ok { color: #4cd08a; background: rgba(76, 208, 138, .14); }
 .log-cloud.fail { color: #ff7b7b; background: rgba(255, 123, 123, .14); }
+
+/* 掌握率口径说明：学过词但 0% 掌握时出现，防止被当成数字 bug */
+.kpi-note {
+  font-size: 20rpx; color: #8fa3b7; opacity: .8;
+  padding: 0 12rpx; margin-top: 10rpx; text-align: center;
+}

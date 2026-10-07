@@ -242,7 +242,15 @@ function seed(opt) {
       review_date: require('../cloud/functions/class/time.js').getLocalDate(Date.now()),
       created_at: Date.now() - i * 1000
     };
-  }));
+  }).concat((opt.extraLogs || []).map(function (w, i) {
+    // 额外的今日日志：模拟"孩子练了但练的不是作业词"（每日任务词）
+    return {
+      _id: 'xlog' + i, user_id: 'S', word_id: w,
+      feedback: 'known', mode: 'study',
+      review_date: require('../cloud/functions/class/time.js').getLocalDate(Date.now()),
+      created_at: Date.now() - i * 1000
+    };
+  })));
 }
 
 function as(openid, fn) {
@@ -345,21 +353,23 @@ ok('⑤ task.today：今日新词优先取作业里没学过的词 → 学每日
   });
 });
 
-// ---- ⑥ 催学文案自洽：done + left = count ----
-ok('⑥ 催学文案：剩余数 = 总数 - 已完成，且不再把练题数与作业剩余硬拼', function () {
+// ---- ⑥ 催学文案自洽：练的题是作业词时必须如实归因 ----
+ok('⑥ 催学归因：今天练的就是作业词 → 点明"其中 N 个是作业的词"，禁止瞎说"每日任务"', function () {
   seed({ learned: WORD_TEXTS.slice(0, 3) });
   return as(COACH_OPENID, function () {
     return classFn.main({ action: 'nudge', studentId: 'S' });
   }).then(function (r) {
     assert.strictEqual(r.ok, true, JSON.stringify(r));
     var t = r.data.text;
-    assert.ok(t.indexOf('还剩 7 个词') >= 0, '应说还剩 7 个（10-3），实际文案：\n' + t);
-    // 不变量：文案里不得同时出现"练了 N 题"和"还剩 M"这种两套口径的拼接
-    var hasPractice = /今天已经练了\s*\d+\s*题/.test(t);
-    var hasLeft = /还剩\s*\d+\s*个词/.test(t);
-    assert.ok(!(hasPractice && hasLeft),
-      '文案不得同时讲"练了多少题"和"作业还剩多少"——这正是用户看到的矛盾：\n' + t);
+    // 线上实锤（2026-10-07）：孩子练的 5 个全是作业词，文案却说
+    // "这些是每日任务的词，作业还没做" —— 与作业进度 5/10 直接打架
+    assert.ok(t.indexOf('每日任务') === -1,
+      '练的是作业词时不得归因为"每日任务的词"，实际文案：\n' + t);
+    assert.ok(/其中\s*3\s*个/.test(t), '应点明 3 个是作业词，实际：\n' + t);
+    assert.ok(t.indexOf('已完成 3/10') >= 0, '应给出作业进度 3/10，实际：\n' + t);
     assert.ok(t.indexOf('hh') >= 0, '应点名作业，让家长知道说的是哪一项');
+    // 不变量：done + left = count（3 + 7 = 10）
+    assert.ok(/剩下的\s*7\s*个/.test(t), '剩余应说 7 个（10-3），实际：\n' + t);
   });
 });
 
@@ -451,6 +461,20 @@ ok('⑫ 学生调 myAssignments：照常拿到作业，role=student', function (
     assert.strictEqual(r.data.role, 'student');
     assert.strictEqual(r.data.assignments.length, 1, '学生必须能看到作业');
     assert.strictEqual(r.data.assignments[0].done, 3);
+  });
+});
+
+// ---- ⑬ 催学归因另一面：练的确实不是作业词，才允许说"每日任务的词" ----
+ok('⑬ 催学归因：今天只练了任务词 → 文案归因"每日任务"，作业说"还没动"', function () {
+  seed({ learned: [], extraLogs: ['word20', 'word21', 'word22'] });
+  return as(COACH_OPENID, function () {
+    return classFn.main({ action: 'nudge', studentId: 'S' });
+  }).then(function (r) {
+    assert.strictEqual(r.ok, true, JSON.stringify(r));
+    var t = r.data.text;
+    assert.ok(/今天练了\s*3\s*题/.test(t), '应如实报今日练题数 3，实际：\n' + t);
+    assert.ok(t.indexOf('每日任务') >= 0, '练的确实不是作业词，应归因每日任务：\n' + t);
+    assert.ok(t.indexOf('还剩 10 个词') >= 0, '作业没动应说还剩 10 个：\n' + t);
   });
 });
 

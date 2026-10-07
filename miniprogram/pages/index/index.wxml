@@ -114,6 +114,7 @@
       <view class="label">已学词</view>
     </view>
   </view>
+  <view wx:if="{{masteryNote}}" class="kpi-note">{{masteryNote}}</view>
 
   <!-- 今日进度：作业进行中时隐藏——作业卡上的进度条就是当前唯一的进度，
        两个进度条并排（20/20 完成 vs 作业 0/10）只会让人觉得数字错了 -->
