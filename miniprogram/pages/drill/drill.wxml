@@ -95,13 +95,15 @@
       </view>
 
       <view class="dyour" wx:if="{{detail.yourPick}}">
-        你选的是「{{detail.yourPick}}」，正确的是「{{detail.answer}}」
+        <text class="dyour-wrong">你{{detail.pickVerb}}的是「{{detail.yourPick}}」</text>
+        <text class="dyour-right">{{detail.answerVerb}}「{{detail.answer}}」</text>
       </view>
 
-      <!-- 跟读引导：只看不念记不住，这里是唯一鼓励"多听几遍"的地方 -->
-      <view class="read-guide">
+      <!-- 跟读引导：只看不念记不住，这里明确鼓励多听几遍；整块可点，等于一个更好按的大喇叭 -->
+      <view class="read-guide" bindtap="onSpeak">
         <view class="rg-text">🗣 {{detail.guide}}</view>
-        <view class="rg-count" wx:if="{{detail.speakCount}}">已跟着念 {{detail.speakCount}} 遍</view>
+        <view class="rg-count" wx:if="{{detail.speakCount}}">已跟着念 {{detail.speakCount}} 遍 · 点这里再听一遍 🔊</view>
+        <view class="rg-count" wx:else>点这里就能再听一遍 🔊</view>
       </view>
 
       <view class="detail-bottom">
@@ -129,6 +131,13 @@
         <view class="honor-detail" wx:if="{{honor.detail}}">{{honor.detail}}</view>
         <view class="honor-detail" wx:if="{{honor.beat && honor.total > 1}}">
           你打败了 {{honor.beat}}% 的人（第 {{honor.rank}}/{{honor.total}} 名）
+        </view>
+        <!-- 今日 / 本周 / 本月最快：每人都留各自周期内的最好成绩 -->
+        <view class="hp-list" wx:if="{{honorPeriods.length}}">
+          <view class="hp-row" wx:for="{{honorPeriods}}" wx:key="label">
+            <text class="hp-label">{{item.label}}</text>
+            <text class="hp-value">{{item.text}}</text>
+          </view>
         </view>
       </view>
 

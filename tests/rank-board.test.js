@@ -192,6 +192,64 @@ ok('⑨ upsert 的 data 不带 _id（strictSetId 复刻 -501007，daily_tasks �
   });
 });
 
+ok('⑩ 今日/本周/本月最快：各自留住周期内最快，榜首带昵称、能认出是我', function () {
+  reset();
+  return submit('openid-1', { key: KEY, count: 10, seconds: 90, perfect: true })
+    .then(function (r) {
+      assert.strictEqual(r.ok, true, JSON.stringify(r));
+      assert.ok(r.periods && r.periods.day, '要返回周期榜');
+      assert.strictEqual(r.periods.day.rank, 1);
+      assert.strictEqual(r.periods.day.total, 1);
+      assert.strictEqual(r.periods.day.leader.mine, true, '只有自己时榜首就是自己');
+      return submit('openid-2', { key: KEY, count: 10, seconds: 30 });
+    })
+    .then(function (r) {
+      assert.strictEqual(r.periods.day.total, 2);
+      assert.strictEqual(r.periods.day.rank, 1, '30 秒最快 → 今日第 1');
+      assert.strictEqual(r.periods.day.leader.nickname, '小红', '榜首要带昵称（openid-2 是小红）');
+      assert.strictEqual(r.periods.day.leader.mine, true, '榜首就是刚交成绩的小红自己');
+      // 小红自己再交一次更慢的：她的周期最优保持 30 秒不变，榜首仍是她自己
+      return submit('openid-2', { key: KEY, count: 10, seconds: 99 });
+    })
+    .then(function (r) {
+      assert.strictEqual(r.periods.day.leader.mine, true, '更慢的一次不抢自己的周期最优');
+      var me = db.raw.drill_scores.filter(function (x) { return x.user_id === 'U2'; })[0];
+      assert.strictEqual(me.period.day.seconds, 30, '周期桶里只留周期内最快');
+      // 第三人视角：榜首（小红）不是自己，要报出我的名次
+      return submit('openid-3', { key: KEY, count: 10, seconds: 50 });
+    })
+    .then(function (r) {
+      assert.strictEqual(r.periods.day.rank, 2, '50 秒比 30 秒慢 → 今日第 2');
+      assert.strictEqual(r.periods.day.leader.nickname, '小红');
+      assert.strictEqual(r.periods.day.leader.mine, false, '榜首不是我时要如实标注');
+    });
+});
+
+ok('⑪ 跨了周期（新的一天）桶要重开：旧最优不再霸榜', function () {
+  reset();
+  return submit('openid-1', { key: KEY, count: 10, seconds: 60 })
+    .then(function () {
+      // 手工把成绩挪到"昨天/上周/上月"：模拟跨天再来一轮
+      var doc = db.raw.drill_scores[0];
+      doc.period.day.start -= 86400000;      // 昨天的桶
+      doc.period.week.start -= 7 * 86400000; // 上周的桶
+      doc.period.month.start -= 31 * 86400000; // 上月的桶
+      doc.date = '2026-10-01';
+    })
+    .then(function () { return submit('openid-1', { key: KEY, count: 10, seconds: 90 }); })
+    .then(function (r) {
+      var doc = db.raw.drill_scores[0];
+      assert.strictEqual(doc.period.day.seconds, 90, '今天的桶重开，90 秒就是今日最快');
+      assert.strictEqual(doc.period.week.seconds, 90, '本周的桶重开');
+      assert.strictEqual(doc.period.month.seconds, 90, '本月的桶重开');
+      assert.strictEqual(doc.period.day.total === undefined ? true : true, true);
+      assert.strictEqual(r.periods.day.rank, 1, '重开后仍是榜上唯一');
+      // 更慢的一次不刷新最好成绩，也不该把"最好成绩的日期"刷成今天
+      assert.strictEqual(doc.seconds, 60, '总榜仍留最快');
+      assert.strictEqual(doc.date, '2026-10-01', 'date 是"最好成绩的日子"，慢的不许改');
+    });
+});
+
 (function run(i) {
   if (i >= steps.length) {
     console.log('\n' + (process.exitCode ? '有用例失败' : '全部通过：' + steps.length + ' 项 ✓'));

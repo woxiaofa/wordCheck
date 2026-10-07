@@ -60,7 +60,10 @@ function ensureAudio() {
 function play(src) {
   var ctx = ensureAudio();
   if (!ctx) return false;
-  ctx.stop();
+  try { ctx.stop(); } catch (e) { /* 从没播过时 stop 可能报错，忽略 */ }
+  // 关键：先把 src 清空再赋值。同一个 src 直接重赋值时，
+  // 部分真机/工具会认为"没换资源"而不重新加载 —— 表现为"点喇叭突然不读了"。
+  ctx.src = '';
   ctx.src = src;
   ctx.play();
   return true;

@@ -495,5 +495,100 @@ test('⑱ 详情里点喇叭能无限听，并给出"跟着念"的引导与计�
   }
 });
 
+test('⑲ 「认」的选项位置真随机（回归：按字符码定位置导致正确答案一直是第二个）', function () {
+  var p = startedPage();
+  var w = p.data.q.word;
+  var pos = { 0: 0, 1: 0 };
+  for (var i = 0; i < 200; i++) {
+    var q = p.buildQuestion(w, POOL, 'recog', 0, 10);
+    pos[q.answerIdx]++;
+    assert.strictEqual(q.options.length, 2);
+    assert.strictEqual(q.options[q.answerIdx], w.def_cn, 'answerIdx 必须始终指向正确释义');
+  }
+  assert.ok(pos[0] > 20 && pos[1] > 20,
+    '两种位置都必须大量出现才算随机，实际：0→' + pos[0] + ' 次，1→' + pos[1] + ' 次');
+});
+
+test('⑳ 巩固轮拼写题的答案是单词本身，不是中文释义（回归：「你拼的是!eastern，正确的是东方的」）', function () {
+  var p = startedPage();
+  var q = null, guard = 0;
+  while (guard++ < 50) {
+    q = p.buildQuestion(p.data.words[0], POOL, 'loop', 0, 2);
+    if (q.type === 'spell') break;
+  }
+  assert.strictEqual(q.type, 'spell');
+  assert.strictEqual(q.answerText, p.data.words[0].word,
+    '拼写题 answerText 必须是单词，实际 ' + q.answerText);
+  // 走一遍判定：详情里的 answer 也要是单词
+  p._qs[p.data.idx] = q;
+  p.showQuestion();
+  p.onKeyInput({ detail: { value: ['x'] } });
+  p.onKeyConfirm();
+  assert.strictEqual(p.data.state, 'detail');
+  assert.strictEqual(p.data.detail.answer, q.wordId, '详情要告诉他正确拼写');
+  assert.strictEqual(p.data.detail.pickVerb, '拼', '文案要说"你拼的是"');
+  assert.strictEqual(p.data.detail.answerVerb, '正确拼写是');
+});
+
+test('㉑ 每条学习记录都带时长 durationMs（含看详情的时间）——简报"经过 X 分钟"的数据源', function () {
+  submitted.length = 0;
+  var p = startedPage();
+  // 第 1 题：题面已出现 5 秒后作答
+  p._qShownAt = Date.now() - 5000;
+  elapsed(p, 1000);
+  p.onPick({ currentTarget: { dataset: { idx: p.data.q.answerIdx } } });
+  flushTimers();
+  assert.ok(submitted.length === 1 && submitted[0].durationMs >= 4000,
+    'durationMs 应约等于答题用时，实际 ' + (submitted[0] || {}).durationMs);
+  // 第 2 题：先看 4 秒详情再作答。详情停留的时长记在"下一条"记录上（日汇总口径不变）
+  p.onDontKnow();
+  assert.strictEqual(submitted.length, 2, '点了不会也立即记一条');
+  p._detailAt = Date.now() - 4000;
+  p.onDetailNext();
+  p._qShownAt = Date.now();
+  elapsed(p, 1000);
+  p.onPick({ currentTarget: { dataset: { idx: p.data.q.answerIdx } } });
+  flushTimers();
+  assert.ok(submitted.length === 3 && submitted[2].durationMs >= 3000,
+    '详情停留时长要计入下一条记录，实际 ' + (submitted[2] || {}).durationMs);
+});
+
+test('㉒ 拼写题答错后的详情里喇叭必须出声（回归：spell 守卫误伤详情页）', function () {
+  var tts = require('../miniprogram/utils/tts');
+  var spoken = [];
+  var origSpeak = tts.speak;
+  tts.speak = function (t) { spoken.push(t); };
+  try {
+    var p = startedPage();
+    var q = null, guard = 0;
+    while (guard++ < 50) {
+      q = p.buildQuestion(p.data.words[0], POOL, 'loop', 0, 2);
+      if (q.type === 'spell') break;
+    }
+    p._qs[p.data.idx] = q;
+    p.showQuestion();
+    p.onKeyInput({ detail: { value: ['x'] } });
+    p.onKeyConfirm();
+    assert.strictEqual(p.data.state, 'detail', '拼错进详情');
+    spoken.length = 0;
+    p.onSpeak();
+    assert.strictEqual(spoken.length, 1,
+      '详情页点喇叭必须念 —— 详情已把单词摆出来，念不泄题，实际没念');
+  } finally {
+    tts.speak = origSpeak;
+  }
+});
+
+test('㉓ 「写」阶段：没有本地发音的词降级为看中文拼写，不出哑巴听写', function () {
+  var p = startedPage();
+  var w = { word: 'zzz-no-audio', def_cn: '测试词', pos: 'n.', phonetic: '/test/', freq: 9999 };
+  for (var i = 0; i < 20; i++) {
+    var q = p.buildQuestion(w, POOL, 'spell', i, 10);
+    assert.strictEqual(q.type, 'spell',
+      '无音频的词在「写」阶段必须是看中文拼写，实际 ' + q.type);
+    assert.strictEqual(q.answerText, w.word);
+  }
+});
+
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));
 if (failed.length) process.exitCode = 1;

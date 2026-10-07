@@ -3,12 +3,15 @@
  *
  * 用自绘组件而不是小程序原生 tabBar：原生 tabBar 的图标是必需资源，
  * 而本仓库刻意不引入二进制图标文件；自绘也便于后续加"今日待办"角标。
+ *
+ * 注意：没有"抽查"入口 —— 2026-10-07 起背词页已合并抽查（认 → 写 → 巩固），
+ * 再留一个"抽查"tab 会让家长以为这是两条独立的练习线（用户实锤反馈）。
+ * 独立交卷制抽查页（quiz）保留，供首页"检验真实水平"按钮进入。
  */
 
 var ITEMS = [
   { key: 'index', label: '今日', icon: '◎', path: '/pages/index/index' },
   { key: 'study', label: '背词', icon: '▶', path: '/pages/drill/drill' },
-  { key: 'quiz', label: '抽查', icon: '✎', path: '/pages/quiz/quiz' },
   { key: 'stats', label: '数据', icon: '▤', path: '/pages/stats/stats' },
   { key: 'class', label: '班级', icon: '⌂', path: '/pages/class/class' }
 ];

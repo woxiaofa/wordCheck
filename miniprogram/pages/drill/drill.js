@@ -83,6 +83,7 @@ Page({
     result: null,            // 完成态数据
     typeLabel: '',
     honor: null,             // 完成后的荣誉/排名（云端返回）
+    honorPeriods: [],        // 今日/本周/本月最快（云端返回后拼好文案）
     me: { nickname: '', avatar: '' }   // 榜单展示用的昵称/头像（用户自愿填）
   },
 
@@ -94,6 +95,8 @@ Page({
     this.startedAt = 0;
     this._spellTries = {};       // 每个词本轮拼错的次数（决定键盘难度）
     this._honest = false;        // 本次作答是不是点了【不会】
+    this._carryMs = 0;           // 详情页停留时长，计入学习简报的"学了多久"
+    this._detailAt = 0;
 
     // 班级作业：URL 带 ids 时，这一轮只练作业里的词
     if (options && options.ids) {
@@ -235,7 +238,7 @@ Page({
     if (phase === 'recog') {
       // 二选一：一个正确释义 + 一个干扰（优先同词性，更迷惑）
       var ds = quizLib.pickDistractors(w, pool, 1);
-      var options = quizLib.shuffleWithAnswer(w.def_cn, ds);
+      var options = shuffleAny(quizLib.shuffleWithAnswer(w.def_cn, ds));
       return {
         type: 'binary',
         wordId: w.word,
@@ -250,8 +253,11 @@ Page({
       // 第 2 步「写」：读音 + 音标 + 中文释义 → 拼出英文。
       // 题面绝不显示单词本身（否则答案就在题面上），但这一档允许读音 ——
       // 它就是一道带提示的听写，念的是"这个词怎么读"，不是"选项哪个对"。
+      // 没有本地发音的词不能出"听音拼写"——喇叭按了没声，孩子只能干等（哑巴题），
+      // 降级为"看中文拼写"，跟巩固轮同一个口径。
+      var hasSound = tts.hasAudio(w.word);
       return {
-        type: 'dictation',
+        type: hasSound ? 'dictation' : 'spell',
         wordId: w.word,
         word: w,
         stem: w.def_cn,
@@ -269,11 +275,19 @@ Page({
     if (type === 'listen' && !tts.hasAudio(w.word)) type = 'spell';
     var q = quizLib.buildQuestion(type, w, pool);
     q.word = w;
-    q.answerText = w.def_cn;
+    // 答案文案按题型给：选义题是中文释义，拼写/听写题是单词本身。
+    // 之前一刀切给 def_cn，详情里出现过"你拼的是「!eastern」，正确的是「东方的；向东的」"
+    // —— 拼写题拿中文当答案，孩子看得一头雾水（2026-10-07 实锤）
+    q.answerText = (type === 'meaning') ? w.def_cn : w.word;
     // quiz.buildQuestion 按"服务端判分"设计刻意不下发答案，但 drill 是本地判定，
     // 与首轮 binary 的 answerIdx 同一口径 —— 不补上这行，巩固轮选义题永远判错
     // （2026-10-07 用户实锤：选了正确释义却被记 forgot，详情里"你选的=正确的"）
-    if (q.options) q.answerIdx = q.options.indexOf(w.def_cn);
+    if (q.options) {
+      // 真随机再洗一次：shuffleWithAnswer 按答案字符码取模定位置（服务端复现用），
+      // 二选一时等价于"答案位置由单词拼写决定"——用户实测"对了几次之后正确答案一直是第二个"
+      q.options = shuffleAny(q.options);
+      q.answerIdx = q.options.indexOf(w.def_cn);
+    }
     return q;
   },
 
@@ -326,6 +340,7 @@ Page({
     // 例外：巩固轮的 spell（看中文拼写）题面只有中文，一念就是把答案读出来。
     if (q.type !== 'spell') this.speak();
     this.startTimer();
+    this._qShownAt = Date.now();     // 学习时长的计时起点（judge 里取用）
   },
 
   /** "第 1 步 认 · 3/10" 这类进度文案 */
@@ -424,6 +439,13 @@ Page({
     var word = q.word || this.findWord(q.wordId);
     var slowAt = WRITE_TYPES[q.type] ? WRITE_SLOW_MS : SLOW_MS;
 
+    // 这个词花了多久：从题面出现到判定 + 之前看详情的时长。
+    // 学习简报的"经过 X 分钟"就是把这些 durationMs 逐条加起来 ——
+    // 之前从不传时长，云端一律记 0，简报永远显示"经过 1 分钟"（2026-10-07 实锤）。
+    var raw = Date.now() - (this._qShownAt || Date.now());
+    var wordMs = Math.min(600000, Math.max(0, raw)) + (this._carryMs || 0);
+    this._carryMs = 0;
+
     // 反馈档位：不会/答错/超时 = 不会；答对但想了很久 = 想了很久
     var fb = 'known';
     if (!ok || timeout || honest) fb = 'forgot';
@@ -436,7 +458,7 @@ Page({
       }
     }
 
-    this.record(word, fb, q.type);
+    this.record(word, fb, q.type, wordMs);
 
     // 错题本：凡是没被判 known 的都要再巩固
     var wrongBook = this.data.wrongBook.slice();
@@ -464,6 +486,9 @@ Page({
       else if (q.options) yourPick = q.options[this.data.pickedIdx] || '';
       else yourPick = this.data.kbValue.join('');
 
+      // 是"选"出来的错还是"拼"出来的错：文案不一样，混着说孩子看不懂
+      var pickVerb = q.options ? '选' : '拼';
+
       this.setData({
         state: 'detail',
         detail: {
@@ -471,13 +496,16 @@ Page({
           ok: false,
           timeout: !!timeout,
           honest: !!honest,
+          pickVerb: pickVerb,
           yourPick: yourPick,
           answer: q.answerText || (word ? word.def_cn : ''),
+          answerVerb: q.options ? '正确的是' : '正确拼写是',
           fbLabel: honest ? '你点了「不会」' : (timeout ? '超时没答，按不会记' : '答错了'),
           speakCount: 0,
           guide: '先听一遍，跟着念出来（点上面的大喇叭）'
         }
       });
+      this._detailAt = Date.now();
       return;
     }
 
@@ -487,8 +515,12 @@ Page({
     setTimeout(function () { self.setData({ judgedOk: false }); self.next(); }, 180);
   },
 
-  /** 详情页「跟着念完了，继续」 */
+  /** 详情页「跟着念完了，继续」：把看详情的时长记进总学习时长（简报口径） */
   onDetailNext: function () {
+    if (this._detailAt) {
+      this._carryMs += Date.now() - this._detailAt;
+      this._detailAt = 0;
+    }
     this.setData({ detail: null });
     this.next();
   },
@@ -585,14 +617,35 @@ Page({
           beat: data.beat || 0,
           badge: data.badge || (perfect ? '🏅 全对通关' : ''),
           detail: data.detail || ''
-        }
+        },
+        honorPeriods: self.periodRows(data.periods)
       });
     }).catch(function (err) {
       // 榜单挂了不影响练词，只给本地荣誉
-      self.setData({ honor: { badge: perfect ? '🏅 全对通关' : '', detail: '' } });
+      self.setData({ honor: { badge: perfect ? '🏅 全对通关' : '', detail: '' }, honorPeriods: [] });
       console.warn('[drill] 成绩上报失败（不影响本轮结果）：',
         (err && (err.errMsg || err.message)) || err);
     });
+  },
+
+  /**
+   * 把云端返回的周期榜（今日/本周/本月最快）拼成完成页的三行文案。
+   * 榜首是我：直说"就是你"；不是我：报榜首 + 我的名次（没名次就只报榜首）。
+   */
+  periodRows: function (periods) {
+    if (!periods) return [];
+    var labels = { day: '今日最快', week: '本周最快', month: '本月最快' };
+    var rows = [];
+    ['day', 'week', 'month'].forEach(function (p) {
+      var it = periods[p];
+      if (!it || !it.total) return;
+      var leader = it.leader || {};
+      var who = leader.mine ? '就是你' : (leader.nickname || '暂无昵称');
+      var text = who + ' · ' + (leader.secondsText || '');
+      if (!leader.mine && it.rank) text += '（我第 ' + it.rank + ' 名）';
+      rows.push({ label: labels[p], text: text });
+    });
+    return rows;
   },
 
   onShareAppMessage: function () {
@@ -658,8 +711,9 @@ Page({
   /**
    * 记一次反馈：本地镜像 + 日报 + 流水 + 云端（幂等）
    * 与学习页 applyRating 同一套口径，保证三处（学习/抽查/快刷）的状态一致。
+   * durationMs：这个词花了多久 —— 学习简报"经过 X 分钟"的唯一数据来源。
    */
-  record: function (word, fb, type) {
+  record: function (word, fb, type, durationMs) {
     if (!word) return;
     var prev = this.mirror[word.word] || null;
     var next = srs.nextState(prev, fb, Date.now());
@@ -694,6 +748,7 @@ Page({
       wordId: word.word,
       feedback: fb,
       mode: 'learn',
+      durationMs: Math.max(0, Math.round(Number(durationMs) || 0)),
       clientReqId: reqId
     }).then(function (res) {
       var errCode = (res && res.ok === false) ? (res.code || 'CLOUD_FAIL') : '';
@@ -708,11 +763,14 @@ Page({
 
   /**
    * 念当前词。答题中和详情页都能无限点 —— 记单词不看读音等于只记一半。
-   * 唯一的例外：巩固轮的 spell（题面只有中文，念出来就是答案）。
+   * 例外只有"答题中的看中文拼写"：题面只有中文，念出来就是把答案送出去。
+   * 详情页必须放行 —— 详情本来就把单词摆出来了，喇叭是跟读引导的核心；
+   * 之前一刀切拦掉，拼写题答错后的详情里大喇叭按了没声（2026-10-07 实锤）。
    */
   speak: function () {
     var q = this.data.q || (this._qs && this._qs[this.data.idx]);
-    if (q && q.type === 'spell') return;
+    var inRun = this.data.state === 'run';
+    if (inRun && q && q.type === 'spell') return;
     var w = (q && q.word) || (this.data.detail && this.data.detail.word);
     if (!w) return;
     tts.speak(w.word || w.wordId, function () { /* 没声音也不打断流程 */ });
@@ -736,4 +794,19 @@ function levelLabel(level) {
   } catch (e) {
     return level === 'easy' ? '仅正确字母' : (level === 'medium' ? '含易混字母' : '全键盘');
   }
+}
+
+/**
+ * 真随机洗牌（Fisher–Yates）。
+ * 只用于 drill 本地出题：quiz.js 里的 shuffleWithAnswer 刻意用确定性位置
+ * （服务端判分要能复现同一道题），但那意味着"答案在第几位"由单词拼写算出来，
+ * 二选一时就是"一直偏第二位"这种可被孩子看穿的规律。本地判分没必要背着这个包袱。
+ */
+function shuffleAny(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
 }

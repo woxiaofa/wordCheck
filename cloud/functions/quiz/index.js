@@ -117,8 +117,9 @@ async function buildWordPool(userId) {
         .catch(() => ({ data: [] }));
       (wRes.data || []).forEach((w) => {
         push(w);
-        // 把 SRS 状态挂上，供排序使用（不进入下发给客户端的字段）
-        const st = (stRes.data || []).find((s) => s.word_id === w.word);
+        // 把 SRS 状态挂上，供排序使用（不进入下发给客户端的字段）。
+        // 注意 queryStates 返回的就是行数组（上面已经 .map 用过），不是 {data:[...]}
+        const st = stRows.find((s) => s.word_id === w.word);
         if (st) pool[pool.length - 1]._state = st;
       });
     }

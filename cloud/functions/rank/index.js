@@ -20,7 +20,7 @@ const _ = db.command;
 
 const { getLocalDate } = require('./time');
 
-const VERSION = 'rank-20261007-v1';
+const VERSION = 'rank-20261007-periods';
 
 const COLL = {
   users: 'users',
@@ -29,6 +29,9 @@ const COLL = {
 
 /** 榜单单次返回上限 */
 const BOARD_LIMIT = 50;
+
+/** 参与比的周期：今日 / 本周 / 本月（各自独立成榜，每人在每个周期内只留最快） */
+const PERIODS = ['day', 'week', 'month'];
 
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
@@ -66,6 +69,23 @@ async function onSubmit(openid, event) {
   const prevData = prev && prev.data;
   const better = !prevData || !(prevData.seconds <= seconds);
 
+  // 周期桶：今日/本周/本月各留一份"这个周期内的最快"。
+  // 跨了周期（新的一天/周一/月初）就重开；没跨就只在你更快时刷新。
+  // 这样"本周最快"不需要留存全部流水 —— 每个人的周期最优就躺在自己的成绩文档里。
+  const starts = periodStarts(now);
+  const prevPeriod = (prevData && prevData.period) || {};
+  const period = {};
+  for (const p of PERIODS) {
+    const pb = prevPeriod[p];
+    if (!pb || pb.start !== starts[p]) {
+      period[p] = { start: starts[p], seconds: seconds, count: count, perfect: perfect };
+    } else if (seconds < pb.seconds) {
+      period[p] = { start: pb.start, seconds: seconds, count: count, perfect: perfect };
+    } else {
+      period[p] = pb;
+    }
+  }
+
   // upsert 的 data 里绝不能带 _id（doc(id).set() 已经指定了，再带会 -501007）
   const doc = {
     user_id: user._id,
@@ -74,8 +94,10 @@ async function onSubmit(openid, event) {
     count: count,
     seconds: better ? seconds : prevData.seconds,
     perfect: better ? perfect : !!prevData.perfect,
+    // date 是"最好成绩是哪天练的"：更慢的一次不该把它刷成今天（否则最好成绩的日期是假的）
+    date: better ? today : (prevData.date || today),
     runs: (prevData && prevData.runs ? prevData.runs : 0) + 1,
-    date: today,
+    period: period,
     updated_at: now
   };
 
@@ -98,7 +120,7 @@ async function onSubmit(openid, event) {
 }
 
 /**
- * 算排名与荣誉
+ * 算排名与荣誉（总榜 + 今日/本周/本月三个周期榜）
  * @param {object} doc 成绩文档
  * @param {object} user 用户（取昵称）
  */
@@ -126,15 +148,89 @@ async function rankOf(doc, user) {
     doc.count + ' 个词 · ' + fmtSeconds(doc.seconds) +
     ' · 第 ' + rank + '/' + total + ' 名';
 
+  const periods = await periodRanks(doc);
+  const best = doc.seconds;
+
   return {
     rank: rank,
     total: total,
     beat: beat,
     badge: badgeOf(rank, total, beat, doc.perfect),
     detail: detail,
-    best: doc.seconds,
+    best: best,
     key: doc.key,
-    keyName: doc.key_name || ''
+    keyName: doc.key_name || '',
+    periods: periods
+  };
+}
+
+/**
+ * 三个周期榜（今日/本周/本月）里我的名次与榜首。
+ * 取全 key 的成绩文档（同一人每 key 只一条，班级场景几十条封顶）在内存里算，
+ * 不做聚合查询 —— 数据量级之下，简单可验证远比"看起来高级"重要。
+ */
+async function periodRanks(doc) {
+  const starts = periodStarts(Date.now());
+  const res = await db.collection(COLL.scores)
+    .where({ key: doc.key }).limit(200).get().catch(() => null);
+  const rows = (res && res.data) || [];
+
+  // 榜首要显示昵称：一次性把涉及的用户批量取回
+  const ids = rows.map(r => r.user_id).filter(Boolean);
+  const users = {};
+  if (ids.length) {
+    const us = await db.collection(COLL.users).where({ _id: _.in(ids) })
+      .limit(BOARD_LIMIT).get().catch(() => null);
+    ((us && us.data) || []).forEach(u => { users[u._id] = u; });
+  }
+
+  const out = {};
+  for (const p of PERIODS) {
+    // 有这个周期成绩的人（start 相同 = 同一个今天/同一周/同一个月）
+    const inP = rows.filter(r => r.period && r.period[p] &&
+      r.period[p].start === starts[p]);
+    if (!inP.length) { out[p] = null; continue; }
+
+    const mine = doc.period && doc.period[p] ? doc.period[p].seconds : doc.seconds;
+    const fasterInP = inP.filter(r => r.period[p].seconds < mine).length;
+    const rankInP = fasterInP + 1;
+
+    const leaderRow = inP.reduce((best, r) =>
+      r.period[p].seconds < best.period[p].seconds ? r : best, inP[0]);
+    const lu = users[leaderRow.user_id] || {};
+
+    out[p] = {
+      rank: rankInP,
+      total: inP.length,
+      seconds: mine,
+      secondsText: fmtSeconds(mine),
+      leader: {
+        nickname: lu.nickname || '',
+        seconds: leaderRow.period[p].seconds,
+        secondsText: fmtSeconds(leaderRow.period[p].seconds),
+        perfect: !!leaderRow.period[p].perfect,
+        mine: leaderRow.user_id === doc.user_id
+      }
+    };
+  }
+  return out;
+}
+
+/** UTC+8 的三个周期起点（毫秒时间戳）：今天 0 点 / 本周一 0 点 / 本月 1 号 0 点 */
+function periodStarts(now) {
+  const t = new Date(now + 8 * 3600 * 1000);   // 平移到 UTC+8 后按 UTC 读字段
+  const y = t.getUTCFullYear();
+  const m = t.getUTCMonth();
+  const d = t.getUTCDate();
+  const dow = t.getUTCDay();                    // 0=周日
+  const mondayOffset = dow === 0 ? 6 : dow - 1;
+  const DAY = 86400000;
+  const TZ = 8 * 3600 * 1000;
+  const dayStart = Date.UTC(y, m, d) - TZ;
+  return {
+    day: dayStart,
+    week: dayStart - mondayOffset * DAY,
+    month: Date.UTC(y, m, 1) - TZ
   };
 }
 
