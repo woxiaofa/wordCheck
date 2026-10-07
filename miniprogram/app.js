@@ -88,5 +88,19 @@ App({
 
     // 回到前台：再试一次补传（网络可能已经恢复）
     this.flushPending();
+  },
+
+  /**
+   * 全局错误兜底
+   * PC 微信 / iPad 上偶发的"打不开"，往往就是这里能抓到的那一条 ——
+   * 微信给的那句"当前网络不稳定"不告诉你是哪一步挂了，这里补上。
+   */
+  onError: function (msg) {
+    console.error('[app] 未捕获错误：', msg);
+  },
+
+  /** Promise 里没人接的 reject（云调用链路上最常见） */
+  onUnhandledRejection: function (res) {
+    console.error('[app] 未处理的 Promise 拒绝：', res && res.reason ? res.reason : res);
   }
 });

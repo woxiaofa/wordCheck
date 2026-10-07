@@ -82,7 +82,9 @@ function checkWxml() {
       ? fs.readFileSync(f.replace(/\.wxml$/, '.js'), 'utf8') : null;
     if (js) {
       verify.checkHandlers(label, js, wxml);
-      verify.checkData(label, js, wxml);
+      // 第 4 个参数必须传：behavior（如 layout.behavior）注入的字段不在页面 data 里，
+      // 要靠 js 文件路径去被引入的模块里取出来放行
+      verify.checkData(label, js, wxml, f.replace(/\.wxml$/, '.js'));
     }
 
     // 把 verify 收集到的问题搬过来，保持单一实现

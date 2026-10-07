@@ -159,7 +159,7 @@ function checkPages() {
     const wxml = read(base + '.wxml');
     if (js && wxml) {
       checkHandlers('pages/' + name, js, wxml);
-      checkData('pages/' + name, js, wxml);
+      checkData('pages/' + name, js, wxml, base + '.js');
     }
   });
   notes.push('app.json 声明了 ' + app.pages.length + ' 个页面');
@@ -190,7 +190,7 @@ function stripWxmlComments(wxml) {
 }
 
 /** wxml 里用到的简单字段，最好在 js 的 data 里出现过（避免拼写错误导致空白） */
-function checkData(label, js, wxmlRaw) {
+function checkData(label, js, wxmlRaw, jsFile) {
   const wxml = stripWxmlComments(wxmlRaw);
   const dataMatch = js.match(/data\s*:\s*\{([\s\S]*?)\n\s{2,4}\}/);
   if (!dataMatch) return;
@@ -220,6 +220,25 @@ function checkData(label, js, wxmlRaw) {
   const useRe = /\{\{\s*([A-Za-z_$][\w$]*)/g;
   let u;
   while ((u = useRe.exec(wxml))) used.add(u[1]);
+
+  // behaviors 注入的字段（如 layout.behavior 的 layoutWide / layoutStyle）
+  // 不在页面自己的 data 里，但确实会被 setData 写入 —— 从被引入的模块里取出来放行。
+  // 否则每次新增一个共享 behavior，所有用到它的页面都会被误报成"拼写错误"。
+  if (jsFile && js.indexOf('behaviors') >= 0) {
+    const behRe = /var\s+([A-Za-z_$][\w$]*)\s*=\s*require\(['"]([^'"]+)['"]\)/g;
+    let b;
+    while ((b = behRe.exec(js))) {
+      if (js.indexOf(b[1] + '.behavior') < 0) continue;
+      const modPath = path.resolve(path.dirname(jsFile), b[2].endsWith('.js') ? b[2] : b[2] + '.js');
+      let mod = '';
+      try { mod = fs.readFileSync(modPath, 'utf8'); } catch (e) { continue; }
+      const md = mod.match(/data\s*:\s*\{([\s\S]*?)\n\s{2,4}\}/);
+      if (!md) continue;
+      const kr = /^\s*([A-Za-z_$][\w$]*)\s*:/gm;
+      let kk;
+      while ((kk = kr.exec(md[1]))) declared.add(kk[1]);
+    }
+  }
 
   used.forEach((name) => {
     if (declared.has(name)) return;
@@ -269,7 +288,7 @@ function checkDuplicateAttrs(label, wxml) {
   const tagRe = /<([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/g;
   let m;
   while ((m = tagRe.exec(wxml))) {
-    const attrStr = m[2] || '';
+    const attrStr = (m[2] || '').replace(/\{\{[\s\S]*?\}\}/g, '""');
     const attrRe = /([a-zA-Z_:][\w:.-]*)\s*=/g;
     const seenLocal = {};
     let a;
@@ -302,7 +321,7 @@ function checkAllWxml() {
     checkTags(label, wxml);
     checkDuplicateAttrs(label, wxml);
     const js = read(f.replace(/\.wxml$/, '.js'));
-    if (js) { checkHandlers(label, js, wxml); checkData(label, js, wxml); }
+    if (js) { checkHandlers(label, js, wxml); checkData(label, js, wxml, f.replace(/\.wxml$/, '.js')); }
   });
   notes.push('检查了 ' + files.length + ' 个 wxml 文件（含标签配平、重复属性、绑定一致性）');
 }

@@ -1,5 +1,5 @@
 <!-- 数据看板与错词本 -->
-<view class="page">
+<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
 
   <!-- ===== 日报 / 周报 / 月报 ===== -->
   <view class="rpt-tabs">

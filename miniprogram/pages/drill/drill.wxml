@@ -1,0 +1,144 @@
+<!--
+  快刷页（背单词新流程）
+  首轮：单词 + 音标 + 自动读音 → 两个中文释义二选一 → 对就下一词，错/超时进详情
+  之后：没拿下的词进入循环轮次，用选义/拼写/听写反复测到全对
+  完成：本轮时长 + 错题本 + 继续学习 / 下一个任务
+-->
+<view class="page drill {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+
+  <view class="bar row-between">
+    <text class="tag-line">
+      <block wx:if="{{assignName}}">📌 {{assignName}}</block>
+      <block wx:else>{{phase === 'binary' ? '第 1 轮 · 快刷' : '第 ' + round + ' 轮 · 巩固'}}</block>
+    </text>
+    <text class="muted">{{state === 'done' ? '完成' : (idx + 1) + ' / ' + words.length}}</text>
+  </view>
+  <view class="progress">
+    <view class="progress-inner" style="width:{{progressPct}}%"></view>
+  </view>
+
+  <!-- ============ 答题 ============ -->
+  <block wx:if="{{state === 'run' && q}}">
+    <view class="card qcard {{judgedOk ? 'flash' : ''}}">
+      <!-- 题干：单词 + 音标，点一下重听 -->
+      <view class="qword-row" bindtap="onSpeak">
+        <text class="qword">{{q.type === 'listen' ? '🔊 听写' : q.wordId}}</text>
+        <text class="speaker">🔊</text>
+      </view>
+      <view class="qph" wx:if="{{q.type !== 'listen'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
+
+      <!-- 选择题：首轮只有两个选项，循环轮是四个 -->
+      <block wx:if="{{q.options}}">
+        <view
+          wx:for="{{q.options}}"
+          wx:key="*this"
+          class="opt {{pickedIdx === index ? (index === q.answerIdx ? 'right' : 'wrong') : ''}}"
+          data-idx="{{index}}"
+          bindtap="onPick"
+        >{{item}}</view>
+      </block>
+
+      <!-- 拼写 / 听写：键盘输入 -->
+      <block wx:else>
+        <view class="qstem">{{q.type === 'listen' ? '把听到的单词拼出来' : q.stem}}</view>
+        <view class="typed">{{kbValue.length ? kbValue.join('') : '…'}}</view>
+        <letter-keyboard
+          class="mt"
+          length="{{q.length || 0}}"
+          word="{{q.wordId || ''}}"
+          value="{{kbValue}}"
+          confirm-label="确定"
+          bind:input="onKeyInput"
+          bind:confirm="onKeyConfirm"
+        />
+      </block>
+
+      <view class="slow-hint" wx:if="{{slowHint && pickedIdx < 0 && !q.options}}">
+        想不起来也没关系 —— 拼一个试试，看完详情记得更牢
+      </view>
+      <view class="slow-hint" wx:elif="{{slowHint && pickedIdx < 0}}">
+        想了很久？凭第一感觉选，选错会立刻给你看释义
+      </view>
+    </view>
+
+    <view class="muted center mt-s">
+      选对了立刻跳下一个词；答错或超过 10 秒没选，会先看一眼这个词
+    </view>
+  </block>
+
+  <!-- ============ 答错/超时：词详情 ============ -->
+  <block wx:if="{{state === 'detail' && detail}}">
+    <view class="card detail-card">
+      <view class="dflag bad">{{detail.fbLabel}}</view>
+
+      <view class="qword-row" bindtap="onSpeak">
+        <text class="qword">{{detail.word.word}}</text>
+        <text class="speaker">🔊</text>
+      </view>
+      <view class="qph">{{detail.word.phonetic}}　{{detail.word.pos}}</view>
+
+      <view class="ddef">{{detail.word.def_cn}}</view>
+
+      <view class="dex" wx:if="{{detail.word.example_en}}">
+        <view class="dex-en">{{detail.word.example_en}}</view>
+        <view class="dex-cn">{{detail.word.example_cn}}</view>
+      </view>
+
+      <view class="dyour" wx:if="{{detail.yourPick}}">
+        你选的是「{{detail.yourPick}}」，正确的是「{{detail.answer}}」
+      </view>
+
+      <button class="btn mt" bindtap="onDetailNext">记住了，继续</button>
+      <view class="muted center mt-s">
+        这个词等下还会再考你一次，直到答对为止
+      </view>
+    </view>
+  </block>
+
+  <!-- ============ 完成 ============ -->
+  <block wx:if="{{state === 'done' && result}}">
+    <view class="card center">
+      <view class="done-emoji">{{result.allDone ? '🎉' : '👍'}}</view>
+      <view class="done-title">{{result.allDone ? '这一轮全部答对' : '这一轮练完了'}}</view>
+      <view class="done-sub">
+        {{result.assignName ? result.assignName + ' · ' : ''}}用时 {{elapsedText}}，
+        {{result.mastered}}/{{result.total}} 个词已拿下
+      </view>
+
+      <view class="kpi-row mt">
+        <view class="kpi"><view class="num">{{result.total}}</view><view class="label">本轮词数</view></view>
+        <view class="kpi"><view class="num">{{result.mastered}}</view><view class="label">已拿下</view></view>
+        <view class="kpi"><view class="num">{{result.wrongBook.length}}</view><view class="label">曾答错</view></view>
+      </view>
+
+      <!-- 错题本：答错的词摆出来，家长一眼看得出要盯哪几个 -->
+      <view class="wb" wx:if="{{result.wrongBook.length}}">
+        <view class="wb-title">错题本（这几个词还要再巩固）</view>
+        <view class="wb-list">
+          <view class="wb-item" wx:for="{{result.wrongBook}}" wx:key="word">
+            <text class="wb-w">{{item.word}}</text>
+            <text class="wb-d">{{item.def_cn}}</text>
+          </view>
+        </view>
+      </view>
+
+      <button class="btn mt" bindtap="onAgain">
+        {{result.left.length ? '把剩下的 ' + result.left.length + ' 个再练一轮' : '再来一轮'}}
+      </button>
+      <button class="btn ghost mt-s" bindtap="onNextTask">下一个任务</button>
+      <button class="btn ghost mt-s" wx:if="{{result.wrongBook.length}}" bindtap="onWrongBook">看错词本</button>
+    </view>
+  </block>
+
+  <!-- ============ 没有词 ============ -->
+  <block wx:if="{{state === 'empty' || state === 'loading'}}">
+    <view class="card center">
+      <view class="muted" style="padding:60rpx 0">
+        {{state === 'loading' ? '正在取出今天要练的词…' : '今天没有要练的词了，明天再来 🎉'}}
+      </view>
+      <button class="btn ghost mt" wx:if="{{state === 'empty'}}" bindtap="onHome">回首页</button>
+    </view>
+  </block>
+
+  <footer-nav active="study" />
+</view>

@@ -12,12 +12,14 @@ var assignParam = require('../../utils/assign');
 var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
+var layout = require('../../utils/layout');
 
 var TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
 var CREATE_KEY = 'class_create_reqid';   // 建班幂等 ID 持久化：重进页面不产生第二个班
 var CREATE_ID_PREFIX = 'class-create:';
 
 Page({
+  behaviors: [layout.behavior],
   data: {
     loading: true,
     cloudError: '',
@@ -353,12 +355,12 @@ Page({
     var ids = (a.word_ids || []).join(',');
     if (!ids) {
       // 旧版服务端不下发词单：退回普通学习页，至少有得学
-      wx.redirectTo({ url: '/pages/study/study' });
+      wx.redirectTo({ url: '/pages/drill/drill' });
       return;
     }
     var name = a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业');
     wx.redirectTo({
-      url: '/pages/study/study?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
+      url: '/pages/drill/drill?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
         '&name=' + encodeURIComponent(name)
     });
   },

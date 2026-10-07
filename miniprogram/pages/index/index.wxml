@@ -1,14 +1,14 @@
 <!-- 今日任务：一眼回答三个问题——做多少、都是什么词、现在点哪里 -->
-<view class="page">
+<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
 
   <!-- 首次使用：一句话价值 + 一个动作。非阻断、可关闭、永不再现（新手引导第 1 段） -->
   <view class="card intro" wx:if="{{intro}}">
     <view class="t1">每天 5 分钟，{{target}} 个词</view>
     <view class="muted mt-s">
       今天该复习什么，系统按遗忘曲线排好了，你只需要开始。
-      先学习、后抽查，答对的词隔更久再出现。
+      先快刷：看单词选意思，选对就过；答错或想不起来才看详情，看完接着考。
     </view>
-    <button class="btn mt" bindtap="goStudy">开始学第 1 轮</button>
+    <button class="btn mt" bindtap="goStudy">开始背单词</button>
     <view class="link center mt-s" bindtap="toggleHowto">先看看它怎么运作</view>
     <view class="intro-close" bindtap="dismissIntro">✕</view>
   </view>

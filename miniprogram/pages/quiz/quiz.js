@@ -19,6 +19,7 @@ var books = require('../../utils/books');
 var tts = require('../../utils/tts');
 var report = require('../../utils/report');
 var learnlog = require('../../utils/learnlog');
+var layout = require('../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -28,6 +29,7 @@ var MAX_REPLAY = 3;
 var FEEDBACK_MS = 1800;
 
 Page({
+  behaviors: [layout.behavior],
   data: {
     state: 'intro',          // intro | run | result
     questions: [],

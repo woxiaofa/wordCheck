@@ -21,6 +21,7 @@ var tts = require('../../utils/tts');
 var report = require('../../utils/report');
 var assignParam = require('../../utils/assign');
 var learnlog = require('../../utils/learnlog');
+var layout = require('../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -30,6 +31,7 @@ var ONBOARD_KEY = 'onboard_v1_gesture';
 var FEEDBACK_LABELS = { known: '想得很快', vague: '想起来了，但费劲', forgot: '没想起来' };
 
 Page({
+  behaviors: [layout.behavior],
   data: {
     queue: [],
     index: 0,

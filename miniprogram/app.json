@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/drill/drill",
     "pages/study/study",
     "pages/quiz/quiz",
     "pages/stats/stats",
@@ -16,5 +17,6 @@
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "resizable": true
 }

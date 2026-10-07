@@ -10,6 +10,7 @@ var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var report = require('../../utils/report');
+var layout = require('../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
@@ -25,6 +26,7 @@ var RANGES = [
 ];
 
 Page({
+  behaviors: [layout.behavior],
   data: {
     mastery: 0,
     streak: 0,

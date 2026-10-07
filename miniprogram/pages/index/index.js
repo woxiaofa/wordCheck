@@ -16,6 +16,7 @@ var time = require('../../utils/time');
 var books = require('../../utils/books');
 var cloud = require('../../utils/cloud');
 var learnlog = require('../../utils/learnlog');
+var layout = require('../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 /** 首次引导卡：点"开始学"或关闭后写入，之后永不再现 */
@@ -27,6 +28,7 @@ var CHECKIN_RATIO = 0.8;
 var SECONDS_PER_WORD = 15;
 
 Page({
+  behaviors: [layout.behavior],
   data: {
     totalCount: 0,
     dueCount: 0,
@@ -140,7 +142,7 @@ Page({
     // 注意：a.ids 已经 buildIdsParam 编码过（含 %2C），这里不能再编码一次，
     // 否则 %2C → %252C 双重编码，学习页解码后逗号回不来，整串又变成"一个词"
     wx.redirectTo({
-      url: '/pages/study/study?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
+      url: '/pages/drill/drill?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
     });
   },
 
@@ -270,11 +272,13 @@ Page({
     // 一个待学的词都没有：本地词库已学完、全部排进未来，
     // 之后 SRS 把它们全推到未来，这时不该显示"0 个词 + 开始学习"（用户会以为坏了）
     var allDone = total === 0 && learned > 0;
+    // 新流程：主按钮一律进快刷（单词+两个意思二选一，答错才看详情）。
+    // 今天没有待学的词时快刷页会自己给出"今天没有要练的词"，不再需要绕去抽查页。
     var mainBtnText;
-    if (allDone) mainBtnText = '去做抽查';
-    else if (!total || taskDone) mainBtnText = '再学一轮';
-    else if (done > 0) mainBtnText = '继续学习 · 还剩 ' + rest + ' 个';
-    else mainBtnText = '开始学习';
+    if (allDone) mainBtnText = '去复习一轮';
+    else if (!total || taskDone) mainBtnText = '再练一轮';
+    else if (done > 0) mainBtnText = '继续背 · 还剩 ' + rest + ' 个';
+    else mainBtnText = '开始背单词';
 
     if (allDone) progressNote = '今天的词都记在计划里了，去抽查检验一下真实水平';
 
@@ -330,14 +334,9 @@ Page({
   },
 
   goStudy: function () {
-    // 点"开始学第 1 轮"即视为看过引导，以后永不再现
+    // 点"开始背单词"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
-    // 今天没有待学的词时，"开始学习"会把用户送进一个空白页，直接改去抽查
-    if (this.data.allDone) {
-      wx.redirectTo({ url: '/pages/quiz/quiz' });
-      return;
-    }
-    wx.redirectTo({ url: '/pages/study/study' });
+    wx.redirectTo({ url: '/pages/drill/drill' });
   },
 
   goQuiz: function () {

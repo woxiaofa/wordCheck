@@ -7,7 +7,7 @@
 
 var ITEMS = [
   { key: 'index', label: '今日', icon: '◎', path: '/pages/index/index' },
-  { key: 'study', label: '学习', icon: '▶', path: '/pages/study/study' },
+  { key: 'study', label: '背词', icon: '▶', path: '/pages/drill/drill' },
   { key: 'quiz', label: '抽查', icon: '✎', path: '/pages/quiz/quiz' },
   { key: 'stats', label: '数据', icon: '▤', path: '/pages/stats/stats' },
   { key: 'class', label: '班级', icon: '⌂', path: '/pages/class/class' }

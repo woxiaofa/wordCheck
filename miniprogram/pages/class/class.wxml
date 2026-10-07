@@ -1,6 +1,6 @@
 <!-- 班级页：一页三态——未加入（二选一入口）/ 教练端 / 学生端。
      数据全部来自 class 云函数；云不可用时整页降级为提示，本地功能不受影响。 -->
-<view class="page">
+<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
 
   <!-- ===== 加载中 ===== -->
   <view wx:if="{{loading}}" class="card center muted">正在载入班级…</view>
@@ -66,6 +66,12 @@
         <text class="form-label">词数</text>
         <slider min="3" max="30" step="1" value="{{form.count}}" activeColor="#3ea6ff"
                 block-size="20" show-value bindchange="pickCount" class="grow" />
+      </view>
+      <!-- 小学阶段的量：一次超过 10 个，孩子多半会为了赶完乱点，等于没学 -->
+      <view class="count-tip {{form.count > 10 ? 'warn' : ''}}">
+        {{form.count > 10
+          ? '⚠️ 小学生一次建议不超过 10 个词 —— 词太多容易为了赶进度乱点，看着做完了其实没记住'
+          : '小学生一次 5~10 个词效果最好：做完有成就感，也记得住'}}
       </view>
       <view class="form-row">
         <text class="form-label">截止</text>

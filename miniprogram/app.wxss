@@ -72,3 +72,43 @@ page {
 /* 进度条 */
 .progress { height: 10rpx; background: #2b3949; border-radius: 99rpx; overflow: hidden; }
 .progress-inner { height: 100%; background: linear-gradient(90deg, #3ea6ff, #7c5cff); width: 0; }
+
+/* ===== 宽屏适配：iPad / 折叠屏展开 / 双屏 Duo / PC 窗口 =====
+   .wide 由 utils/layout.js 在窗口短边 >= 600px 时挂到页面根节点（<view class="page">）。
+   为什么需要：rpx 的换算是"750rpx = 屏幕宽度"，宽屏上 30rpx 会被放大到 1.5~2 倍，
+   卡片撑满整屏、按钮巨大、一行放不下原来的内容。这里把关键尺寸改回 px，
+   视觉比例回到手机上的样子；内容区宽度由根节点的 max-width(px) 限制并居中。 */
+
+/* 大屏基础字号：app.wxss 的 30rpx 在 iPad 上会被放大到 ~40px，收回成 16px */
+.page.wide { font-size: 16px; padding-left: 24px; padding-right: 24px; }
+
+.wide .card { padding: 20px; border-radius: 14px; margin-bottom: 16px; }
+.wide .card-title { font-size: 17px; }
+.wide .t1 { font-size: 19px; }
+.wide .t2, .wide .muted { font-size: 14px; }
+.wide .btn { height: 46px; border-radius: 12px; font-size: 17px; }
+.wide .btn.sm { height: 36px; font-size: 15px; border-radius: 10px; }
+.wide .kpi { padding: 14px 16px; border-radius: 12px; }
+.wide .kpi .num { font-size: 26px; }
+.wide .kpi .label { font-size: 13px; }
+.wide .line { padding: 12px 0; }
+.wide .grid-2, .wide .grid-3 { gap: 16px; }
+.wide .input { height: 44px; font-size: 16px; }
+
+/* 首页 hero（页面 wxss 里是 rpx，宽屏会被放大；这里按 px 收回） */
+.wide .hero-label { font-size: 14px; }
+.wide .hero-num { font-size: 46px; }
+.wide .hero-unit { font-size: 17px; }
+.wide .book-chips { margin-top: 12px; }
+.wide .book-chip { padding: 6px 12px; font-size: 14px; }
+
+/* 学习页/抽查页/班级页的关键元素 */
+.wide .assign-bar { padding: 10px 14px; }
+.wide .assign-name, .wide .assign-num { font-size: 14px; }
+.wide .qopt { padding: 14px 16px; font-size: 16px; border-radius: 12px; }
+.wide .assign { padding: 14px; border-radius: 12px; }
+
+/* 拼写键盘：大屏上按键不该跟着放大成麻将牌 */
+.wide .kb-key { height: 44px; border-radius: 10px; font-size: 18px; }
+.wide .kb-bar { height: 40px; }
+.wide .kb-del, .wide .kb-clear { height: 40px; font-size: 15px; }
