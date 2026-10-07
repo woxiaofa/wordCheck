@@ -123,7 +123,25 @@ async function onToday(openid) {
   try {
     await db.collection(COLL.tasks).doc(taskId).set({ data: saveDoc });
   } catch (e) {
-    // 仍失败（如同一天的任务被老格式文档占住了业务键）：按业务键找回照常回放
+    // set-upsert 仍可能撞唯一索引：插入瞬间，库里 task_date 为空的旧格式脏文档
+    // 占住了 (user_id, task_date) 索引（dup key 显示 task_date: null 即此因）。
+    // 自愈：删掉该用户的空日期脏文档后重试一次；重试还不行
+    // （如今天日期的旧文档占键）就继续往下走业务键回放兜底。
+    const msg = (e && (e.errMsg || e.message)) || '';
+    if (/E11000|duplicate|502001/i.test(msg)) {
+      await db.collection(COLL.tasks)
+        .where({ user_id: user._id, task_date: _.eq(null) })
+        .remove()
+        .catch(() => null);
+      try {
+        await db.collection(COLL.tasks).doc(taskId).set({ data: saveDoc });
+        const words = await fetchWords(newIds.concat(dueIds));
+        return ok({ task: taskView(doc), words, date: today });
+      } catch (e2) {
+        // 重试仍撞键：走下面的业务键回放
+      }
+    }
+    // 其他失败：按业务键找回照常回放
     const again = await db.collection(COLL.tasks).doc(taskId).get().catch(() => null);
     let t = again && again.data;
     if (!t) {
@@ -227,6 +245,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261007-tasksfix';
+const VERSION = 'task-20261007-nullfix';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

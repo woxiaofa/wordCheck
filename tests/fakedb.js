@@ -43,6 +43,11 @@ function createFakeDb(opts) {
         if (cond.__op === 'lte' && !(val !== undefined && val <= cond.v)) return false;
         if (cond.__op === 'gte' && !(val !== undefined && val >= cond.v)) return false;
         if (cond.__op === 'in' && cond.v.indexOf(val) === -1) return false;
+        if (cond.__op === 'eq') {
+          // Mongo 语义：等值 null 同时命中"字段值为 null"和"字段不存在"的文档
+          var hitNull = (cond.v === null) && (val === undefined || val === null);
+          if (!(hitNull || val === cond.v)) return false;
+        }
         continue;
       }
       // 云端语义：字段是数组时，等值条件会匹配数组里的元素（tags:['中考'] 能被 {tags:'中考'} 命中）
@@ -56,6 +61,7 @@ function createFakeDb(opts) {
   }
 
   var command = {
+    eq: function (v) { return { __op: 'eq', v: v }; },
     lt: function (v) { return { __op: 'lt', v: v }; },
     gt: function (v) { return { __op: 'gt', v: v }; },
     lte: function (v) { return { __op: 'lte', v: v }; },
@@ -63,8 +69,9 @@ function createFakeDb(opts) {
     in: function (arr) { return { __op: 'in', v: arr }; }
   };
 
-  /** 查询链。rows 是当时的快照，每个算子都返回新链（与云开发的链式调用一致） */
-  function chain(rows) {
+  /** 查询链。rows 是当时的快照，每个算子都返回新链（与云开发的链式调用一致）。
+      remove 需要写回集合，所以要传 collName（doc().remove() 不走 chain，不受影响） */
+  function chain(rows, collName) {
     return {
       count: function () { return Promise.resolve({ total: rows.length }); },
       limit: function (n) { return chain(rows.slice(0, n)); },
@@ -93,7 +100,7 @@ function createFakeDb(opts) {
       },
       remove: function () {
         var ids = rows.map(function (d) { return d._id; });
-        colls[name] = ensure(name).filter(function (d) { return ids.indexOf(d._id) === -1; });
+        colls[collName] = ensure(collName).filter(function (d) { return ids.indexOf(d._id) === -1; });
         return Promise.resolve({ stats: { removed: ids.length } });
       }
     };
@@ -102,7 +109,7 @@ function createFakeDb(opts) {
   function collection(name) {
     var self = {
       where: function (q) {
-        return chain(ensure(name).filter(function (d) { return match(d, q); }));
+        return chain(ensure(name).filter(function (d) { return match(d, q); }), name);
       },
       // 不带 where 的全表链式入口（task.today 取词库 / class.onAssign 选词走这条）
       orderBy: function (f, dir) { return chain(ensure(name).slice()).orderBy(f, dir); },

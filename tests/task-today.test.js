@@ -62,8 +62,10 @@ function asU(run) {
 
 function tasksDocs() { return (db.raw.daily_tasks || []).slice(); }
 
-/** 模拟真实库的唯一索引：daily_tasks 上 (user_id + task_date) 相同即写失败 */
-var UNIQUE_PAIRS = [];
+/** 模拟真实库的唯一索引：daily_tasks 上 (user_id + task_date) 唯一。
+ *  线上实锤语义：task_date 为空的旧脏文档会挡住同一用户的任何新插入
+ *  （E11000 的 dup key 显示 task_date: null 即此因），按此建模。
+ *  冲突直接查当前集合内容（动态），不再手工登记。 */
 function installUniqueIndex() {
   var baseCollection = db.collection;
   db.collection = function (name) {
@@ -74,10 +76,18 @@ function installUniqueIndex() {
       var d = origDoc.call(c, id);
       var origSet = d.set;
       d.set = function (o) {
-        var pair = JSON.stringify([o.data.user_id, o.data.task_date]);
-        if (UNIQUE_PAIRS.indexOf(pair) !== -1) {
+        var nd = o.data.task_date === undefined ? null : o.data.task_date;
+        function hits() {
+          return (db.raw.daily_tasks || []).filter(function (d2) {
+            return d2._id !== id && d2.user_id === o.data.user_id &&
+              (d2.task_date === nd || d2.task_date == null || nd === null);
+          });
+        }
+        if (hits().length) {
+          var hit = hits()[0];
+          var kv = JSON.stringify([hit.user_id, hit.task_date === undefined ? null : hit.task_date]);
           return Promise.reject(new Error(
-            'collection.set:fail -502001 duplicate key error, dup key: ' + pair));
+            'collection.set:fail -502001 E11000 duplicate key error, dup key: ' + kv));
         }
         return origSet.call(d, o);
       };
@@ -116,20 +126,39 @@ ok('③ set 撞唯一索引（老文档占用业务键）→ 按业务键回放�
     new_count: 1, review_count: 1, quiz_count: 10,
     created_at: 1, updated_at: 1
   });
-  // 把现有配对登记进唯一索引模拟器（含老文档的键）
-  tasksDocs().forEach(function (d) {
-    UNIQUE_PAIRS.push(JSON.stringify([d.user_id, d.task_date]));
-  });
   installUniqueIndex();
   // 干掉今天的确定性文档，模拟"回读 miss → 走创建 → 撞索引"
   db.raw.daily_tasks = tasksDocs().filter(function (d) { return d._id !== 'daily:U:' + TODAY; });
-  UNIQUE_PAIRS.push(JSON.stringify(['U', TODAY]));   // 老文档占着键，set 必炸
 
   return asU(function () { return taskFn.main({ action: 'today' }); }).then(function (r) {
     assert.strictEqual(r.ok, true, '应回放老文档而不是报错：' + JSON.stringify(r));
     assert.deepStrictEqual(r.data.task.new, ['apple'], '应回放老文档的快照');
     var today = tasksDocs().filter(function (d) { return d.task_date === TODAY; });
     assert.strictEqual(today.length, 1, '不应再新建第二条，实际 ' + today.length);
+  });
+});
+
+ok('⑤ 空日期脏文档占住唯一索引（E11000，task_date:null）→ 自愈删除后重试成功', function () {
+  // 线上实锤形态：旧格式文档连 task_date 都没有，dup key 显示 task_date: null。
+  // 隔离本场景：先清掉 ③ 留下的"今天日期旧文档"（那是 ③ 的回放场景）
+  db.raw.daily_tasks = tasksDocs().filter(function (d) { return d._id !== 'legacy-format-doc'; });
+  db.raw.daily_tasks.push({
+    _id: 'dirty-null-date',
+    user_id: 'U',
+    snapshot_json: { new: [], review: [], repeat: [] },
+    created_at: 1, updated_at: 1
+  });
+
+  // 干掉今天的确定性文档，制造"回读 miss → set 插入 → 撞 null 键"
+  db.raw.daily_tasks = tasksDocs().filter(function (d) { return d._id !== 'daily:U:' + TODAY; });
+
+  return asU(function () { return taskFn.main({ action: 'today' }); }).then(function (r) {
+    assert.strictEqual(r.ok, true, '自愈后应创建成功：' + JSON.stringify(r));
+    var nulls = tasksDocs().filter(function (d) { return d.user_id === 'U' && (d.task_date === null || d.task_date === undefined); });
+    assert.strictEqual(nulls.length, 0, '空日期脏文档应被清理，剩 ' + nulls.length);
+    var mine = tasksDocs().filter(function (d) { return d._id === 'daily:U:' + TODAY; });
+    assert.strictEqual(mine.length, 1, '今天的任务应存在');
+    assert.strictEqual(mine[0].task_date, TODAY);
   });
 });
 

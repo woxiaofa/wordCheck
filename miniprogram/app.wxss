@@ -41,11 +41,16 @@ page {
 
 /* 按钮。2026-10-07 按用户规范重做：不写死宽度 —— 宽度自适应文案，
    靠左右 padding 撑起按钮，整颗在卡片里居中（margin auto）。
-   width:fit-content 不被支持时该行被丢弃，回退成块级撑满，不会更坏。
+   width 必须 !important：微信给原生 button 自动注入
+   wx-button:not([size=mini]) { width:184px }（选择器 0-1-1 比类选择器高，
+   普通 fit-content 会被它盖掉，检查器里能看到最终 width 是写死的 184px）。
+   fit-content 不被支持时该行被丢弃、回退注入默认，不会更坏。
    white-space:nowrap 保留：按钮文案换行非常难看，超长就改文案。 */
 .btn {
   display: block;
-  width: fit-content;
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   margin-left: auto; margin-right: auto;
   padding: 0 64rpx;
   box-sizing: border-box;
