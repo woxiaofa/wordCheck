@@ -31,7 +31,7 @@ var ONBOARD_KEY = 'onboard_v1_gesture';
 var FEEDBACK_LABELS = { known: '想得很快', vague: '想起来了，但费劲', forgot: '没想起来' };
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
   data: {
     queue: [],
     index: 0,

@@ -26,7 +26,7 @@ var RANGES = [
 ];
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
   data: {
     mastery: 0,
     streak: 0,

@@ -44,7 +44,7 @@ var MAX_ROUNDS = 5;
 var DEFAULT_WORDS = 10;
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
 
   data: {
     state: 'loading',        // loading | run | detail | done | empty
@@ -227,6 +227,10 @@ Page({
     var q = quizLib.buildQuestion(type, w, pool);
     q.word = w;
     q.answerText = w.def_cn;
+    // quiz.buildQuestion 按"服务端判分"设计刻意不下发答案，但 drill 是本地判定，
+    // 与首轮 binary 的 answerIdx 同一口径 —— 不补上这行，循环轮选义题永远判错
+    // （2026-10-07 用户实锤：选了正确释义却被记 forgot，详情里"你选的=正确的"）
+    if (q.options) q.answerIdx = q.options.indexOf(w.def_cn);
     return q;
   },
 

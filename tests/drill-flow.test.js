@@ -235,5 +235,54 @@ test('⑩ 每次判定都提交云端（幂等 reqId），教练端进度才跟�
   assert.ok(submitted[0].clientReqId, '必须带幂等 ID，否则补传会重复计数');
 });
 
+test('⑪ 循环轮选义题答对必须判对（回归：buildQuestion 不带 answerIdx 导致选对判错）', function () {
+  var p = startedPage();
+  // 先把两个词都答错，进入循环轮
+  for (var i = 0; i < 2; i++) {
+    elapsed(p, 1000);
+    p.onPick({ currentTarget: { dataset: { idx: p.data.q.answerIdx === 0 ? 1 : 0 } } });
+    p.onDetailNext();
+  }
+  assert.strictEqual(p.data.phase, 'loop', '应已进入循环轮');
+  // 造一道选义题（循环轮题型随机，等到 meaning 为止）
+  var pool = require('../miniprogram/data/words');
+  var q = null, guard = 0;
+  while (guard++ < 50) {
+    q = p.buildQuestion(p.data.words[0], pool, 'loop');
+    if (q.type === 'meaning') break;
+  }
+  assert.strictEqual(q.type, 'meaning', '应造出选义题');
+  assert.ok(q.answerIdx !== undefined && q.answerIdx >= 0,
+    '循环轮选义题必须有 answerIdx（此前缺失导致永远判错）');
+  assert.strictEqual(q.options[q.answerIdx], q.word.def_cn, 'answerIdx 必须指向正确释义');
+
+  // 完整走一遍：循环轮里选正确选项 → 必须 known，不得进详情
+  // （把当前页的题换成上面这道，模拟真实出题）
+  p._qs[p.data.idx] = q;
+  p.showQuestion();
+  elapsed(p, 1000);
+  p.onPick({ currentTarget: { dataset: { idx: q.answerIdx } } });
+  flushTimers();
+  var w = q.word.word;
+  assert.strictEqual(p.mirror[w].last_feedback, 'known',
+    '循环轮选对必须记 known，实际 ' + p.mirror[w].last_feedback);
+  assert.notStrictEqual(p.data.state, 'detail', '选对不得进详情');
+});
+
+test('⑫ 循环轮拼写题判定不受影响（isSpellingCorrect 路径回归）', function () {
+  var p = startedPage();
+  var q = p.buildQuestion(p.data.words[0], require('../miniprogram/data/words'), 'loop');
+  if (q.type === 'meaning') { console.log('      (随机到选义，拼写路径由既有用例覆盖)'); return; }
+  // spell/listen：q 无 options，answerIdx 不需要
+  assert.strictEqual(q.options, undefined, '拼写/听写题不该有 options');
+  p._qs[p.data.idx] = q;
+  p.showQuestion();
+  p.data.kbValue = q.word.word.split('');
+  elapsed(p, 1000);
+  p.onKeyConfirm();
+  flushTimers();
+  assert.strictEqual(p.mirror[q.word.word].last_feedback, 'known');
+});
+
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));
 if (failed.length) process.exitCode = 1;

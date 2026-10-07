@@ -3,16 +3,26 @@
 .drill .bar { margin-bottom: 12rpx; }
 .tag-line { font-size: 26rpx; color: #8fa3b7; }
 
-/* 题目卡：词要大，选项要好点 */
-.qcard { padding: 40rpx 28rpx; }
+/* 题目卡：一屏一题 —— 词在上方大字展示，选项贴底（拇指够得着） */
+.qcard {
+  display: flex;
+  flex-direction: column;
+  /* 扣掉顶栏+进度条+底部导航，让卡片基本占满一屏 */
+  min-height: calc(100vh - 400rpx);
+  box-sizing: border-box;
+  padding: 40rpx 28rpx;
+}
 .qword-row { display: flex; align-items: center; justify-content: center; }
 .qword {
-  font-size: 72rpx; font-weight: 700; letter-spacing: 2rpx;
+  font-size: 100rpx; font-weight: 800; letter-spacing: 2rpx;
   color: #e8eef5; word-break: break-all; text-align: center;
 }
-.speaker { font-size: 40rpx; margin-left: 16rpx; opacity: .75; }
+.speaker { font-size: 44rpx; margin-left: 16rpx; opacity: .75; }
 .qph { text-align: center; color: #8fa3b7; font-size: 28rpx; margin-top: 8rpx; }
 .qstem { text-align: center; font-size: 34rpx; margin-top: 20rpx; }
+
+/* 选项/键盘区：推到卡片底部 */
+.qbody { margin-top: auto; }
 
 /* 选项：首轮两个、循环轮四个，都是大块，好点 */
 .opt {
@@ -47,20 +57,41 @@
   font-size: 24rpx; color: #ffb020;
 }
 
-/* 详情（答错/超时后看一眼这个词） */
-.detail-card { padding: 36rpx 28rpx; }
+/* 详情（答错/超时后看一眼这个词）：卡片充满一屏，按钮钉底 */
+.detail-card {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 400rpx);
+  box-sizing: border-box;
+  padding: 36rpx 28rpx;
+}
+.detail-bottom { margin-top: auto; }
 .dflag {
   display: inline-block; padding: 6rpx 16rpx; border-radius: 99rpx;
   font-size: 24rpx; background: #3a1f2a; color: #ff8a9c; margin-bottom: 20rpx;
+  align-self: flex-start;
 }
 .ddef {
   margin-top: 20rpx; text-align: center;
-  font-size: 40rpx; font-weight: 600; color: #3ea6ff;
+  font-size: 44rpx; font-weight: 600; color: #3ea6ff;
 }
 .dex { margin-top: 24rpx; padding: 22rpx; background: #16202c; border-radius: 16rpx; }
 .dex-en { font-size: 30rpx; line-height: 1.6; }
 .dex-cn { margin-top: 6rpx; font-size: 26rpx; color: #8fa3b7; line-height: 1.6; }
 .dyour { margin-top: 18rpx; text-align: center; font-size: 26rpx; color: #ffb020; }
+
+/* 宽屏（iPad / 折叠展开 / PC）：rpx 会被放大，收回 px 比例 */
+.wide .qcard, .wide .detail-card { min-height: calc(100vh - 260px); padding: 20px; }
+.wide .qword { font-size: 48px; }
+.wide .speaker { font-size: 22px; }
+.wide .qph { font-size: 14px; }
+.wide .qstem { font-size: 17px; }
+.wide .opt { padding: 15px 13px; font-size: 16px; border-radius: 10px; margin-top: 10px; }
+.wide .dflag { font-size: 12px; padding: 3px 8px; }
+.wide .ddef { font-size: 22px; }
+.wide .dex-en { font-size: 15px; }
+.wide .dex-cn { font-size: 13px; }
+.wide .dyour { font-size: 13px; }
 
 /* 完成态 */
 .done-emoji { font-size: 88rpx; }

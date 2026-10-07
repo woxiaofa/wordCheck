@@ -29,7 +29,7 @@ var MAX_REPLAY = 3;
 var FEEDBACK_MS = 1800;
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
   data: {
     state: 'intro',          // intro | run | result
     questions: [],

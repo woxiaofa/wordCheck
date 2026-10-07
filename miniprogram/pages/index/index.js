@@ -28,7 +28,7 @@ var CHECKIN_RATIO = 0.8;
 var SECONDS_PER_WORD = 15;
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
   data: {
     totalCount: 0,
     dueCount: 0,

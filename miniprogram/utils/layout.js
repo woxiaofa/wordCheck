@@ -95,49 +95,56 @@ function apply(self, w, h) {
 }
 
 /**
- * Page behavior：页面只需 `behaviors: [layout.behavior]`，
+ * Page behavior：页面只需 `behaviors: [layout.behavior()]`，
  * 根节点写成 <view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+ *
+ * 注意必须**调用**（layout.behavior()），传函数本身微信会把整个 behaviors 列表忽略
+ * （Console 警告 "behaviors list contains non-behavior item"，宽屏适配全部失效）。
  */
-function behavior() {
-  return Behavior({
-    data: {
-      layoutMode: 'phone',
-      layoutWide: false,
-      layoutMaxW: 0,
-      layoutStyle: ''
-    },
-    onLoad: function () {
-      var i = windowInfo();
-      apply(this, i.windowWidth, i.windowHeight);
-      this._bindLayoutResize();
-    },
-    onShow: function () {
-      // 从别的页面返回：窗口可能已经变过（iPad 分屏、PC 拖窗口）
-      var i = windowInfo();
-      apply(this, i.windowWidth, i.windowHeight);
-    },
-    onUnload: function () { this._unbindLayoutResize(); },
-    onHide: function () { this._unbindLayoutResize(); },
+var BEHAVIOR_DEF = {
+  data: {
+    layoutMode: 'phone',
+    layoutWide: false,
+    layoutMaxW: 0,
+    layoutStyle: ''
+  },
+  onLoad: function () {
+    var i = windowInfo();
+    apply(this, i.windowWidth, i.windowHeight);
+    this._bindLayoutResize();
+  },
+  onShow: function () {
+    // 从别的页面返回：窗口可能已经变过（iPad 分屏、PC 拖窗口）
+    var i = windowInfo();
+    apply(this, i.windowWidth, i.windowHeight);
+  },
+  onUnload: function () { this._unbindLayoutResize(); },
+  onHide: function () { this._unbindLayoutResize(); },
 
-    _bindLayoutResize: function () {
-      if (typeof wx === 'undefined' || !wx.onWindowResize) return;
-      if (this.__layoutHandler) return;              // 不重复注册
-      var self = this;
-      this.__layoutHandler = function (res) {
-        var size = (res && res.size) || res || {};
-        apply(self, size.windowWidth, size.windowHeight);
-      };
-      try { wx.onWindowResize(this.__layoutHandler); } catch (e) { /* 老基础库忽略 */ }
-    },
+  _bindLayoutResize: function () {
+    if (typeof wx === 'undefined' || !wx.onWindowResize) return;
+    if (this.__layoutHandler) return;              // 不重复注册
+    var self = this;
+    this.__layoutHandler = function (res) {
+      var size = (res && res.size) || res || {};
+      apply(self, size.windowWidth, size.windowHeight);
+    };
+    try { wx.onWindowResize(this.__layoutHandler); } catch (e) { /* 老基础库忽略 */ }
+  },
 
-    _unbindLayoutResize: function () {
-      if (!this.__layoutHandler) return;
-      if (typeof wx !== 'undefined' && wx.offWindowResize) {
-        try { wx.offWindowResize(this.__layoutHandler); } catch (e) { /* 忽略 */ }
-      }
-      this.__layoutHandler = null;
+  _unbindLayoutResize: function () {
+    if (!this.__layoutHandler) return;
+    if (typeof wx !== 'undefined' && wx.offWindowResize) {
+      try { wx.offWindowResize(this.__layoutHandler); } catch (e) { /* 忽略 */ }
     }
-  });
+    this.__layoutHandler = null;
+  }
+};
+
+function behavior() {
+  // Node 测试环境没有 Behavior，退回普通定义对象（页面桩只取 data/方法，不受影响）
+  if (typeof Behavior === 'undefined') return BEHAVIOR_DEF;
+  return Behavior(BEHAVIOR_DEF);
 }
 
 module.exports = {

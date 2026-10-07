@@ -19,7 +19,7 @@ var CREATE_KEY = 'class_create_reqid';   // 建班幂等 ID 持久化：重进�
 var CREATE_ID_PREFIX = 'class-create:';
 
 Page({
-  behaviors: [layout.behavior],
+  behaviors: [layout.behavior()],
   data: {
     loading: true,
     cloudError: '',

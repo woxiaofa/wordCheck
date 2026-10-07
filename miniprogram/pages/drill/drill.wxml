@@ -27,37 +27,40 @@
       </view>
       <view class="qph" wx:if="{{q.type !== 'listen'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
 
-      <!-- 选择题：首轮只有两个选项，循环轮是四个 -->
-      <block wx:if="{{q.options}}">
-        <view
-          wx:for="{{q.options}}"
-          wx:key="*this"
-          class="opt {{pickedIdx === index ? (index === q.answerIdx ? 'right' : 'wrong') : ''}}"
-          data-idx="{{index}}"
-          bindtap="onPick"
-        >{{item}}</view>
-      </block>
+      <!-- 选项/键盘区：贴到卡片底部，视线不用往上够 -->
+      <view class="qbody">
+        <!-- 选择题：首轮只有两个选项，循环轮是四个 -->
+        <block wx:if="{{q.options}}">
+          <view
+            wx:for="{{q.options}}"
+            wx:key="*this"
+            class="opt {{pickedIdx === index ? (index === q.answerIdx ? 'right' : 'wrong') : ''}}"
+            data-idx="{{index}}"
+            bindtap="onPick"
+          >{{item}}</view>
+        </block>
 
-      <!-- 拼写 / 听写：键盘输入 -->
-      <block wx:else>
-        <view class="qstem">{{q.type === 'listen' ? '把听到的单词拼出来' : q.stem}}</view>
-        <view class="typed">{{kbValue.length ? kbValue.join('') : '…'}}</view>
-        <letter-keyboard
-          class="mt"
-          length="{{q.length || 0}}"
-          word="{{q.wordId || ''}}"
-          value="{{kbValue}}"
-          confirm-label="确定"
-          bind:input="onKeyInput"
-          bind:confirm="onKeyConfirm"
-        />
-      </block>
+        <!-- 拼写 / 听写：键盘输入 -->
+        <block wx:else>
+          <view class="qstem">{{q.type === 'listen' ? '把听到的单词拼出来' : q.stem}}</view>
+          <view class="typed">{{kbValue.length ? kbValue.join('') : '…'}}</view>
+          <letter-keyboard
+            class="mt"
+            length="{{q.length || 0}}"
+            word="{{q.wordId || ''}}"
+            value="{{kbValue}}"
+            confirm-label="确定"
+            bind:input="onKeyInput"
+            bind:confirm="onKeyConfirm"
+          />
+        </block>
 
-      <view class="slow-hint" wx:if="{{slowHint && pickedIdx < 0 && !q.options}}">
-        想不起来也没关系 —— 拼一个试试，看完详情记得更牢
-      </view>
-      <view class="slow-hint" wx:elif="{{slowHint && pickedIdx < 0}}">
-        想了很久？凭第一感觉选，选错会立刻给你看释义
+        <view class="slow-hint" wx:if="{{slowHint && pickedIdx < 0 && !q.options}}">
+          想不起来也没关系 —— 拼一个试试，看完详情记得更牢
+        </view>
+        <view class="slow-hint" wx:elif="{{slowHint && pickedIdx < 0}}">
+          想了很久？凭第一感觉选，选错会立刻给你看释义
+        </view>
       </view>
     </view>
 
@@ -88,9 +91,12 @@
         你选的是「{{detail.yourPick}}」，正确的是「{{detail.answer}}」
       </view>
 
-      <button class="btn mt" bindtap="onDetailNext">记住了，继续</button>
-      <view class="muted center mt-s">
-        这个词等下还会再考你一次，直到答对为止
+      <!-- 按钮钉在卡片底部：视线落在释义上，手在下面等 -->
+      <view class="detail-bottom">
+        <button class="btn" bindtap="onDetailNext">记住了，继续</button>
+        <view class="muted center mt-s">
+          这个词等下还会再考你一次，直到答对为止
+        </view>
       </view>
     </view>
   </block>

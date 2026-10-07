@@ -115,15 +115,45 @@ async function onToday(openid) {
     updated_at: now
   };
 
-  // 确定性 _id：并发重复创建会命中唯一键冲突，回读即可
+  // 确定性 _id：并发重复创建会命中唯一键冲突，回读即可。
+  // 但不能只回读 _id —— 库里存在旧版本落下的脏数据（task_date 为空/缺失），
+  // 会撞 (user_id + task_date) 唯一索引且 _id 对不上，此时按业务键找回，
+  // 找不到就清掉本用户的脏文档重试一次（2026-10-07 实锤 -502001 daily_tasks）。
   try {
     await db.collection(COLL.tasks).add({ data: doc });
   } catch (e) {
+    // 1) 确定性 _id 命中 → 正常回放
     const again = await db.collection(COLL.tasks).doc(taskId).get().catch(() => null);
-    if (!again || !again.data) {
+    let t = again && again.data;
+
+    // 2) 业务键命中（task_date = 今天但 _id 不同，如老格式文档）→ 同样回放
+    if (!t) {
+      const byBiz = await db.collection(COLL.tasks)
+        .where({ user_id: user._id, task_date: today })
+        .limit(1).get().catch(() => null);
+      t = byBiz && byBiz.data && byBiz.data[0];
+    }
+
+    // 3) 脏数据（task_date 为空/缺失，不属于任何一天）→ 删掉重建
+    if (!t) {
+      const junk = await db.collection(COLL.tasks)
+        .where({ user_id: user._id, task_date: null })
+        .limit(5).get().catch(() => null);
+      if (junk && junk.data && junk.data.length) {
+        for (const j of junk) {
+          await db.collection(COLL.tasks).doc(j._id).remove().catch(() => {});
+        }
+        const retry = await db.collection(COLL.tasks).add({ data: doc }).catch(() => null);
+        if (retry) {
+          const words = await fetchWords(newIds.concat(dueIds));
+          return ok({ task: taskView(doc), words, date: today });
+        }
+      }
+    }
+
+    if (!t) {
       return fail('TASK_CREATE_FAIL', (e && e.errMsg) || '任务创建失败');
     }
-    const t = again.data;
     const words = await fetchWords(collectWordIds(t));
     return ok({ task: taskView(t), words, date: today });
   }
