@@ -348,6 +348,6 @@ async function getUser(openid) {
   return r.data && r.data[0] ? r.data[0] : null;
 }
 
-const VERSION = 'quiz-20261007-v2coll';
+const VERSION = 'quiz-20261007-v2fix';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

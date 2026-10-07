@@ -21,6 +21,8 @@ function createFakeDb() {
   var counters = { adds: 0, dupErrors: 0 };
   // 故障注入：复刻线上"假成功"形态——add 抛含 Duplicate 字样的 -502001，但实际没写入
   var faults = { ghostAdd: false };
+  // 集合缺失模拟：真实云端里集合必须显式创建，写不存在的集合报 -502005
+  var missing = {};
 
   function ensure(name) {
     if (!colls[name]) colls[name] = [];
@@ -68,6 +70,12 @@ function createFakeDb() {
     lte: function (v) { return { __op: 'lte', v: v }; },
     in: function (arr) { return { __op: 'in', v: arr }; }
   };
+
+  function notExist(name, op) {
+    return Promise.reject(new Error(
+      'collection.' + op + ':fail -502005 database collection not exists. ' +
+      '[ResourceNotFound] Db or Table not exist: ' + name));
+  }
 
   function collection(name) {
     var self = {
@@ -123,6 +131,8 @@ function createFakeDb() {
               return Promise.reject(new Error(
                 'document.set:fail -501007 invalid parameter, 不能更新_id的值'));
             }
+            // 云端真实行为（2026-10-07 实锤）：写不存在的集合报 -502005
+            if (missing[name]) return notExist(name, 'doc.set');
             // 故障注入：集合级写入损坏形态——set 也抛 -502001（线上实测 set/add 双双失败）
             if (name === 'user_word_state_v2' && faults.ghost) {
               return Promise.reject(new Error(
@@ -142,6 +152,8 @@ function createFakeDb() {
         };
       },
       add: function (o) {
+        // 云端真实行为（2026-10-07 实锤）：写不存在的集合报 -502005
+        if (missing[name]) return notExist(name, 'add');
         var data = clone(o.data);
         counters.adds++;
         // 故障注入（v4 回归）：-502001 报错文本含 "Duplicate" 但文档没写入。
@@ -201,10 +213,21 @@ function createFakeDb() {
     command: command,
     counters: counters,
     faults: faults,
+    missing: missing,
     raw: colls,
+    // 云端 createCollection：建好后集合可写；对已存在的集合报 "already exists"
+    createCollection: function (name) {
+      if (missing[name]) {
+        delete missing[name];
+        ensure(name);
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error('-502001 collection already exists: ' + name));
+    },
     reset: function () {
       // 原地清空：db.raw 必须始终指向同一对象，否则测试里塞的种子数据会丢
       Object.keys(colls).forEach(function (k) { delete colls[k]; });
+      Object.keys(missing).forEach(function (k) { delete missing[k]; });
     }
   };
 }
@@ -490,6 +513,22 @@ steps.push(function () {
       var legacy = db.raw.user_word_state || [];
       assert.strictEqual(legacy.length, 1, 'legacy 原记录不动（只读兼容）');
       assert.strictEqual(db.raw.users[0].stats_cache.learned_words, 1, '合并口径下已学词数=1');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑬ v5.1 集合不存在（-502005）：写入器自动 createCollection 后重试成功', function () {
+    seedUser();
+    // 线上真实形态（2026-10-07 截图）：新集合忘了在云端创建，
+    // 首次提交 set/add 双双报 -502005 Db or Table not exist
+    db.missing.user_word_state_v2 = true;
+    return submit('fresh-word').then(function (r) {
+      assert.strictEqual(r.ok, true, '应自动建集合并写入成功：' + JSON.stringify(r));
+      assert.strictEqual(db.missing.user_word_state_v2, undefined, '集合应已被自动创建');
+      var st = (db.raw.user_word_state_v2 || []).filter(function (d) { return d.word_id === 'fresh-word'; });
+      assert.strictEqual(st.length, 1, '重试后应写入成功');
+      assert.strictEqual(st[0]._id, 'u1:fresh-word');
     });
   });
 });

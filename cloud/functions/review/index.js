@@ -20,7 +20,7 @@ const _ = db.command;
 const { nextState, REQ_ID_TTL_DAYS } = require('./srs');
 const { getLocalDate, getLocalDayStart } = require('./time');
 const {
-  upsertState, queryStates, STATE_COLL, LEGACY_COLL
+  upsertState, queryStates, ensureCollection, STATE_COLL, LEGACY_COLL
 } = require('./state-store');
 
 const COLL = {
@@ -40,7 +40,7 @@ const COLL = {
  * "[cloud] review 云端版本: xxx"。判断"云端跑的是不是最新代码"
  * 不用再猜 —— 版本号对不上就是没部署成功。
  */
-const VERSION = 'rev-20261007-v2coll';
+const VERSION = 'rev-20261007-v2fix';
 
 /**
  * 云函数入口。约定调用方式：wx.cloud.callFunction({ name:'review', data:{ action:'submit', ... } })
@@ -256,6 +256,11 @@ async function onDiagnose(openid, { clean, all }) {
  * 幂等：已存在的记录只更新不新建，跑多少次结果一致。
  */
 async function onRepair(openid, { dryRun }) {
+  // v2 新集合可能还没建（-502005 Db or Table not exist）—— 回填前先确保存在
+  const built = await ensureCollection(db, COLL.state);
+  if (!built && !dryRun) {
+    return fail('NO_COLLECTION', '无法创建状态集合 ' + COLL.state + '，请在云控制台数据库里手动新建');
+  }
   const logsRes = await db.collection(COLL.logs)
     .orderBy('created_at', 'desc').limit(1000)
     .field({ user_id: true, word_id: true, feedback: true, created_at: true })
@@ -436,6 +441,10 @@ async function diagnoseAll(clean) {
   const probeOut = [];
   const now2 = Date.now();
   const uni = String(now2).slice(-8); // 每轮唯一后缀，杜绝与历史残留相撞
+
+  // A0) 先确保 v2 集合存在（-502005 = 忘了建集合，写入必挂），结果直接进探针报告
+  const built = await ensureCollection(db, COLL.state);
+  probeOut.push(built ? '建集合:OK' : '⚠建集合:失败（-502005 会持续，需控制台手动建）');
 
   // 探针单项：set 随机 _id + 回读验证
   const probeSet = async (collName, label) => {

@@ -62,11 +62,34 @@ async function readBack(db, userId, wordId) {
   return rows[0] || null;
 }
 
-/**
- * 写入（幂等 upsert 到 v2，成功前回读验证）。
- * @returns {Promise<string|null>} null=成功；字符串为错误码（含底层报错摘要，供前端流水展示）
- */
-async function upsertState(db, userId, wordId, doc, now) {
+/* ---- 集合自动创建 ----
+ * 云数据库的集合必须显式存在，往不存在的集合写会报 -502005
+ * "Db or Table not exist"（2026-10-07 实锤：v2 新集合忘了建，写入全挂）。
+ * createCollection 是服务端（wx-server-sdk）专属能力；客户端副本没有
+ * 这个方法，typeof 守卫直接跳过。成功与否记入模块级缓存，热实例内只建一次。 */
+const _ensured = {};
+async function ensureCollection(db, name) {
+  if (typeof db.createCollection !== 'function') return false;
+  if (_ensured[name]) return true;
+  try {
+    await db.createCollection(name);
+    _ensured[name] = true;
+    return true;
+  } catch (e) {
+    // 并发/重复创建会报 "already exists" —— 集合在 = 目标达成。
+    // ⚠ 只有真实创建成功才进缓存：already-exists 分支不缓存，否则
+    // "集合被人删了再重建"的场景会被过期缓存挡住（测试 ⑬ 实锤过）
+    if (/exists/i.test(String((e && (e.errMsg || e.message)) || e))) {
+      return true;
+    }
+    console.error('[state-store] createCollection 失败:', name,
+      String((e && (e.errMsg || e.message)) || e).slice(0, 120));
+    return false;
+  }
+}
+
+/** 单次完整写入尝试（set → update 老文档 → add），成功返回 null，失败返回错误串 */
+async function tryWrite(db, userId, wordId, doc, now) {
   const coll = db.collection(STATE_COLL);
   const _id = stateDocId(userId, wordId);
   // ⚠ set/add 的 data 里都不能带 _id：云端规定 set 带 _id 必抛 -501007
@@ -113,12 +136,27 @@ async function upsertState(db, userId, wordId, doc, now) {
   return 'STATE_WRITE_FAIL:' + lastErr;
 }
 
+/**
+ * 写入（幂等 upsert 到 v2，成功前回读验证）。
+ * 集合不存在（-502005）时自动 createCollection 后整体重试一次。
+ * @returns {Promise<string|null>} null=成功；字符串为错误码（含底层报错摘要，供前端流水展示）
+ */
+async function upsertState(db, userId, wordId, doc, now) {
+  let err = await tryWrite(db, userId, wordId, doc, now);
+  if (err && /-502005|not exist/i.test(err)) {
+    const built = await ensureCollection(db, STATE_COLL);
+    if (built) err = await tryWrite(db, userId, wordId, doc, now);
+  }
+  return err;
+}
+
 module.exports = {
   STATE_COLL,
   LEGACY_COLL,
   upsertState,
   queryStates,
   readBack,
+  ensureCollection,
   isDupErr,
   stateDocId
 };
