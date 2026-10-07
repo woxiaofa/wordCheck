@@ -20,12 +20,12 @@
   <!-- ============ 答题 ============ -->
   <block wx:if="{{state === 'run' && q}}">
     <view class="card qcard {{judgedOk ? 'flash' : ''}}">
-      <!-- 题干：单词 + 音标，点一下重听 -->
+      <!-- 题干：选义显示单词；拼写绝不显示单词（否则答案就在题面上）；听写只给喇叭 -->
       <view class="qword-row" bindtap="onSpeak">
-        <text class="qword">{{q.type === 'listen' ? '🔊 听写' : q.wordId}}</text>
-        <text class="speaker">🔊</text>
+        <text class="qword {{q.type !== 'meaning' && q.type !== 'binary' ? 'qword-hint' : ''}}">{{q.type === 'listen' ? '🔊 听写' : (q.type === 'spell' ? '✏️ 拼写' : q.wordId)}}</text>
+        <text class="speaker" wx:if="{{q.type !== 'spell'}}">🔊</text>
       </view>
-      <view class="qph" wx:if="{{q.type !== 'listen'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
+      <view class="qph" wx:if="{{q.type === 'meaning' || q.type === 'binary'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
 
       <!-- 选项/键盘区：贴到卡片底部，视线不用往上够 -->
       <view class="qbody">

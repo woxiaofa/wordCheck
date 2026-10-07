@@ -251,8 +251,9 @@ Page({
       progressPct: Math.round(i * 100 / this._qs.length)
     });
 
-    // 自动读音：单词一出现就念（听写题更是必须）
-    this.speak();
+    // 自动读音：单词一出现就念。拼写题例外 —— 一念就是把答案读出来；
+    // 听写必须念（题面只有喇叭）
+    if (q.type !== 'spell') this.speak();
     this.startTimer();
   },
 
@@ -510,9 +511,10 @@ Page({
     });
   },
 
-  /** 念当前词 */
+  /** 念当前词（拼写题禁止 —— 会把答案念出来） */
   speak: function () {
     var q = this.data.q || (this._qs && this._qs[this.data.idx]);
+    if (q && q.type === 'spell') return;
     var w = (q && q.word) || (this.data.detail && this.data.detail.word);
     if (!w) return;
     tts.speak(w.word || w.wordId, function () { /* 没声音也不打断流程 */ });

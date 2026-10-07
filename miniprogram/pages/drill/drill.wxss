@@ -18,6 +18,8 @@
   color: #e8eef5; word-break: break-all; text-align: center;
 }
 .speaker { font-size: 44rpx; margin-left: 16rpx; opacity: .75; }
+/* 拼写/听写题没有大字单词，顶部提示用小一号 */
+.qword-hint { font-size: 48rpx; letter-spacing: 0; color: #8fa3b7; }
 .qph { text-align: center; color: #8fa3b7; font-size: 28rpx; margin-top: 8rpx; }
 .qstem { text-align: center; font-size: 34rpx; margin-top: 20rpx; }
 

@@ -284,5 +284,36 @@ test('⑫ 循环轮拼写题判定不受影响（isSpellingCorrect 路径回归�
   assert.strictEqual(p.mirror[q.word.word].last_feedback, 'known');
 });
 
+test('⑬ 拼写题不泄题：不自动读音、题面不出单词（2026-10-07 用户"这个要填什么"实锤）', function () {
+  var tts = require('../miniprogram/utils/tts');
+  var spoken = [];
+  var origSpeak = tts.speak;
+  tts.speak = function (t) { spoken.push(t); };
+  try {
+    var p = startedPage();
+    var pool = require('../miniprogram/data/words');
+    // 造拼写题
+    var q = null, guard = 0;
+    while (guard++ < 50) {
+      q = p.buildQuestion(p.data.words[0], pool, 'loop');
+      if (q.type === 'spell') break;
+    }
+    assert.strictEqual(q.type, 'spell', '应造出拼写题');
+    spoken.length = 0;
+    p._qs[p.data.idx] = q;
+    p.showQuestion();                       // 展示题目（旧版这里会把 train 念出来）
+    assert.strictEqual(spoken.length, 0,
+      '拼写题绝不能自动读音 —— 一念就是把答案读出来，实际念了 ' + spoken.join(','));
+    assert.strictEqual(p.speak(), undefined);
+    assert.strictEqual(spoken.length, 0, '拼写题点喇叭也不能念');
+    // wxml 题面：拼写题顶部显示"✏️ 拼写"而不是单词本身
+    var wxml = require('fs').readFileSync(
+      require('path').resolve(__dirname, '../miniprogram/pages/drill/drill.wxml'), 'utf8');
+    assert.ok(/q\.type === 'spell' \? '✏️ 拼写'/.test(wxml), '拼写题题面必须隐藏单词');
+  } finally {
+    tts.speak = origSpeak;
+  }
+});
+
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));
 if (failed.length) process.exitCode = 1;
