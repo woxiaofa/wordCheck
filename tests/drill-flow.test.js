@@ -21,6 +21,8 @@
  *   ⑮ 键盘输入实时可见（kbText）
  *   ⑯ 没有本地发音的词不出听写题
  *   ⑰ 巩固轮 spell 不泄题：不自动读音、题面不出单词
+ *   ㉔ 详情页「✍ 抄写一遍」：出键盘照抄，可抄多遍，抄错指出第几个字母
+ *   ㉕ 拼写超时按字母数给（约每字母 2.5 秒），短词不再一律等 25 秒
  */
 
 var assert = require('assert');
@@ -53,7 +55,7 @@ global.wx = {
   }
 };
 /** clearTimeout 必须真的取消：否则上一题的定时器会在后面冒出来乱判 */
-global.setTimeout = function (fn, ms) { timers.push({ id: ++tid, fn: fn }); return tid; };
+global.setTimeout = function (fn, ms) { timers.push({ id: ++tid, fn: fn, ms: ms || 0 }); return tid; };
 global.clearTimeout = function (id) {
   timers = timers.filter(function (t) { return t.id !== id; });
 };
@@ -614,6 +616,76 @@ test('㉓ 「写」阶段：没有本地发音的词降级为看中文拼写，�
       '无音频的词在「写」阶段必须是看中文拼写，实际 ' + q.type);
     assert.strictEqual(q.answerText, w.word);
   }
+});
+
+test('㉔ 详情页「✍ 抄写一遍」：出键盘照抄，抄对记一遍可接着抄，抄错指出第几个字母', function () {
+  var p = startedPage();
+  var w = p.data.q.word.word;
+  p.onDontKnow();
+  assert.strictEqual(p.data.state, 'detail');
+  assert.strictEqual(p.data.detail.writing, false, '默认不展开键盘，不挡住看词');
+
+  p.onDetailWrite();
+  assert.strictEqual(p.data.detail.writing, true, '点抄写要展开键盘和输入框');
+  assert.strictEqual(p.data.detail.copyLength, w.length, '键盘长度要等于词长');
+  assert.strictEqual(p.data.kbLevel, 'easy', '第一遍给最简单的键盘（只有正确字母）');
+
+  // 抄错一次：不算一遍、不清空，直接指出第几个字母不对
+  p.onKeyInput({ detail: { value: ['x'].concat(w.slice(1).split('')) } });
+  p.onCopyConfirm();
+  assert.strictEqual(p.data.detail.copyCount, 0, '抄错不能算一遍');
+  assert.strictEqual(p.data.detail.copyOk, false);
+  assert.ok(/第 1 个字母/.test(p.data.detail.copyMsg),
+    '要说清第几个字母不对，实际：' + p.data.detail.copyMsg);
+  assert.ok(p.data.kbText.length > 0, '抄错保留输入，可以直接改不用重打');
+
+  // 抄对：记一遍、清空让下一遍从头来、键盘难度递进
+  function copyRight() {
+    var v = [];
+    w.split('').forEach(function (ch) { v.push(ch); p.onKeyInput({ detail: { value: v.slice() } }); });
+    p.onCopyConfirm();
+  }
+  copyRight();
+  assert.strictEqual(p.data.detail.copyCount, 1, '抄对要记一遍，实际 ' + p.data.detail.copyCount);
+  assert.strictEqual(p.data.kbText, '', '抄完要清空，才好比照着抄下一遍');
+  assert.strictEqual(p.data.kbLevel, 'medium', '抄熟了键盘要变难一点');
+
+  copyRight();
+  assert.strictEqual(p.data.detail.copyCount, 2, '想抄几遍抄几遍');
+  assert.strictEqual(p.data.kbLevel, 'hard', '抄两遍后给全键盘');
+
+  p.onCopyClose();
+  assert.strictEqual(p.data.detail.writing, false, '收起键盘');
+  p.onDetailNext();
+  assert.strictEqual(p.data.state, 'run', '点下一词回到答题');
+  assert.strictEqual(p.data.kbText, '', '下一词要清干净，否则会串到下一题');
+});
+
+test('㉕ 拼写题超时按字母数给（约每字母 2.5 秒）：长词更宽松，且上下封顶', function () {
+  var p = startedPage();
+  function timeoutMsFor(word) {
+    timers.length = 0;
+    p.data.q = {
+      type: 'dictation', wordId: word, word: { word: word },
+      length: String(word).length, answerText: word
+    };
+    p.startTimer();
+    return Math.max.apply(null, timers.map(function (t) { return t.ms; }));
+  }
+  var short = timeoutMsFor('cat');            // 3 个字母
+  var long = timeoutMsFor('classroom');       // 9 个字母
+  assert.ok(long > short, '长词必须给更多时间：3 字母 ' + short + 'ms，9 字母 ' + long + 'ms');
+  var per = (long - short) / (9 - 3);
+  assert.ok(per >= 2000 && per <= 3000, '每个字母应给 2~3 秒，实际 ' + per + 'ms');
+  assert.ok(timeoutMsFor('a') >= 12000, '极短词也要有下限（12 秒），否则来不及敲');
+  assert.ok(timeoutMsFor('abcdefghijklmnopqrstuvwxyz') <= 45000, '极长词要封顶（45 秒）');
+  assert.ok(timeoutMsFor('cat') < 25000, '短词不该按老规矩给满 25 秒：' + timeoutMsFor('cat'));
+  // 选择题不受影响：认的是意思，跟单词长短无关
+  timers.length = 0;
+  p.data.q = { type: 'binary', wordId: 'cat', word: { word: 'cat' }, options: ['a', 'b'], answerIdx: 0 };
+  p.startTimer();
+  assert.strictEqual(Math.max.apply(null, timers.map(function (t) { return t.ms; })), 10000,
+    '选择题仍是 10 秒超时');
 });
 
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));

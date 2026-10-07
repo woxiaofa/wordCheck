@@ -112,10 +112,43 @@
         <view class="rg-text">🗣 {{detail.guide}}</view>
         <view class="rg-count" wx:if="{{detail.speakCount}}">已跟着念 {{detail.speakCount}} 遍 · 点这里再听一遍 🔊</view>
         <view class="rg-count" wx:else>点这里就能再听一遍 🔊</view>
+        <view class="rg-count" wx:if="{{detail.copyCount}}">已抄写 {{detail.copyCount}} 遍 ✍</view>
       </view>
 
+      <!-- 抄写：照着上面的词用键盘拼一遍，想抄几遍抄几遍（念是耳朵记，抄是手记） -->
+      <block wx:if="{{detail.writing}}">
+        <view class="copy-box">
+          <view class="copy-title">✍ 照着上面的词拼一遍（可以抄好几遍）</view>
+          <view class="typed {{kbText ? 'typed-full' : ''}}" bindtap="onTypedEndTap">
+            <block wx:for="{{kbValue}}" wx:key="index">
+              <text wx:if="{{index === kbCaret}}" class="caret"></text>
+              <text class="tl" data-pos="{{index}}" catchtap="onTypedTap">{{item}}</text>
+            </block>
+            <text wx:if="{{kbCaret >= kbValue.length}}" class="caret"></text>
+          </view>
+          <view class="copy-msg {{detail.copyOk ? 'ok' : 'bad'}}" wx:if="{{detail.copyMsg}}">
+            {{detail.copyMsg}}
+          </view>
+          <letter-keyboard
+            class="mt"
+            length="{{detail.copyLength}}"
+            level="{{kbLevel}}"
+            word="{{detail.word.word}}"
+            value="{{kbValue}}"
+            caret="{{kbCaret}}"
+            confirm-label="抄完这一遍"
+            bind:input="onKeyInput"
+            bind:confirm="onCopyConfirm"
+          />
+          <button class="btn ghost mt-s" bindtap="onCopyClose">收起键盘</button>
+        </view>
+      </block>
+
       <view class="detail-bottom">
-        <button class="btn ghost" bindtap="onSpeak">🔊 跟着念一遍</button>
+        <view class="dbtn-row">
+          <button class="btn ghost" bindtap="onSpeak">🔊 跟着念一遍</button>
+          <button class="btn ghost" bindtap="onDetailWrite">✍ 抄写一遍</button>
+        </view>
         <button class="btn mt-s" bindtap="onDetailNext">下一词</button>
         <view class="muted center mt-s">
           这个词等下还会再考你一次，直到答对为止

@@ -44,12 +44,20 @@ var CACHE_PREFIX = 'word_cache_v1:';
 /** 选择题（认）的判定档位 */
 var SLOW_MS = 5000;
 var TIMEOUT_MS = 10000;
-/** 拼写/听写（写）的判定档位：写字本来就慢，给更宽的时间 */
-var WRITE_SLOW_MS = 10000;
-var WRITE_TIMEOUT_MS = 25000;
+/** 拼写/听写（写）的判定档位：按字母数算，不再一刀切
+ *  一刀切 25 秒的毛病：3 个字母的词太宽松（孩子干等着被判超时），
+ *  12 个字母的词太紧（还没敲完就被记"不会"）。按每个字母 2.5 秒给，
+ *  再夹在 12~45 秒之间（太短来不及敲，太长失去紧迫感）。 */
+var PER_LETTER_MS = 2500;
+var WRITE_BASE_MS = 6000;
+var WRITE_MIN_MS = 12000;
+var WRITE_MAX_MS = 45000;
 /** 巩固轮次上限：超过就结束，把还没拿下的词摆在结果页，不把孩子锁死在循环里
  *  （2026-10-07 从 5 改 3：3 轮还拼不出来的词，继续磨的收益不如回详情多念几遍） */
 var MAX_ROUNDS = 3;
+
+/** 详情页「抄写」的键盘难度递进：抄得越多，键盘越接近真实（要自己找字母） */
+var COPY_LEVELS = ['easy', 'medium', 'hard'];
 /** 默认任务词数（没人布置作业时） */
 var DEFAULT_WORDS = 10;
 
@@ -57,6 +65,26 @@ var DEFAULT_WORDS = 10;
 var WRITE_TYPES = { dictation: 1, spell: 1, listen: 1 };
 
 var PHASE_TEXT = { recog: '认', spell: '写', loop: '巩固' };
+
+/** 拼写题超时：6 秒起步 + 每个字母 2.5 秒，夹在 12~45 秒 */
+function writeTimeoutMs(len) {
+  var n = Math.max(1, len || 0);
+  var ms = WRITE_BASE_MS + PER_LETTER_MS * n;
+  return Math.min(WRITE_MAX_MS, Math.max(WRITE_MIN_MS, ms));
+}
+
+/** 提示"想了很久"的时点：超时的 60%（还没到判不会，先催一下） */
+function writeSlowMs(len) {
+  return Math.round(writeTimeoutMs(len) * 0.6);
+}
+
+/** 取出当前题要拼的单词长度（拼写/听写题才有意义） */
+function wordLenOf(q) {
+  if (!q) return 0;
+  if (q.length) return Number(q.length) || 0;
+  var w = (q.word && (q.word.word || q.word.word_id)) || q.wordId || '';
+  return String(w).length;
+}
 
 Page({
   behaviors: [layout.behavior()],
@@ -373,8 +401,8 @@ Page({
     this.qStartAt = Date.now();
     var q = this.data.q;
     var isWrite = !!(q && WRITE_TYPES[q.type]);
-    var slow = isWrite ? WRITE_SLOW_MS : SLOW_MS;
-    var out = isWrite ? WRITE_TIMEOUT_MS : TIMEOUT_MS;
+    var slow = isWrite ? writeSlowMs(wordLenOf(q)) : SLOW_MS;
+    var out = isWrite ? writeTimeoutMs(wordLenOf(q)) : TIMEOUT_MS;
     this._t5 = setTimeout(function () {
       if (self.data.state !== 'run') return;
       self.setData({ slowHint: true });
@@ -460,7 +488,8 @@ Page({
     var q = this.data.q;
     if (!q) return;
     var word = q.word || this.findWord(q.wordId);
-    var slowAt = WRITE_TYPES[q.type] ? WRITE_SLOW_MS : SLOW_MS;
+    var isWrite = !!WRITE_TYPES[q.type];
+    var slowAt = isWrite ? writeSlowMs(wordLenOf(q)) : SLOW_MS;
 
     // 这个词花了多久：从题面出现到判定 + 之前看详情的时长。
     // 学习简报的"经过 X 分钟"就是把这些 durationMs 逐条加起来 ——
@@ -530,7 +559,13 @@ Page({
           answerVerb: q.options ? '正确的是' : '正确拼写是',
           fbLabel: honest ? '你点了「不会」' : (timeout ? '超时没答，按不会记' : '答错了'),
           speakCount: 0,
-          guide: '先听一遍，跟着念出来（点上面的大喇叭）'
+          guide: '先听一遍，跟着念出来（点上面的大喇叭）',
+          // 抄写：光看念不够，动手拼一遍才记得住。点了「✍ 抄写一遍」才展开键盘
+          writing: false,
+          copyCount: 0,
+          copyOk: false,
+          copyMsg: '',
+          copyLength: String((word && word.word) || '').length
         }
       });
       this._detailAt = Date.now();
@@ -549,8 +584,60 @@ Page({
       this._carryMs += Date.now() - this._detailAt;
       this._detailAt = 0;
     }
-    this.setData({ detail: null });
+    this.setData({ detail: null, kbValue: [], kbText: '', kbCaret: 0 });
     this.next();
+  },
+
+  /**
+   * 详情页「✍ 抄写一遍」：照着上面的词用键盘拼一遍。
+   * 念是耳朵记，抄是手记 —— 两样都做了才算真过一遍。
+   * 想抄几遍抄几遍（键盘难度随遍数递进：仅正确字母 → 含易混字母 → 全键盘）。
+   */
+  onDetailWrite: function () {
+    var d = this.data.detail;
+    if (!d || !d.word) return;
+    var lv = COPY_LEVELS[Math.min(d.copyCount || 0, COPY_LEVELS.length - 1)];
+    this.setData({
+      kbValue: [], kbText: '', kbCaret: 0,
+      kbLevel: lv,
+      'detail.writing': true,
+      'detail.copyOk': false,
+      'detail.copyMsg': '照着上面的词，用键盘拼一遍',
+      'detail.copyLength': String(d.word.word || '').length
+    });
+    this.speak();     // 抄之前先念一遍，耳朵带着手走
+  },
+
+  /** 抄完这一遍：对了记一遍、可继续抄；错了指出第几个字母不对（不清空，可直接改） */
+  onCopyConfirm: function () {
+    var d = this.data.detail;
+    if (!d || !d.word) return;
+    var input = (this.data.kbValue || []).join('');
+    if (!input) return;
+    var target = String(d.word.word || '');
+
+    if (quizLib.isSpellingCorrect(input, target, d.word.variant)) {
+      var n = (d.copyCount || 0) + 1;
+      this.setData({
+        kbValue: [], kbText: '', kbCaret: 0,
+        kbLevel: COPY_LEVELS[Math.min(n, COPY_LEVELS.length - 1)],
+        'detail.copyCount': n,
+        'detail.copyOk': true,
+        'detail.copyMsg': n < 3
+          ? ('👍 第 ' + n + ' 遍抄对了 —— 再抄一遍更牢，也可以点「下一词」')
+          : ('👍 已经抄了 ' + n + ' 遍，这个词稳了')
+      });
+      return;
+    }
+    this.setData({ 'detail.copyOk': false, 'detail.copyMsg': copyDiffHint(input, target) });
+  },
+
+  /** 收起抄写键盘（抄了几遍就记几遍，不影响判定） */
+  onCopyClose: function () {
+    this.setData({
+      'detail.writing': false,
+      kbValue: [], kbText: '', kbCaret: 0
+    });
   },
 
   next: function () {
@@ -815,6 +902,22 @@ Page({
 
   onSpeak: function () { this.speak(); }
 });
+
+/**
+ * 抄写打错时的提示：直接说第几个字母不对，别让孩子自己对着找
+ * @param {string} input 抄出来的
+ * @param {string} target 正确的
+ */
+function copyDiffHint(input, target) {
+  var a = String(input || '').toLowerCase();
+  var b = String(target || '').toLowerCase();
+  var i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (i >= b.length) return '多打了字母，对着上面的词改一下';
+  if (i >= a.length) return '还差 ' + (b.length - a.length) + ' 个字母，接着拼';
+  return '第 ' + (i + 1) + ' 个字母应该是 ' + b[i] +
+    '，你写的是 ' + a[i] + ' —— 改一下再确定';
+}
 
 /** 键盘难度文案（复用组件里的实现，避免两处各写一套） */
 function levelLabel(level) {

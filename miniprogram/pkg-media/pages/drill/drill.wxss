@@ -104,6 +104,21 @@
   background: #16202c; border-radius: 16rpx;
   display: flex; flex-direction: column; gap: 8rpx;
 }
+/* 详情页两个练习按钮并排：念一遍 / 抄一遍 —— 耳朵和手都要走一遍 */
+.dbtn-row { display: flex; gap: 16rpx; }
+.dbtn-row .btn { flex: 1; min-width: 0; }
+
+/* 抄写区：照着词拼一遍，可以抄好几遍 */
+.copy-box {
+  margin-top: 24rpx; padding: 22rpx;
+  background: #16202c; border-radius: 16rpx;
+  border-left: 6rpx solid #ffb020;
+}
+.copy-title { font-size: 26rpx; color: #cfe0f0; margin-bottom: 8rpx; }
+.copy-msg { margin-top: 12rpx; font-size: 25rpx; line-height: 1.5; }
+.copy-msg.ok { color: #2fd07a; }
+.copy-msg.bad { color: #ff8a9c; }
+
 .dyour-wrong { font-size: 26rpx; color: #ff8a9c; }
 .dyour-right { font-size: 28rpx; color: #2fd07a; font-weight: 600; }
 
@@ -120,6 +135,10 @@
 .wide .dex-cn { font-size: 13px; }
 .wide .dyour { font-size: 13px; padding: 10px; gap: 4px; }
 .wide .rg-count { font-size: 11px; }
+.wide .copy-box { padding: 12px; margin-top: 12px; }
+.wide .copy-title { font-size: 13px; }
+.wide .copy-msg { font-size: 13px; }
+.wide .dbtn-row { gap: 8px; }
 .wide .hp-label, .wide .hp-value { font-size: 12px; }
 
 /* 完成态 */
