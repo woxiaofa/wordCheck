@@ -125,6 +125,7 @@
               <text class="tl" data-pos="{{index}}" catchtap="onTypedTap">{{item}}</text>
             </block>
             <text wx:if="{{kbCaret >= kbValue.length}}" class="caret"></text>
+            <text wx:if="{{!kbText}}" class="typed-ph">照着上面的词拼一遍</text>
           </view>
           <view class="copy-msg {{detail.copyOk ? 'ok' : 'bad'}}" wx:if="{{detail.copyMsg}}">
             {{detail.copyMsg}}
@@ -136,7 +137,7 @@
             word="{{detail.word.word}}"
             value="{{kbValue}}"
             caret="{{kbCaret}}"
-            confirm-label="抄完这一遍"
+            confirm-label="{{detail.copyCount ? '继续抄' : '确定'}}"
             bind:input="onKeyInput"
             bind:confirm="onCopyConfirm"
           />

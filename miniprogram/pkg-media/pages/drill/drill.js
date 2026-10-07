@@ -613,7 +613,15 @@ Page({
     var d = this.data.detail;
     if (!d || !d.word) return;
     var input = (this.data.kbValue || []).join('');
-    if (!input) return;
+    if (!input) {
+      // 抄对后输入框会清空，此时点「继续抄」什么都没发生会让人以为按坏了
+      this.setData({
+        'detail.copyMsg': (d.copyCount || 0)
+          ? '照着上面的词再拼一遍，拼完点「继续抄」'
+          : '先照着上面的词拼一遍'
+      });
+      return;
+    }
     var target = String(d.word.word || '');
 
     if (quizLib.isSpellingCorrect(input, target, d.word.variant)) {

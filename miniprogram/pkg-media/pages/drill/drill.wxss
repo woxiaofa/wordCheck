@@ -115,6 +115,8 @@
   border-left: 6rpx solid #ffb020;
 }
 .copy-title { font-size: 26rpx; color: #cfe0f0; margin-bottom: 8rpx; }
+/* 输入框为空时的占位：抄完清空后不至于是一片空白，不知道下一步干嘛 */
+.typed-ph { font-size: 26rpx; color: #5b6b7d; margin-left: 8rpx; }
 .copy-msg { margin-top: 12rpx; font-size: 25rpx; line-height: 1.5; }
 .copy-msg.ok { color: #2fd07a; }
 .copy-msg.bad { color: #ff8a9c; }
@@ -137,6 +139,7 @@
 .wide .rg-count { font-size: 11px; }
 .wide .copy-box { padding: 12px; margin-top: 12px; }
 .wide .copy-title { font-size: 13px; }
+.wide .typed-ph { font-size: 13px; }
 .wide .copy-msg { font-size: 13px; }
 .wide .dbtn-row { gap: 8px; }
 .wide .hp-label, .wide .hp-value { font-size: 12px; }

@@ -688,5 +688,27 @@ test('㉕ 拼写题超时按字母数给（约每字母 2.5 秒）：长词更�
     '选择题仍是 10 秒超时');
 });
 
+test('㉖ 抄写区空输入点确认要有提示（抄完清空后按钮不能像按坏了）', function () {
+  var p = startedPage();
+  p.onDontKnow();
+  p.onDetailWrite();
+  p.onKeyInput({ detail: { value: [] } });
+  p.onCopyConfirm();
+  assert.strictEqual(p.data.detail.copyCount, 0, '空输入不能算一遍');
+  assert.ok(p.data.detail.copyMsg, '要给一句提示：什么都不说等于按钮坏了');
+  assert.ok(p.data.detail.copyMsg.indexOf('拼一遍') >= 0, '提示要说该干嘛：' + p.data.detail.copyMsg);
+
+  // 抄过一遍后，提示要跟着变成"再拼一遍"
+  var w = p.data.detail.word.word;
+  var v = [];
+  w.split('').forEach(function (ch) { v.push(ch); p.onKeyInput({ detail: { value: v.slice() } }); });
+  p.onCopyConfirm();
+  p.onKeyInput({ detail: { value: [] } });
+  p.onCopyConfirm();
+  assert.strictEqual(p.data.detail.copyCount, 1, '空输入不能把已抄的遍数冲掉');
+  assert.ok(p.data.detail.copyMsg.indexOf('再拼一遍') >= 0,
+    '已抄过要提示"再拼一遍"：' + p.data.detail.copyMsg);
+});
+
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));
 if (failed.length) process.exitCode = 1;
