@@ -47,8 +47,9 @@ var TIMEOUT_MS = 10000;
 /** 拼写/听写（写）的判定档位：写字本来就慢，给更宽的时间 */
 var WRITE_SLOW_MS = 10000;
 var WRITE_TIMEOUT_MS = 25000;
-/** 巩固轮次上限：超过就结束，把还没拿下的词摆在结果页，不把孩子锁死在循环里 */
-var MAX_ROUNDS = 5;
+/** 巩固轮次上限：超过就结束，把还没拿下的词摆在结果页，不把孩子锁死在循环里
+ *  （2026-10-07 从 5 改 3：3 轮还拼不出来的词，继续磨的收益不如回详情多念几遍） */
+var MAX_ROUNDS = 3;
 /** 默认任务词数（没人布置作业时） */
 var DEFAULT_WORDS = 10;
 
@@ -70,6 +71,7 @@ Page({
     pickedIdx: -1,           // 已选答案下标（选择题）
     kbValue: [],             // 键盘输入（拼写/听写题）
     kbText: '',              // 已输入字母的拼接串（WXML 表达式不支持 .join()，必须算好再给）
+    kbCaret: 0,              // 插入光标位置（0~kbValue.length），支持从中间插入字母
     kbLevel: 'easy',         // 拼写键盘难度（简单 → 复杂）
     kbLevelLabel: '',
     slowHint: false,         // 是否已超过提示时间
@@ -214,6 +216,9 @@ Page({
     var qs = words.map(function (w, i) { return self.buildQuestion(w, pool, phase, i, words.length); });
 
     var isLoop = phase === 'loop';
+    // 总词数口径（完成页"已拿下 x/y"用）：认写两步是同一批词，只在第一遍计数。
+    // 之前用"最后一轮的 words.length"当总数，巩固轮里只剩错词时完成页显示 0/6（实锤）
+    if (phase === 'recog' && this.data.round === 1) this._totalWords = words.length;
     this.setData({
       state: 'run',
       phase: phase,
@@ -327,6 +332,7 @@ Page({
       pickedIdx: -1,
       kbValue: [],
       kbText: '',
+      kbCaret: 0,
       kbLevel: kbLevel,
       kbLevelLabel: levelLabel(kbLevel),
       slowHint: false,
@@ -408,10 +414,27 @@ Page({
   },
 
   onKeyInput: function (e) {
-    var v = e.detail.value || [];
+    var d = e.detail || {};
+    var v = d.value || [];
     // kbText：拼好再给视图 —— WXML 的 {{}} 表达式不支持 .join() 这类方法调用，
     // 直接写 {{kbValue.join('')}} 永远渲染不出（2026-10-07"填写无效果"实锤）
-    this.setData({ kbValue: v, kbText: v.join('') });
+    var caret = (d.caret === undefined || d.caret === null) ? v.length : Number(d.caret);
+    if (isNaN(caret) || caret < 0 || caret > v.length) caret = v.length;
+    this.setData({ kbValue: v, kbText: v.join(''), kbCaret: caret });
+  },
+
+  /** 点已输入的某个字母：光标移到它前面 —— 拼错中间一个字母不必清空重打 */
+  onTypedTap: function (e) {
+    var pos = Number(e.currentTarget.dataset.pos);
+    var len = (this.data.kbValue || []).length;
+    if (isNaN(pos) || pos < 0) return;
+    if (pos > len) pos = len;
+    this.setData({ kbCaret: pos });
+  },
+
+  /** 点输入区空白处：光标回末尾（继续往后拼） */
+  onTypedEndTap: function () {
+    this.setData({ kbCaret: (this.data.kbValue || []).length });
   },
 
   /** 键盘上的「确定」：拼完了就判 */
@@ -466,10 +489,15 @@ Page({
       var exists = wrongBook.some(function (x) { return x.word === word.word; });
       if (!exists) wrongBook.push(word);
     }
+    // 待巩固名单：答错/超时/点不会的进来；答对的（包括想了很久但答对的）出去 ——
+    // 会了的词不该一遍遍重复（2026-10-07 用户实锤：巩固第 5 轮还是同样 6 个词，
+    // 完成页"已拿下 0/6"。根因就是答对从不出列）
     var roundWrong = this.data.roundWrong.slice();
     if (fb !== 'known' && word) {
       var inRound = roundWrong.some(function (x) { return x.word === word.word; });
       if (!inRound) roundWrong.push(word);
+    } else if (word) {
+      roundWrong = roundWrong.filter(function (x) { return x.word !== word.word; });
     }
 
     this.setData({
@@ -569,13 +597,14 @@ Page({
     var mm = Math.floor(totalSec / 60);
     var ss = totalSec % 60;
     var left = this.data.roundWrong || [];
+    var total = this._totalWords || this.data.words.length;
 
     this.setData({
       state: 'done',
       elapsedText: (mm ? mm + ' 分 ' : '') + ss + ' 秒',
       result: {
-        total: this.data.words.length,
-        mastered: Math.max(0, this.data.words.length - left.length),
+        total: total,
+        mastered: Math.max(0, total - left.length),
         wrongBook: this.data.wrongBook,
         left: left,
         allDone: left.length === 0,
@@ -583,7 +612,7 @@ Page({
         seconds: totalSec
       }
     });
-    console.log('[drill] 本轮完成：' + this.data.words.length + ' 词，用时 ' +
+    console.log('[drill] 本轮完成：' + total + ' 词，用时 ' +
       this.data.elapsedText + '，曾错 ' + this.data.wrongBook.length + ' 个');
 
     this.submitScore(totalSec, left.length);

@@ -73,7 +73,12 @@ function shuffleStable(arr, seed) {
  * 计算某道题应该给出哪些字母键
  * @param {'easy'|'medium'|'hard'} level
  * @param {string} word 目标单词（仅 easy/medium 需要）
- * @returns {Array<string>} 洗好序的字母数组
+ * @returns {Array<string>} 字母数组，一律按 a~z 升序排列
+ *
+ * 为什么不再洗牌（2026-10-07 用户反馈）：
+ * 键少时洗牌的"随机"没有收益，反而每次键位都不一样；
+ * 固定 a~z 排列后，找字母有规律可循（跟查字典一样），低难度档键少也不会乱。
+ * 确定性也顺带保住了：同一个词永远同一批键、同一个顺序。
  */
 function planKeys(level, word) {
   var lv = level || 'hard';
@@ -84,14 +89,14 @@ function planKeys(level, word) {
   var uniq = uniqueLetters(w);
   if (!uniq.length) return ALPHABET.slice();   // 拿不到词（云端未下发）就退回全键盘
 
-  if (lv === 'easy') return shuffleStable(uniq, w);
+  if (lv === 'easy') return uniq.slice().sort();
 
   var extra = [];
   for (var i = 0; i < CONFUSABLES.length && extra.length < MEDIUM_EXTRA; i++) {
     var c = CONFUSABLES[i];
     if (uniq.indexOf(c) < 0) extra.push(c);
   }
-  return shuffleStable(uniq.concat(extra), w);
+  return uniq.concat(extra).sort();
 }
 
 /** 难度文案（界面上直接写明这题用的是哪档，家长和老师看得见） */

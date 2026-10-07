@@ -6,12 +6,12 @@
  *   ② 输入法会自动纠错 —— 拼错的词会被"修正"，用户永远看不到自己拼错
  *   ③ 会自动首字母大写 —— 归一化能容忍大小写，但容忍不了联想与纠错
  *
- * 布局（v2）：
- *   - 字母键用 flex 自动换行，不再按"每行几个"硬切 —— 难度越高键越少，
- *     硬切行会出现半行空键，退格键也被挤到下一行（用户反馈过"退格换行别扭"）。
- *   - 「下一题 / 交卷」移到键盘下方的整行大按钮上，拇指最容易够到，
- *     同时退格键得以留在字母区里，不再占位换行。
- *   - 键位顺序对同一个词是固定的（keys.js 的 shuffleStable），不会随输入跳动。
+ * 布局（v3，2026-10-07）：
+ *   - 字母键一律按 a~z 升序排列（keys.planKeys 已保证），找字母有规律可循。
+ *   - 支持光标编辑：◀ ▶ 移动插入位置，字母插到光标处，退格删光标前一个 ——
+ *     拼错中间一个字母不用清空重打（页面上点已输入的字母也能定位光标）。
+ *   - 键位加大（96×104rpx）、间距拉开（14rpx），降低孩子误触邻键的概率；
+ *     光标/退格/清空都在键盘下方的操作行，跟字母区隔开，不会挤在一起误按。
  */
 
 var keysLib = require('./keys');
@@ -29,7 +29,9 @@ Component({
     /** 主操作键文案："下一题" 或 "交卷" */
     confirmLabel: { type: String, value: '下一题' },
     /** 是否显示"清空"键 */
-    showClear: { type: Boolean, value: true }
+    showClear: { type: Boolean, value: true },
+    /** 插入光标位置（0~value.length）。页面点已输入字母时传入 */
+    caret: { type: Number, value: 0, optionalTypes: [null] }
   },
 
   data: {
@@ -45,6 +47,9 @@ Component({
   observers: {
     'level, word, showClear': function () {
       this.rebuild();
+    },
+    'value, caret': function () {
+      this.fixCaret();
     }
   },
 
@@ -55,27 +60,60 @@ Component({
       this.setData({ keys: keys });
     },
 
+    /** 光标越界（外部把 value 改短/清空了）就收回末尾 */
+    fixCaret: function () {
+      var len = (this.data.value || []).length;
+      var c = Number(this.data.caret);
+      if (isNaN(c) || c < 0 || c > len) this.setData({ caret: len });
+    },
+
+    /** 当前有效的插入位置（0~value.length） */
+    caretNow: function () {
+      var len = (this.data.value || []).length;
+      var c = Number(this.data.caret);
+      if (isNaN(c) || c < 0 || c > len) return len;
+      return c;
+    },
+
+    /** 统一的对外通知：value 和 caret 一起给，页面视图才能同步画光标 */
+    emit: function (value, caret) {
+      this.triggerEvent('input', { value: value, caret: caret });
+    },
+
     onLetter: function (e) {
       var letter = e.currentTarget.dataset.letter;
       var len = Number(this.data.length) || 0;
       var value = (this.data.value || []).slice();
       if (len && value.length >= len) return;   // 已填满，忽略多余输入
-      value.push(letter);
-      this.triggerEvent('input', { value: value });
+      var caret = this.caretNow();
+      value.splice(caret, 0, letter);
+      this.setData({ caret: caret + 1 });
+      this.emit(value, caret + 1);
     },
 
     onAction: function (e) {
       var action = e.currentTarget.dataset.action;
       var value = (this.data.value || []).slice();
+      var caret = this.caretNow();
 
       if (action === 'del') {
-        if (!value.length) return;
-        value.pop();
+        if (!value.length || caret === 0) return;
+        value.splice(caret - 1, 1);
         if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
-        this.triggerEvent('input', { value: value });
+        this.setData({ caret: caret - 1 });
+        this.emit(value, caret - 1);
+      } else if (action === 'left') {
+        if (caret <= 0) return;
+        this.setData({ caret: caret - 1 });
+        this.emit(value, caret - 1);
+      } else if (action === 'right') {
+        if (caret >= value.length) return;
+        this.setData({ caret: caret + 1 });
+        this.emit(value, caret + 1);
       } else if (action === 'clear') {
         if (!value.length) return;
-        this.triggerEvent('input', { value: [] });
+        this.setData({ caret: 0 });
+        this.emit([], 0);
       } else if (action === 'confirm') {
         this.triggerEvent('confirm', { value: value });
       }

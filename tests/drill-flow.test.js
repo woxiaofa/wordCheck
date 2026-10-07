@@ -354,7 +354,7 @@ test('⑪ 全部答对 → 完成态：时长 + 错题本 + 全对标记 + 上�
   assert.strictEqual(scores[0].perfect, true);
 });
 
-test('⑫ 一直答错不会把孩子锁死：最多 5 轮后结束，剩下的词摆出来', function () {
+test('⑫ 一直答错不会把孩子锁死：最多 3 轮后结束，剩下的词摆出来', function () {
   var p = startedPage();
   var guard = 0;
   while (p.data.state !== 'done' && guard < 300) {
@@ -364,10 +364,36 @@ test('⑫ 一直答错不会把孩子锁死：最多 5 轮后结束，剩下的�
     answerWrong(p);
   }
   assert.strictEqual(p.data.state, 'done', '必须在有限轮次内结束');
-  assert.ok(p.data.round <= 5, '轮次不得超过上限，实际 ' + p.data.round);
+  assert.ok(p.data.round <= 3, '轮次不得超过上限（2026-10-07 由 5 改 3），实际 ' + p.data.round);
   assert.strictEqual(p.data.result.allDone, false);
   assert.ok(p.data.result.left.length > 0, '没拿下的词要摆在结果页');
   assert.ok(p.data.result.wrongBook.length > 0, '错题本要有内容');
+});
+
+test('⑫b 巩固轮答对的词必须从待巩固名单出列（回归：完成页"已拿下 0/6"、会了的词反复出）', function () {
+  var p = startedPage();
+  var total = 0;
+  assert.ok(runTo(p, 'loop', 60), '先进巩固轮');
+  total = p.data.words.length;
+  var first = p.data.words[0];
+  // 巩固轮把第一个词答对：它必须从 roundWrong 里消失，下一轮不再出现
+  var before = p.data.roundWrong.length;
+  answerRight(p, 1000);
+  var after = p.data.roundWrong.length;
+  assert.strictEqual(after, before - 1, '答对后待巩固数应减一：' + before + '→' + after);
+  assert.strictEqual(p.data.roundWrong.some(function (x) { return x.word === first.word; }), false,
+    '答对的词不应留在待巩固名单里');
+  // 走到完成：mastered 口径 = 总词数 - 还没拿下的
+  var guard = 0;
+  while (p.data.state !== 'done' && guard++ < 120) {
+    if (p.data.state === 'detail') { p.onDetailNext(); continue; }
+    if (!p.data.q) break;
+    answerRight(p, 1000);
+  }
+  assert.strictEqual(p.data.state, 'done');
+  assert.strictEqual(p.data.result.total, total, '总数应是本轮任务词数，不是最后一轮的词数');
+  assert.strictEqual(p.data.result.mastered, total, '全答对应全部拿下');
+  assert.strictEqual(p.data.result.allDone, true);
 });
 
 test('⑬ 每次判定都提交云端（幂等 reqId），教练端进度才跟得上', function () {

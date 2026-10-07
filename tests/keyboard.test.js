@@ -53,9 +53,15 @@ ok('hard 包含 a-z 全部字母', 'abcdefghijklmnopqrstuvwxyz'.split('').every(
 
 /* ---------------- 稳定性与兜底 ---------------- */
 
+function isSorted(a) {
+  for (var i = 1; i < a.length; i++) { if (a[i - 1] > a[i]) return false; }
+  return true;
+}
+ok('键位一律按 a~z 升序排列（2026-10-07 用户要求：不管几个键都有固定规律）',
+  isSorted(easy) && isSorted(medium) && isSorted(hard));
 eq('同一个词两次规划结果完全一致（键位不乱跳）',
   keysLib.planKeys('medium', 'letter'), keysLib.planKeys('medium', 'letter'));
-ok('不同词的键位顺序可以不同',
+ok('不同词给出的键集合不同（键位顺序本身固定）',
   JSON.stringify(keysLib.planKeys('easy', 'letter')) !== JSON.stringify(keysLib.planKeys('easy', 'school')));
 eq('拿不到单词时退回全键盘（云端未下发的兜底）', keysLib.planKeys('easy', '').length, 26);
 eq('未知难度按全键盘处理', keysLib.planKeys('', 'letter').length, 26);

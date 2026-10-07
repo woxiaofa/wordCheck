@@ -1,29 +1,30 @@
 /* 字母区：flex 自动换行。键数随难度变化（5～26 个），
-   硬切行会在难度低时留半行空位，所以交给换行规则，不用 JS 算列数。 */
+   硬切行会在难度低时留半行空位，所以交给换行规则，不用 JS 算列数。
+   v3：键加大、间距拉开 —— 挤在一起是孩子拼错词的一大来源（误触邻键）。 */
 .kb {
   background: #1a2432;
   border: 1rpx solid #2b3949;
   border-radius: 20rpx;
-  padding: 12rpx;
+  padding: 14rpx;
 }
 .kb-keys {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10rpx;
+  gap: 14rpx;
 }
 
 .kb-key {
-  width: 80rpx;
-  height: 92rpx;
+  width: 96rpx;
+  height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #243040;
   border: 1rpx solid #2b3949;
-  border-radius: 12rpx;
+  border-radius: 14rpx;
   color: #e8eef5;
-  font-size: 32rpx;
+  font-size: 38rpx;
   font-weight: 600;
 }
 .kb-key:active {
@@ -33,40 +34,53 @@
 
 /* 退格跟在字母后面，宽度稍大一点方便连按 */
 .kb-del {
-  width: 108rpx;
+  width: 128rpx;
   background: #2b3949;
   color: #cfe0f0;
-  font-size: 30rpx;
+  font-size: 34rpx;
 }
 
-/* 键盘下方的操作行：清空（次要）+ 下一题/交卷（主要，占满剩余宽度） */
+/* 键盘下方的操作行：光标移动（编辑用）+ 清空（次要）+ 下一题/交卷（主要） */
 .kb-bar {
   display: flex;
-  gap: 10rpx;
-  margin-top: 12rpx;
+  gap: 12rpx;
+  margin-top: 14rpx;
 }
-.kb-clear {
-  width: 150rpx;
-  height: 92rpx;
+.kb-nav {
+  width: 96rpx;
+  height: 100rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #2b3949;
-  border-radius: 12rpx;
+  border-radius: 14rpx;
+  color: #cfe0f0;
+  font-size: 30rpx;
+}
+.kb-nav:active { background: #3a4a5e; }
+.kb-nav-off { opacity: .35; }
+.kb-clear {
+  width: 150rpx;
+  height: 100rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2b3949;
+  border-radius: 14rpx;
   color: #cfe0f0;
   font-size: 28rpx;
 }
 .kb-clear:active { background: #3a4a5e; }
 .kb-go {
   flex: 1;
-  height: 92rpx;
+  height: 100rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #3ea6ff, #7c5cff);
-  border-radius: 12rpx;
+  border-radius: 14rpx;
   color: #ffffff;
-  font-size: 32rpx;
+  font-size: 34rpx;
   font-weight: 600;
 }
 .kb-go:active { opacity: .85; }

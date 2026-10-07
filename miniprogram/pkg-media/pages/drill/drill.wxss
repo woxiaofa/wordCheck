@@ -42,16 +42,33 @@
 .opt.wrong { border-color: #ff5c72; background: #3a1f2a; }
 
 /* 拼写/听写输入区 */
+/* 已输入区：字母加大加间距（孩子要盯着的主体），字母可点=把光标放到它前面 */
 .typed {
   margin-top: 24rpx;
-  min-height: 80rpx;
+  min-height: 96rpx;
   display: flex; align-items: center; justify-content: center;
-  font-size: 48rpx; font-weight: 700; letter-spacing: 4rpx;
+  flex-wrap: wrap;
+  padding: 8rpx 12rpx;
   color: #3ea6ff;
   background: #16202c; border-radius: 16rpx; border: 2rpx dashed #2b3949;
 }
+.typed .tl {
+  font-size: 56rpx; font-weight: 700;
+  padding: 0 8rpx; line-height: 1.2;
+}
+.typed-full { border-style: solid; color: #e8eef5; }
+.typed-full .tl { color: #e8eef5; }
 
-.typed-full { border-style: solid; color: #e8eef5; letter-spacing: 6rpx; }
+/* 插入光标：一条竖线，标出"下一个字母从哪里插进去" */
+.caret {
+  display: inline-block;
+  width: 6rpx; height: 56rpx;
+  margin: 0 4rpx;
+  border-radius: 3rpx;
+  background: #3ea6ff;
+  animation: caret-blink 1s step-end infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
 
 /* 答对后短暂的高亮：让"换词"看得见 */
 .qcard.flash { border-color: #2fd07a; }
@@ -175,8 +192,12 @@
   background: #16202c; border-radius: 16rpx; text-align: left;
 }
 .prow { display: flex; align-items: center; margin-top: 16rpx; }
+/* 头像按钮：宽高必须 !important —— 微信给原生 button 注入的
+   wx-button { width:184px } 选择器优先级更高，会把 96rpx 盖掉，
+   96rpx 高 × 184px 宽就拉成了椭圆（2026-10-07 实锤） */
 .avatar-btn {
-  width: 96rpx; height: 96rpx; padding: 0; margin: 0;
+  width: 96rpx !important; height: 96rpx !important;
+  min-width: 0 !important; padding: 0 !important; margin: 0 !important;
   border-radius: 50%; overflow: hidden;
   background: #243040; border: 2rpx solid #3a4a5e;
   display: flex; align-items: center; justify-content: center;
@@ -192,4 +213,5 @@
 .wide .rg-text { font-size: 15px; }
 .wide .honor { padding: 12px; }
 .wide .honor-badge { font-size: 18px; }
-.wide .avatar-btn, .wide .avatar-img { width: 52px; height: 52px; }
+.wide .avatar-btn { width: 52px !important; height: 52px !important; min-width: 0 !important; }
+.wide .avatar-img { width: 52px; height: 52px; }

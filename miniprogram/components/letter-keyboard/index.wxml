@@ -2,10 +2,10 @@
      为什么必须自研：系统输入法会联想、纠错、自动首字母大写，
      用它来做拼写题等于把题目难度交给输入法 —— 用户打出前三个字母就被补全了。
 
-     布局：
-       字母键 flex 自动换行（键数是随难度变的，硬切行会出现半行空位）
-       退格键跟在字母后面 —— 不再因为给操作键腾地方而换行
-       「下一题 / 交卷」独立成键盘下方的一整行大按钮，拇指最好够 -->
+     布局（v3）：
+       字母键按 a~z 排列（keys.planKeys 保证），flex 自动换行；
+       退格键跟在字母后面；光标移动 ◀ ▶ 和清空、确定放在键盘下方的操作行 ——
+       编辑键与字母键分区，避免孩子按字母时误碰到编辑键。 -->
 <view class="kb">
   <view class="kb-keys">
     <view
@@ -20,6 +20,8 @@
   </view>
 
   <view class="kb-bar">
+    <view class="kb-nav {{caret <= 0 ? 'kb-nav-off' : ''}}" data-action="left" bindtap="onAction">◀</view>
+    <view class="kb-nav {{caret >= value.length ? 'kb-nav-off' : ''}}" data-action="right" bindtap="onAction">▶</view>
     <view wx:if="{{showClear}}" class="kb-clear" data-action="clear" bindtap="onAction">清空</view>
     <view class="kb-go" data-action="confirm" bindtap="onAction">{{confirmLabel}}</view>
   </view>
