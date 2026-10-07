@@ -184,9 +184,14 @@ ok('④ 教师端逐学员进度：用各自词单算，与学员自己看到的
     var perB = a.per_student.filter(function (p) { return p.user_id === 'B'; })[0];
     assert.ok(perA && perB, '应给出逐学员进度');
     assert.strictEqual(perA.count, 5, '小明的总数=他自己的词单数');
-    // 小明学过 w1/w2/w3/w4，但 w3 已掌握被裁掉了 → 他的词单里只有 3 个学过
-    assert.strictEqual(perA.done, 3, '只应统计他自己词单里的词，实际 ' + perA.done);
+    // 小明学过 w1/w2/w3/w4，但 w3 已掌握被裁掉 → 词单里只有 w1/w2/w4；
+    // 新口径：w1 最近一次反馈是"忘了"（抽查答错）不算完成 → done=2
+    assert.strictEqual(perA.done, 2, '忘了的词不应计入完成，实际 ' + perA.done);
+    assert.strictEqual(perA.forgot, 1, 'w1 应以 forgot 单独报出');
     assert.strictEqual(perB.done, 0, '小红什么都没学过');
+    // 教练端必须能看见"个性化给了谁什么词"（2026-10-07 反馈：开了个性化也不知道给谁了）
+    assert.ok(perA.nickname === '小明' && perB.nickname === '小红', '逐学员进度应带昵称');
+    assert.ok(perA.preview.length > 0 && perA.preview.indexOf('w') === 0, '应给出词单预览，实际：' + perA.preview);
     // 关键：教师端不能拿全班基础词单（前 5 个 w1..w5）硬算所有人的进度
     assert.strictEqual(a.finished, 0, '没人做完，完成人数应为 0');
   });
@@ -246,9 +251,10 @@ ok('⑦ 催学文案：个性化作业下按该学员自己的词单说数字', 
     return as(COACH, function () { return classFn.main({ action: 'nudge', studentId: 'A' }); });
   }).then(function (r) {
     var t = r.data.text;
-    assert.ok(/已完成\s*3\/5/.test(t), '小明应为 3/5，实际：\n' + t);
+    // 新口径：w1 忘了不计完成 → done=2，剩余 3 个；归因按今天练的 3 题仍说"其中 3 个"
+    assert.ok(/已完成\s*2\/5/.test(t), '小明应为 2/5（忘了的 w1 不算），实际：\n' + t);
     assert.ok(/其中\s*3\s*个/.test(t), '应归因"其中 3 个是作业的词"，实际：\n' + t);
-    assert.ok(/剩下的\s*2\s*个/.test(t), '剩余应为 2 个，实际：\n' + t);
+    assert.ok(/剩下的\s*3\s*个/.test(t), '剩余应为 3 个，实际：\n' + t);
   });
 });
 

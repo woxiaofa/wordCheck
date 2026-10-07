@@ -205,6 +205,13 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
   }
   note = typeof note === 'string' ? note.trim().slice(0, LIMITS.NOTE_MAX) : '';
 
+  const now = Date.now();
+  const personal = personalized === true;
+
+  // 作业名：备注优先；没写备注就自动按"日期 时间·词库"命名。
+  // 此前所有作业都叫"全部作业"，两份并排完全同名，家长分不清哪份是哪份（2026-10-07 反馈）。
+  const name = note || autoAssignName(tag, now, personal);
+
   // --- 幂等闸 ---
   const dup = await db.collection(COLL.requests)
     .where({ _id: ctx.user._id + ':assign:' + clientReqId }).limit(1).get()
@@ -216,7 +223,6 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
 
   // --- 选词：按词频升序取前 count 个（简单可解释，学生先学高频词）---
   // 个性化作业要多拉一些候选：好让"已掌握的词跳过、易错词补进来"有挑选余地
-  const personal = personalized === true;
   const fetchMax = personal
     ? Math.min(LIMITS.WORDS_FETCH_MAX, count * LIMITS.PERSONAL_POOL_FACTOR)
     : Math.min(LIMITS.WORDS_FETCH_MAX, count);
@@ -233,11 +239,11 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     return fail('WORDS_EMPTY', '该词库暂无可布置的单词');
   }
 
-  const now = Date.now();
   const addRes = await db.collection(COLL.assignments).add({
     data: {
       class_id: ctx.cls._id,
       tag,
+      name,
       word_ids: wordIds,
       count: wordIds.length,
       deadline,
@@ -579,7 +585,7 @@ async function onNudge(openid, { studentId }) {
     const left = total - done;
     if (left > 0) {
       assignLeft = {
-        name: a.note || a.tag + '作业',
+        name: a.name || a.note || a.tag + '作业',
         left: left,
         done: done,
         count: total,
@@ -686,7 +692,8 @@ async function requireCoach(openid) {
 
 /**
  * 按学生统计作业词的完成数。
- * 完成定义：user_word_state 里该词存在且 correct_count>0 或 stage>0（学过并至少答对一次/进入复习流程）。
+ * 完成定义：user_word_state 里该词存在，且最近一次反馈不是 forgot
+ * （学过即算；抽查答"忘了"的词不算，重学后自动回到完成。见 progressByStudent）。
  */
 /**
  * 个性化取词与学员词单：规则只有一份真相（shared/personal.js），
@@ -696,19 +703,52 @@ const personal = require('./personal');
 /** 适配成本函数的两参调用形态（共享模块需要显式传 db） */
 const wordsForStudent = (a, userId) => personal.wordsForStudent(db, a, userId);
 
-/** 一份作业的逐学员进度（各自词单、各自 count） */
+/** 一份作业的逐学员进度（各自词单、各自 count）。
+ * 个性化作业必须让人看见"给谁、给了什么词"——否则家长开了个性化却
+ * 只看到一个总进度条，根本无法确认两个孩子拿到的词单真的不同（2026-10-07 反馈）。 */
 async function progressForAssignment(a, studentIds) {
   const out = [];
+  const nickMap = await nicknameMap(studentIds);
   for (const sid of studentIds) {
     const texts = await wordsForStudent(a, sid);
     const per = await progressByStudent([sid], texts);
+    const meta = a.personalized ? await personalMeta(a, sid) : null;
     out.push({
       user_id: sid,
+      nickname: nickMap[sid] || '学员',
       done: per.length ? per[0].done : 0,
-      count: texts.length
+      forgot: per.length ? (per[0].forgot || 0) : 0,
+      count: texts.length,
+      // 词单预览：个性化时每人是自己的词，非个性化展示全班统一的头 3 个
+      preview: texts.slice(0, 3).join('、'),
+      wrong_top: meta ? meta.wrong_top : null,
+      skipped_mastered: meta ? meta.skipped_mastered : null
     });
   }
   return out;
+}
+
+/** 用户 id → 昵称（催学文案与教练端展示都要人话，别甩一串 openid） */
+async function nicknameMap(userIds) {
+  const map = {};
+  if (!userIds.length) return map;
+  const res = await db.collection(COLL.users)
+    .where({ _id: _.in(userIds) })
+    .field({ nickname: true })
+    .get().catch(() => ({ data: [] }));
+  (res.data || []).forEach(u => { map[u._id] = u.nickname || ''; });
+  return map;
+}
+
+/** 个性化词单快照的解释字段：错词几个、跳过已掌握几个（家长问"为什么是这些词"时有的答） */
+async function personalMeta(a, userId) {
+  const res = await db.collection(COLL.asgStudents).doc(a._id + ':' + userId)
+    .get().catch(() => null);
+  if (!res || !res.data) return null;
+  return {
+    wrong_top: res.data.wrong_top || 0,
+    skipped_mastered: res.data.skipped_mastered || 0
+  };
 }
 
 async function progressByStudent(studentIds, wordIds) {
@@ -721,13 +761,15 @@ async function progressByStudent(studentIds, wordIds) {
     : [];
   const map = {};
   rows.forEach(s => {
-    // 完成定义 = 学过（见过并评价过，无论对错）。对错由 SRS 安排后续复习，
-    // 不该在这里二次设卡 —— 旧口径（correct_count>0 或 stage>0）会把
-    // 认真学完但选了"模糊"的孩子判成 0 进度，家长看到的就是假的。
-    if (!map[s.user_id]) map[s.user_id] = { user_id: s.user_id, done: 0 };
-    map[s.user_id].done++;
+    // 完成定义 = 学过且最近一次反馈不是"忘了"。抽查答忘了（forgot）的词不计完成 ——
+    // 否则"学了就算完成"，抽查暴露没记住的词反而把进度刷满，抽查等于白做（2026-10-07 实锤）。
+    // 学过(known)/模糊(vague) 都算完成：不二次设卡，避免把认真学完但选"模糊"的孩子判成假 0。
+    // 答忘的词重学（再点会了/抽查答对）后 last_feedback 变 known，自动回到"完成"。
+    if (!map[s.user_id]) map[s.user_id] = { user_id: s.user_id, done: 0, forgot: 0 };
+    if (s.last_feedback === 'forgot') map[s.user_id].forgot++;
+    else map[s.user_id].done++;
   });
-  return studentIds.map(id => map[id] || { user_id: id, done: 0 });
+  return studentIds.map(id => map[id] || { user_id: id, done: 0, forgot: 0 });
 }
 
 /**
@@ -775,10 +817,22 @@ function publicClass(c) {
 }
 
 /** 作业下发字段：word_ids 明细只给学生端 myAssignments 用，教练列表不给 */
+/** 作业自动命名：按 UTC+8 取"10月7日 12:10·全部·个性化"这样的名字，见名知时知范围 */
+function autoAssignName(tag, nowMs, personal) {
+  const d = new Date(nowMs + 8 * 3600 * 1000);          // UTC+8
+  const mm = d.getUTCMonth() + 1;
+  const dd = d.getUTCDate();
+  const hh = ('0' + d.getUTCHours()).slice(-2);
+  const mi = ('0' + d.getUTCMinutes()).slice(-2);
+  return mm + '月' + dd + '日 ' + hh + ':' + mi + '·' + tag + (personal ? '·个性化' : '');
+}
+
 function publicAssignment(a) {
   return {
     id: a._id,
     tag: a.tag,
+    // 老作业没有 name 字段：回退到备注，再退到旧默认名，前端不出现空标题
+    name: a.name || a.note || (a.tag || '') + '作业',
     count: a.count,
     deadline: a.deadline || '',
     note: a.note || '',
@@ -790,6 +844,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261007-personal';
+const VERSION = 'class-20261007-personal2';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

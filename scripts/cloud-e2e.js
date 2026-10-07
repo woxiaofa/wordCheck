@@ -73,8 +73,12 @@ function localRequireCheck(name) {
 }
 
 function runCli(args) {
-  // shell:true 是必须的：新版 Node 出于安全（CVE-2024-27980）禁止直接 spawn .bat
-  const r = spawnSync(CLI, args, { encoding: 'utf8', timeout: 10 * 60 * 1000, shell: true });
+  // shell:true 是必须的：新版 Node 出于安全（CVE-2024-27980）禁止直接 spawn .bat。
+  // 但 spawnSync(file, args, {shell:true}) 会把带空格的路径原样拼接（"Program Files" 断开），
+  // 导致 CLI 一个字都吐不出来 —— 所以这里自己拼整条命令并对含空格参数加引号。
+  const quoted = args.map((a) => (/\s/.test(a) ? '"' + a + '"' : a)).join(' ');
+  const cmd = '"' + CLI + '" ' + quoted;
+  const r = spawnSync(cmd, { encoding: 'utf8', timeout: 10 * 60 * 1000, shell: true });
   const out = String(r.stdout || '') + String(r.stderr || '');
   const ok = r.status === 0 && /√ deploy cloudfunctions|√ download cloudfunction|√ query/.test(out);
   return { ok: ok, out: out };

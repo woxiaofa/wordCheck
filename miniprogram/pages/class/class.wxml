@@ -76,7 +76,7 @@
       </view>
       <view class="form-row">
         <text class="form-label">备注</text>
-        <input class="grow input" value="{{form.note}}" placeholder="如：周末之前过一遍（可选）"
+        <input class="grow input" value="{{form.note}}" placeholder="作业名称，不填自动按日期命名"
                maxlength="30" bindinput="inputNote" />
       </view>
       <view class="form-row">
@@ -100,13 +100,23 @@
       </view>
       <view class="assign" wx:for="{{assignments}}" wx:key="id">
         <view class="row-between">
-          <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+          <text class="assign-name">{{item.name || item.note || item.tag + '作业'}}</text>
           <text class="muted" style="font-size:24rpx">{{item.finished}}/{{item.total_students}} 人完成</text>
         </view>
         <view class="muted" style="font-size:24rpx">
           {{item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}{{item.personalized ? ' · 个性化' : ''}}
         </view>
         <view class="bar"><view class="bar-in" style="width:{{item.total_students ? item.finished * 100 / item.total_students : 0}}%"></view></view>
+        <!-- 个性化透明化：每个孩子分到什么词、各自进度，一页看全（否则家长无从确认词单真的不同） -->
+        <view wx:if="{{item.per_student.length}}" class="per-stu">
+          <view class="per-stu-row" wx:for="{{item.per_student}}" wx:for-item="ps" wx:key="user_id">
+            <text class="per-stu-name">{{ps.nickname}}</text>
+            <text class="muted per-stu-mid">{{ps.done}}/{{ps.count}}{{ps.forgot ? ' · 忘 ' + ps.forgot : ''}}</text>
+            <view class="per-stu-words">
+              <text class="muted" style="font-size:22rpx">{{ps.wrong_top ? '错词 ' + ps.wrong_top + ' · ' : ''}}{{ps.skipped_mastered ? '跳过已掌握 ' + ps.skipped_mastered + ' · ' : ''}}{{ps.preview}}</text>
+            </view>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -155,7 +165,7 @@
                   class="muted mt-s">还没有学习记录，等孩子学一轮后再来看。</view>
             <view wx:for="{{reports[stu.id].assignments}}" wx:key="id" class="report-assign">
               <view class="row-between">
-                <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+                <text class="assign-name">{{item.name || item.note || item.tag + '作业'}}</text>
                 <text class="muted" style="font-size:22rpx">{{item.done}}/{{item.count}}</text>
               </view>
               <view class="bar"><view class="bar-in" style="width:{{item.count ? item.done * 100 / item.count : 0}}%"></view></view>
@@ -199,7 +209,7 @@
       </view>
       <view class="assign" wx:for="{{myAssignments}}" wx:key="id">
         <view class="row-between">
-          <text class="assign-name">{{item.note || item.tag + '作业'}}</text>
+          <text class="assign-name">{{item.name || item.note || item.tag + '作业'}}</text>
           <text class="{{item.expired ? 'bad-text' : 'muted'}}" style="font-size:24rpx">
             {{item.expired ? '已过期 · ' : ''}}{{item.done}}/{{item.count}}
           </text>

@@ -106,7 +106,7 @@ Page({
       self.setData({
         coachCls: null,
         clsAssign: {
-          name: a.note || (a.tag ? a.tag + '作业' : '班级作业'),
+          name: a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业'),
           done: done,
           count: count,
           ids: ids,

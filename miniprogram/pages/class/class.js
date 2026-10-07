@@ -341,7 +341,7 @@ Page({
       wx.redirectTo({ url: '/pages/study/study' });
       return;
     }
-    var name = a.note || (a.tag ? a.tag + '作业' : '班级作业');
+    var name = a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业');
     wx.redirectTo({
       url: '/pages/study/study?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
         '&name=' + encodeURIComponent(name)

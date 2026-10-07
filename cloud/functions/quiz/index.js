@@ -211,8 +211,13 @@ async function onSubmit(openid, { answers, clientReqId, durationMs }) {
       return fail('BAD_PARAM', '未知题型：' + a.type);
     }
 
-    if (isCorrect) correct++;
-    else {
+    if (isCorrect) {
+      correct++;
+      // 抽查答对必须写状态：此前答对什么都不写，抽查结果完全不参与进度 ——
+      // 家长看到的是"点了会了就算完成，抽查白做"。答对 = 一次有效学习（known），
+      // 与学习页/复习链路同一份 SRS 规则（错词重置档位也早已同款）。
+      await applyKnown(user._id, w.word, now);
+    } else {
       // 错词重置档位：复用与学习页完全相同的规则（只有一份实现）
       await applyForgot(user._id, w.word, now, a.type);
     }
@@ -289,26 +294,45 @@ async function loadWords(wordIds) {
 
 /** 按"没想起来"重置该词状态（与 review 云函数的规则一致） */
 async function applyForgot(userId, wordId, now, questionType) {
+  const doc = await srsDocFor(userId, wordId, now, 'forgot');
+  doc.wrong_count += 1;
+  doc.last_wrong_type = questionType || 'quiz';
+  await writeState(userId, wordId, doc);
+}
+
+/** 抽查答对 = 一次有效学习：推进 SRS 档位（与 review 的 known 路径同规则） */
+async function applyKnown(userId, wordId, now) {
+  const doc = await srsDocFor(userId, wordId, now, 'known');
+  doc.correct_count += 1;
+  await writeState(userId, wordId, doc);
+}
+
+/** 按反馈算出下一状态文档（不含计数增减，由调用方补） */
+async function srsDocFor(userId, wordId, now, feedback) {
   const rows = await queryStates(db, { user_id: userId, word_id: wordId }, { limit: 1 });
   const prev = rows[0] || null;
-  const next = srs.nextState(prev, 'forgot', now);
-
-  const doc = {
+  const next = srs.nextState(prev, feedback, now);
+  return {
     stage: next.stage,
     last_feedback: next.lastFeedback,
     next_review_at: next.nextReviewAt,
-    wrong_count: (prev ? prev.wrong_count : 0) + 1,
-    last_wrong_type: questionType || 'quiz',
+    correct_count: (prev ? prev.correct_count : 0),
+    wrong_count: (prev ? prev.wrong_count : 0),
+    last_wrong_type: feedback === 'forgot'
+      ? null   // 由 applyForgot 覆写为具体题型
+      : ((prev && prev.last_wrong_type) || null),
     updated_at: now
   };
+}
 
-  // 一律 upsert（同 review：prev 可能来自 legacy，其 _id 在 v2 上不存在，
-  // 对它 update 会静默 updated:0 假成功 —— 统一走确定性 _id 的全量 set）
-  const errCode = await upsertState(db, userId, wordId, doc, now).catch((e) => {
-    console.error('[quiz] 错词状态写入异常:', e && e.errMsg);
+/** v5 写入器：确定性 _id 全量 set + 回读验证（与 review 同一套约定） */
+async function writeState(userId, wordId, doc) {
+  const errCode = await upsertState(db, userId, wordId, doc, doc.updated_at).catch((e) => {
+    console.error('[quiz] 学习状态写入异常:', e && e.errMsg);
     return 'STATE_STORE_ERROR';
   });
-  if (errCode) console.error('[quiz] 错词状态未能写入（不影响交卷判分）:', wordId, errCode);
+  if (errCode) console.error('[quiz] 学习状态未能写入（不影响交卷判分）:', wordId, errCode);
+  return errCode;
 }
 
 /* ------------------------------------------------------------------ */
@@ -348,6 +372,6 @@ async function getUser(openid) {
   return r.data && r.data[0] ? r.data[0] : null;
 }
 
-const VERSION = 'quiz-20261007-v2fix';
+const VERSION = 'quiz-20261007-quizcount';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });
