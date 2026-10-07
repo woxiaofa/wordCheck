@@ -268,6 +268,8 @@ Page({
       upd['reports.' + id] = {
         open: true, loading: false, error: '', at: Date.now(),
         nickname: (r.student && r.student.nickname) || '',
+        // 简报来自 studentDetail（与学员端同一句文案、同一份荣誉词）
+        summary: r.summary || null,
         assignments: r.assignments || [],
         logs: logs
       };
@@ -280,6 +282,19 @@ Page({
       };
       self.setData(upd);
       console.warn('[class] 学员报告加载失败', err);
+    });
+  },
+
+  /** 复制学员简报：家长要的就是"能直接发给对方的一句话" */
+  copyStuSummary: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var r = this.data.reports[id];
+    var s = r && r.summary;
+    if (!s || !s.text) return;
+    var text = s.honor ? s.text + '\n' + s.honor.badge + ' · ' + s.honor.detail : s.text;
+    wx.setClipboardData({
+      data: text,
+      success: function () { wx.showToast({ title: '简报已复制', icon: 'none' }); }
     });
   },
 

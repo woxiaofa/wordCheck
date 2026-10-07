@@ -161,6 +161,21 @@
             <text class="link" data-id="{{stu.id}}" bindtap="toggleReport"> 重试</text>
           </view>
           <block wx:else>
+            <!-- 学习简报：与学员端同一句文案、同一份荣誉词（家长可直接复制发给对方） -->
+            <view wx:if="{{reports[stu.id].summary}}" class="summary">
+              <view class="row-between">
+                <text class="card-title">今日学习简报</text>
+                <text class="link" data-id="{{stu.id}}" bindtap="copyStuSummary">复制</text>
+              </view>
+              <view class="summary-text mt-s">{{reports[stu.id].summary.text}}</view>
+              <view wx:if="{{reports[stu.id].summary.honor}}" class="honor">
+                <text class="honor-badge">{{reports[stu.id].summary.honor.badge}}</text>
+                <view class="honor-detail">{{reports[stu.id].summary.honor.detail}}</view>
+              </view>
+              <view wx:elif="{{reports[stu.id].summary.need_loop}}" class="loop-tip">
+                还有 {{reports[stu.id].summary.failed + reports[stu.id].summary.forgot_today}} 个没过关，继续循环学习。
+              </view>
+            </view>
             <view wx:if="{{!reports[stu.id].assignments.length && !reports[stu.id].logs.length}}"
                   class="muted mt-s">还没有学习记录，等孩子学一轮后再来看。</view>
             <view wx:for="{{reports[stu.id].assignments}}" wx:key="id" class="report-assign">

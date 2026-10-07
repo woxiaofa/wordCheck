@@ -175,6 +175,22 @@
     <button class="btn ghost sm mt-s" bindtap="goClass">去看学员进度</button>
   </view>
 
+  <!-- 学习简报：一句话讲清今天学了什么、抽查结果如何（与教练端同一句文案） -->
+  <view class="card mt" wx:if="{{mySummary}}">
+    <view class="row-between">
+      <text class="card-title">今日学习简报</text>
+      <text class="link" bindtap="copySummary">复制</text>
+    </view>
+    <view class="summary-text mt-s">{{mySummary.text}}</view>
+    <view wx:if="{{mySummary.honor}}" class="honor">
+      <text class="honor-badge">{{mySummary.honor.badge}}</text>
+      <view class="honor-detail">{{mySummary.honor.detail}}</view>
+    </view>
+    <view wx:elif="{{mySummary.need_loop}}" class="loop-tip">
+      还有 {{mySummary.failed + mySummary.forgot_today}} 个没过关 —— 点「继续学」再走一轮就稳了。
+    </view>
+  </view>
+
   <!-- 学习流水：把"我做了什么 → 进度有没有往前走"逐条摆出来，不靠猜 -->
   <view class="card mt">
     <view class="row-between">
@@ -182,7 +198,7 @@
       <text class="link" bindtap="copyLearnLog">复制</text>
     </view>
     <view class="muted mt-s" bindtap="toggleRule">
-      进度口径：学过即算 —— 每个词评价一次（认识/模糊/忘了都算）就计入作业完成，抽查对错不影响。
+      进度口径：学过即算 —— 每个词评价一次（认识/模糊都算完成）；抽查答"忘了"的词不算完成，重新学会后自动回到完成。
       <text class="link">{{ruleOpen ? '收起' : '举例'}}</text>
     </view>
     <view class="muted mt-s" wx:if="{{ruleOpen}}">

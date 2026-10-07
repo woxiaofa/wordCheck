@@ -64,7 +64,10 @@ Page({
     /** 学习流水：最近若干条"我学了什么 → 云端有没有确认"，进度对不上时用它对质 */
     learnLog: [],
     /** "什么算进度"的说明是否展开 */
-    ruleOpen: false
+    ruleOpen: false,
+    /** 学习简报：一句话（学了多久/多少个/抽查掌握几个/还要不要循环）+ 荣誉词。
+     *  与教练端看学员时是同一句文案（shared/summary 唯一真相），双方都有。 */
+    mySummary: null
   },
 
   onShow: function () {
@@ -77,7 +80,19 @@ Page({
     var self = this;
     var flushed = cloud.flushPending().catch(function () {});
     Promise.race([flushed, new Promise(function (r) { setTimeout(r, 1200); })])
-      .then(function () { self.loadClassAssignment(); });
+      .then(function () { self.loadClassAssignment(); self.loadMySummary(); });
+  },
+
+  /** 我的学习简报：今天学了多久、几个词、抽查掌握与不会各有几个 */
+  loadMySummary: function () {
+    var self = this;
+    cloud.api.learnSummary().then(function (r) {
+      if (!r || !r.text) return;
+      self.setData({ mySummary: r });
+    }).catch(function (err) {
+      // 简报是锦上添花，失败不打扰主流程，但留线索
+      console.warn('[index] 学习简报加载失败：', (err && (err.errMsg || err.message)) || err);
+    });
   },
 
   /** 首页的班级作业入口：孩子不用再翻到"班级"页找作业 */
@@ -149,6 +164,21 @@ Page({
       }
     });
     console.log('[learnlog]\n' + text);
+  },
+
+  /** 复制简报：家长要的就是"能直接发给对方的一句话" */
+  copySummary: function () {
+    var s = this.data.mySummary;
+    if (!s || !s.text) return;
+    var text = s.honor
+      ? s.text + '\n' + s.honor.badge + ' · ' + s.honor.detail
+      : s.text;
+    wx.setClipboardData({
+      data: text,
+      success: function () {
+        wx.showToast({ title: '简报已复制', icon: 'none' });
+      }
+    });
   },
 
   /** 首次打开（本地没有任何学习记录且从未关闭过）约 1 秒后浮出引导卡 */

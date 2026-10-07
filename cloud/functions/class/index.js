@@ -63,6 +63,7 @@ exports.main = async (event) => {
     case 'students':      return onStudents(OPENID);
     case 'studentDetail': return onStudentDetail(OPENID, event);
     case 'nudge':         return onNudge(OPENID, event);
+    case 'summary':       return onSummary(OPENID, event);
     default:              return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
@@ -537,6 +538,11 @@ async function onStudentDetail(openid, { studentId }) {
     }));
   }
 
+  // 学习简报：与学员端同一句文案、同一份荣誉词（shared/summary 是唯一真相）
+  const summary = await summaryLib.learnSummary(
+    db, studentId, uRes.data.nickname || '同学', getLocalDate(Date.now())
+  );
+
   return ok({
     student: {
       id: uRes.data._id,
@@ -545,6 +551,7 @@ async function onStudentDetail(openid, { studentId }) {
       stats: uRes.data.stats_cache || {},
       last_seen_at: uRes.data.last_seen_at || 0
     },
+    summary: summary,
     recent_logs: logs0.map(l => ({
       word_id: l.word_id,
       word_text: (wordMap[l.word_id] || {}).text || l.word_id,
@@ -668,6 +675,33 @@ async function onNudge(openid, { studentId }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 学习简报：一句话讲清"学了多久、学了多少、抽查掌握几个、还要不要循环"      */
+/* ------------------------------------------------------------------ */
+async function onSummary(openid, { studentId }) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+
+  const today = getLocalDate(Date.now());
+  // 教练看学员（必须在本班）；学员看自己（学生端首页/班级页同一句文案）
+  let target = user;
+  if (studentId && studentId !== user._id) {
+    const cls = await findOwnedClass(user._id);
+    if (!cls) return fail('NOT_COACH', '仅班级创建者可查看学员简报');
+    const ids = cls.student_ids || [];
+    if (ids.indexOf(studentId) === -1) return fail('FORBIDDEN', '该学生不在你的班级');
+    const uRes = await db.collection(COLL.users).doc(studentId).get().catch(() => null);
+    if (!uRes || !uRes.data) return fail('NOT_FOUND', '学生不存在');
+    target = uRes.data;
+  }
+
+  const summary = await summaryLib.learnSummary(
+    db, target._id, target.nickname || '同学', today
+  );
+  // 两端同口径的凭证：谁看都应当拿到同一句话与同一份荣誉词
+  return ok(Object.assign({ user_id: target._id, date: today, viewer: user.role || '' }, summary));
+}
+
+/* ------------------------------------------------------------------ */
 /* 工具                                                                */
 /* ------------------------------------------------------------------ */
 async function getUser(openid) {
@@ -700,6 +734,7 @@ async function requireCoach(openid) {
  * class 与 task 共用，避免"作业说剩 3 个、今日任务塞另外 5 个"的接缝错位。
  */
 const personal = require('./personal');
+const summaryLib = require('./summary');
 /** 适配成本函数的两参调用形态（共享模块需要显式传 db） */
 const wordsForStudent = (a, userId) => personal.wordsForStudent(db, a, userId);
 
@@ -844,6 +879,6 @@ function publicAssignment(a) {
   };
 }
 
-const VERSION = 'class-20261007-personal2';
+const VERSION = 'class-20261007-summary';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

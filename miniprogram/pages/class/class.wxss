@@ -188,3 +188,17 @@
 .per-stu-name { font-size: 26rpx; font-weight: 600; margin-right: 12rpx; }
 .per-stu-mid { font-size: 22rpx; margin-right: 12rpx; }
 .per-stu-words { font-size: 0; }
+
+/* 学习简报（教练端学员报告内，与学员端同一句文案） */
+.summary { margin-bottom: 18rpx; }
+.summary-text { font-size: 26rpx; line-height: 1.7; }
+.honor {
+  margin-top: 12rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  background: linear-gradient(90deg, #3a2f10, #2a2a1c);
+  border: 2rpx solid #7a6320;
+}
+.honor-badge { font-size: 30rpx; font-weight: 700; color: #ffd166; }
+.honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
+.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: #ffb0b0; }

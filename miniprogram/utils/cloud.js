@@ -265,6 +265,14 @@ var api = {
     return call('review', 'repair', {});
   },
 
+  /**
+   * 学习简报：一句话的"学了多久/多少个/抽查掌握几个/还要不要循环"。
+   * 不传 studentId = 看自己（学生端首页）；教练传学员 id 看该学员 —— 两端同一句文案。
+   */
+  learnSummary: function (studentId) {
+    return call('class', 'summary', { studentId: studentId || '' });
+  },
+
   /* ------------- 班级（家长/老师端，批次 1） ------------- */
 
   /** 建班级（幂等：重复调用返回同一班级） */

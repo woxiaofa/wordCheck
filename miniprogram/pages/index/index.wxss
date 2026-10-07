@@ -99,3 +99,16 @@
   font-size: 20rpx; color: #8fa3b7; opacity: .8;
   padding: 0 12rpx; margin-top: 10rpx; text-align: center;
 }
+
+/* 今日学习简报 */
+.summary-text { font-size: 28rpx; line-height: 1.7; }
+.honor {
+  margin-top: 12rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  background: linear-gradient(90deg, #3a2f10, #2a2a1c);
+  border: 2rpx solid #7a6320;
+}
+.honor-badge { font-size: 30rpx; font-weight: 700; color: #ffd166; }
+.honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
+.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: #ffb0b0; }
