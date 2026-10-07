@@ -51,6 +51,8 @@
   background: #16202c; border-radius: 16rpx; border: 2rpx dashed #2b3949;
 }
 
+.typed-full { border-style: solid; color: #e8eef5; letter-spacing: 6rpx; }
+
 /* 答对后短暂的高亮：让"换词"看得见 */
 .qcard.flash { border-color: #2fd07a; }
 

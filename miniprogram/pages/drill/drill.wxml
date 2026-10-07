@@ -43,7 +43,7 @@
         <!-- 拼写 / 听写：键盘输入 -->
         <block wx:else>
           <view class="qstem">{{q.type === 'listen' ? '把听到的单词拼出来' : q.stem}}</view>
-          <view class="typed">{{kbValue.length ? kbValue.join('') : '…'}}</view>
+          <view class="typed {{kbText ? 'typed-full' : ''}}">{{kbText || '…'}}</view>
           <letter-keyboard
             class="mt"
             length="{{q.length || 0}}"

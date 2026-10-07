@@ -115,42 +115,23 @@ async function onToday(openid) {
     updated_at: now
   };
 
-  // 确定性 _id：并发重复创建会命中唯一键冲突，回读即可。
-  // 但不能只回读 _id —— 库里存在旧版本落下的脏数据（task_date 为空/缺失），
-  // 会撞 (user_id + task_date) 唯一索引且 _id 对不上，此时按业务键找回，
-  // 找不到就清掉本用户的脏文档重试一次（2026-10-07 实锤 -502001 daily_tasks）。
+  // 用 doc().set() 语义写任务（文档不存在则创建）—— 从根上消除 add 撞唯一键的
+  // -502001（2026-10-07 实锤：库里旧格式脏数据 task_date 为空，撞 (user_id+task_date)
+  // 唯一索引且 _id 对不上，add 必炸）。set 的 data 不能带 _id（-501007）。
+  const saveDoc = Object.assign({}, doc);
+  delete saveDoc._id;
   try {
-    await db.collection(COLL.tasks).add({ data: doc });
+    await db.collection(COLL.tasks).doc(taskId).set({ data: saveDoc });
   } catch (e) {
-    // 1) 确定性 _id 命中 → 正常回放
+    // 仍失败（如同一天的任务被老格式文档占住了业务键）：按业务键找回照常回放
     const again = await db.collection(COLL.tasks).doc(taskId).get().catch(() => null);
     let t = again && again.data;
-
-    // 2) 业务键命中（task_date = 今天但 _id 不同，如老格式文档）→ 同样回放
     if (!t) {
       const byBiz = await db.collection(COLL.tasks)
         .where({ user_id: user._id, task_date: today })
         .limit(1).get().catch(() => null);
       t = byBiz && byBiz.data && byBiz.data[0];
     }
-
-    // 3) 脏数据（task_date 为空/缺失，不属于任何一天）→ 删掉重建
-    if (!t) {
-      const junk = await db.collection(COLL.tasks)
-        .where({ user_id: user._id, task_date: null })
-        .limit(5).get().catch(() => null);
-      if (junk && junk.data && junk.data.length) {
-        for (const j of junk) {
-          await db.collection(COLL.tasks).doc(j._id).remove().catch(() => {});
-        }
-        const retry = await db.collection(COLL.tasks).add({ data: doc }).catch(() => null);
-        if (retry) {
-          const words = await fetchWords(newIds.concat(dueIds));
-          return ok({ task: taskView(doc), words, date: today });
-        }
-      }
-    }
-
     if (!t) {
       return fail('TASK_CREATE_FAIL', (e && e.errMsg) || '任务创建失败');
     }
@@ -246,6 +227,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261007-personal';
+const VERSION = 'task-20261007-tasksfix';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

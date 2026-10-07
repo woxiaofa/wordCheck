@@ -33,6 +33,11 @@ function hasLocalAudio() {
   return false;
 }
 
+/** 这个词有没有本地发音（没有的词不能出听写题 —— 一道哑巴题只能错） */
+function hasAudio(word) {
+  return !!(manifest && manifest[word]);
+}
+
 /** 本地音频路径；不在清单里返回 '' */
 function localSrc(word) {
   if (manifest && manifest[word]) return '/assets/audio/' + word + '.mp3';
@@ -114,6 +119,7 @@ function _reset() {
 module.exports = {
   isAvailable: isAvailable,
   hasLocalAudio: hasLocalAudio,
+  hasAudio: hasAudio,
   speak: speak,
   _reset: _reset
 };

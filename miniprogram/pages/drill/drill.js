@@ -55,6 +55,7 @@ Page({
     q: null,                 // 当前题
     pickedIdx: -1,           // 已选答案下标（选择题）
     kbValue: [],             // 键盘输入（拼写/听写题）
+    kbText: '',              // 已输入字母的拼接串（WXML 表达式不支持 .join()，必须算好再给）
     slowHint: false,         // 是否已超过 5 秒（给"想很久了"的提示）
     detail: null,            // 详情态数据
     wrongBook: [],           // 全程曾错的词（去重，结果页展示）
@@ -224,6 +225,9 @@ Page({
     // 循环轮：随机用现有抽查方式（选义 / 拼写 / 听写）
     var types = quizLib.QUESTION_TYPES;
     var type = types[Math.floor(Math.random() * types.length)];
+    // 听写题必须出声 —— 没有本地发音的词（如外研四上新增词）出听写就是哑巴题，
+    // 孩子听不到只能瞎拼。降级为"看中文拼写"，答案仍然是这个词
+    if (type === 'listen' && !tts.hasAudio(w.word)) type = 'spell';
     var q = quizLib.buildQuestion(type, w, pool);
     q.word = w;
     q.answerText = w.def_cn;
@@ -245,6 +249,7 @@ Page({
       q: q,
       pickedIdx: -1,
       kbValue: [],
+      kbText: '',
       slowHint: false,
       detail: null,
       typeLabel: labels[q.type] || '',
@@ -293,7 +298,10 @@ Page({
   },
 
   onKeyInput: function (e) {
-    this.setData({ kbValue: e.detail.value || [] });
+    var v = e.detail.value || [];
+    // kbText：拼好再给视图 —— WXML 的 {{}} 表达式不支持 .join() 这类方法调用，
+    // 直接写 {{kbValue.join('')}} 永远渲染不出（2026-10-07"填写无效果"实锤）
+    this.setData({ kbValue: v, kbText: v.join('') });
   },
 
   /** 键盘上的「确定」：拼完了就判 */

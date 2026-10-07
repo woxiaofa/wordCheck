@@ -269,7 +269,7 @@ test('⑪ 循环轮选义题答对必须判对（回归：buildQuestion 不带 a
   assert.notStrictEqual(p.data.state, 'detail', '选对不得进详情');
 });
 
-test('⑫ 循环轮拼写题判定不受影响（isSpellingCorrect 路径回归）', function () {
+test('⑫ 循环轮拼写题：键盘输入实时可见（kbText），判定不受影响', function () {
   var p = startedPage();
   var q = p.buildQuestion(p.data.words[0], require('../miniprogram/data/words'), 'loop');
   if (q.type === 'meaning') { console.log('      (随机到选义，拼写路径由既有用例覆盖)'); return; }
@@ -277,11 +277,44 @@ test('⑫ 循环轮拼写题判定不受影响（isSpellingCorrect 路径回归�
   assert.strictEqual(q.options, undefined, '拼写/听写题不该有 options');
   p._qs[p.data.idx] = q;
   p.showQuestion();
-  p.data.kbValue = q.word.word.split('');
+  // 用户逐键输入：必须走真实 onKeyInput（回归 kbText 显示串，WXML 不支持 join()）
+  q.word.word.split('').forEach(function (ch) {
+    var cur = p.data.kbValue.slice();
+    cur.push(ch);
+    p.onKeyInput({ detail: { value: cur } });
+  });
+  assert.strictEqual(p.data.kbText, q.word.word,
+    '已输入字母必须实时拼接可见（2026-10-07"填写无效果"实锤：显示恒为 …）');
   elapsed(p, 1000);
   p.onKeyConfirm();
   flushTimers();
   assert.strictEqual(p.mirror[q.word.word].last_feedback, 'known');
+});
+
+test('⑭ 没有本地发音的词不出听写题（外研四上 100 词无 mp3，哑巴题只能瞎拼）', function () {
+  var p = startedPage();
+  var pool = require('../miniprogram/data/words');
+  var tts = require('../miniprogram/utils/tts');
+  // 用一个音频清单里不存在的词反复造循环轮题：listen 必须被降级为 spell
+  var w = { word: 'zzz-no-audio', def_cn: '测试词', pos: 'n.', phonetic: '/test/', freq: 9999 };
+  assert.strictEqual(tts.hasAudio(w.word), false, '前置：该词应无音频');
+  var sawListen = 0, sawType = {};
+  for (var i = 0; i < 60; i++) {
+    var q = p.buildQuestion(w, pool, 'loop');
+    sawType[q.type] = (sawType[q.type] || 0) + 1;
+    if (q.type === 'listen') sawListen++;
+  }
+  assert.ok(sawType.meaning > 0 && sawType.spell > 0, '其余题型照常出现：' + JSON.stringify(sawType));
+  assert.strictEqual(sawListen, 0, '无音频的词绝不能出听写，实际出现 ' + sawListen + ' 次');
+  // 有音频的词仍然可以出听写
+  var withAudio = Object.keys(require('../miniprogram/data/audio-manifest.js'))[0];
+  var wa = pool.filter(function (x) { return x.word === withAudio; })[0] ||
+           { word: withAudio, def_cn: 'x', pos: 'n.', phonetic: '/x/', freq: 9999 };
+  var gotListen = false;
+  for (var j = 0; j < 80 && !gotListen; j++) {
+    gotListen = p.buildQuestion(wa, pool, 'loop').type === 'listen';
+  }
+  assert.ok(gotListen, '有音频的词应能出听写题');
 });
 
 test('⑬ 拼写题不泄题：不自动读音、题面不出单词（2026-10-07 用户"这个要填什么"实锤）', function () {
