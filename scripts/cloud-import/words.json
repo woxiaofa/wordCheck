@@ -13,7 +13,7 @@
 {"word":"clean","phonetic":"/kli:n/","pos":"vt.","def_cn":"清理；使干净","example_en":"Please clean your desk before you leave.","example_cn":"离开前请把书桌清理干净。","tags":["中考","高考"],"freq":1514}
 {"word":"studio","phonetic":"/'stju:diəu/","pos":"n.","def_cn":"工作室；画室","example_en":"She records songs in a small studio.","example_cn":"她在一间小录音室里录歌。","tags":["高考"],"freq":1515}
 {"word":"county","phonetic":"/'kaunti/","pos":"n.","def_cn":"县；郡","example_en":"The county built a new library.","example_cn":"这个县建了一座新图书馆。","tags":["四级"],"freq":1516}
-{"word":"train","phonetic":"/trein/","pos":"n.","def_cn":"火车；列车","example_en":"The train to Beijing leaves at eight.","example_cn":"开往北京的火车八点出发。","tags":["中考","高考"],"freq":1516}
+{"word":"train","phonetic":"/trein/","pos":"n.","def_cn":"火车；列车","example_en":"The train to Beijing leaves at eight.","example_cn":"开往北京的火车八点出发。","tags":["中考","高考","外研四上"],"freq":1516}
 {"word":"lady","phonetic":"/'leidi/","pos":"n.","def_cn":"女士；淑女","example_en":"A young lady helped me find the way.","example_cn":"一位年轻女士帮我找到了路。","tags":["中考","高考","四级"],"freq":1517}
 {"word":"colleague","phonetic":"/'kɒli:g/","pos":"n.","def_cn":"同事；同僚","example_en":"My colleague is on holiday this week.","example_cn":"我的同事这周休假。","tags":["高考","四级"],"freq":1518}
 {"word":"application","phonetic":"/.æpli'keiʃən/","pos":"n.","def_cn":"申请；应用","example_en":"You can fill in the application online.","example_cn":"你可以在线填写申请表。","tags":["高考","四级"],"freq":1519}
@@ -31,7 +31,7 @@
 {"word":"expression","phonetic":"/ik'spreʃən/","pos":"n.","def_cn":"表达；表现","example_en":"There was a sad expression on her face.","example_cn":"她脸上露出难过的表情。","tags":["高考","四级"],"freq":1533}
 {"word":"football","phonetic":"/'futbɒ:l/","pos":"n.","def_cn":"足球；橄榄球","example_en":"They play football every Saturday.","example_cn":"他们每周六踢足球。","tags":["中考","高考"],"freq":1534}
 {"word":"intend","phonetic":"/in'tend/","pos":"vt.","def_cn":"计划；打算","example_en":"I intend to finish the book this week.","example_cn":"我打算这周把这本书读完。","tags":["高考","四级"],"freq":1536}
-{"word":"chicken","phonetic":"/'tʃikin/","pos":"n.","def_cn":"小鸡；鸡肉","example_en":"She cooked chicken for dinner.","example_cn":"她晚餐做了鸡肉。","tags":["中考","高考","四级"],"freq":1538}
+{"word":"chicken","phonetic":"/'tʃikin/","pos":"n.","def_cn":"小鸡；鸡肉","example_en":"She cooked chicken for dinner.","example_cn":"她晚餐做了鸡肉。","tags":["中考","高考","四级","外研四上"],"freq":1538}
 {"word":"army","phonetic":"/'ɑ:mi/","pos":"n.","def_cn":"军队；陆军","example_en":"He joined the army at eighteen.","example_cn":"他十八岁参了军。","tags":["中考","高考","四级"],"freq":1539}
 {"word":"abuse","phonetic":"/ə'bju:s.ə'bju:z/","pos":"n.","def_cn":"滥用；虐待","example_en":"The abuse of power harms everyone.","example_cn":"滥用权力会伤害所有人。","tags":["高考","四级"],"freq":1540}
 {"word":"shut","phonetic":"/ʃʌʃ/","pos":"v.","def_cn":"关闭；合上","example_en":"Please shut the door quietly.","example_cn":"请轻轻把门关上。","tags":["中考","高考","四级"],"freq":1541}
@@ -57,7 +57,7 @@
 {"word":"russian","phonetic":"/'rʌʃən/","pos":"n.","def_cn":"俄国人；俄语","example_en":"He is learning Russian.","example_cn":"他在学俄语。","tags":["中考","高考"],"freq":1562}
 {"word":"instruction","phonetic":"/in'strʌkʃən/","pos":"n.","def_cn":"指示；说明","example_en":"Read the instructions before you start.","example_cn":"开始之前先读说明。","tags":["中考","高考","四级"],"freq":1563}
 {"word":"pool","phonetic":"/pu:l/","pos":"n.","def_cn":"游泳池；水池","example_en":"The children swam in the pool.","example_cn":"孩子们在游泳池里游泳。","tags":["中考","高考","四级"],"freq":1565}
-{"word":"climb","phonetic":"/klaim/","pos":"n.","def_cn":"攀登；爬升","example_en":"We plan to climb the hill tomorrow.","example_cn":"我们计划明天爬那座山。","tags":["中考","高考","四级"],"freq":1566}
+{"word":"climb","phonetic":"/klaim/","pos":"n.","def_cn":"攀登；爬升","example_en":"We plan to climb the hill tomorrow.","example_cn":"我们计划明天爬那座山。","tags":["中考","高考","四级","外研四上"],"freq":1566}
 {"word":"sweet","phonetic":"/swi:t/","pos":"adj.","def_cn":"甜的；悦耳的","example_en":"The tea is too sweet for me.","example_cn":"这茶对我来说太甜了。","tags":["中考","高考"],"freq":1567}
 {"word":"engine","phonetic":"/'endʒin/","pos":"n.","def_cn":"引擎；发动机","example_en":"The engine makes a strange noise.","example_cn":"发动机发出奇怪的声音。","tags":["高考","四级"],"freq":1569}
 {"word":"fourth","phonetic":"/fɒ:θ/","pos":"num.","def_cn":"第四；四分之一","example_en":"She finished fourth in the race.","example_cn":"她在比赛中得了第四名。","tags":["中考","高考"],"freq":1570}
@@ -102,7 +102,7 @@
 {"word":"commitment","phonetic":"/kə'mitmənt/","pos":"n.","def_cn":"承诺；投入","example_en":"The job needs a big commitment of time.","example_cn":"这份工作需要投入大量时间。","tags":["高考","四级"],"freq":1616}
 {"word":"emotional","phonetic":"/i'məuʃənəl/","pos":"adj.","def_cn":"情绪的；情感的","example_en":"He gave an emotional speech.","example_cn":"他做了一场动情的演讲。","tags":["四级"],"freq":1617}
 {"word":"supreme","phonetic":"/sju'pri:m/","pos":"adj.","def_cn":"至高的；终极的","example_en":"The supreme court made the decision.","example_cn":"最高法院作出了这个决定。","tags":["高考","四级"],"freq":1618}
-{"word":"bear","phonetic":"/bєə/","pos":"n.","def_cn":"熊","example_en":"The bear slept all winter.","example_cn":"那只熊睡了整个冬天。","tags":["高考"],"freq":1619}
+{"word":"bear","phonetic":"/bєə/","pos":"n.","def_cn":"熊","example_en":"The bear slept all winter.","example_cn":"那只熊睡了整个冬天。","tags":["高考","外研四上"],"freq":1619}
 {"word":"pocket","phonetic":"/'pɒkit/","pos":"n.","def_cn":"口袋；钱袋","example_en":"He put the key in his pocket.","example_cn":"他把钥匙放进了口袋。","tags":["中考","高考","四级"],"freq":1620}
 {"word":"thin","phonetic":"/θin/","pos":"adj.","def_cn":"薄的；瘦的","example_en":"The ice is too thin to walk on.","example_cn":"冰太薄，不能在上面走。","tags":["中考","高考"],"freq":1621}
 {"word":"temperature","phonetic":"/'temprətʃə/","pos":"n.","def_cn":"温度；发烧","example_en":"The temperature dropped below zero.","example_cn":"气温降到了零度以下。","tags":["中考","高考","四级"],"freq":1622}
@@ -115,7 +115,7 @@
 {"word":"balance","phonetic":"/'bæləns/","pos":"n.","def_cn":"平衡；差额","example_en":"Try to keep a balance between work and rest.","example_cn":"尽量在工作和休息之间保持平衡。","tags":["高考","四级"],"freq":1631}
 {"word":"adopt","phonetic":"/ə'dɒpt/","pos":"vt.","def_cn":"采用；收养","example_en":"They adopted a new teaching method.","example_cn":"他们采用了一种新的教学方法。","tags":["高考","四级"],"freq":1632}
 {"word":"minority","phonetic":"/mai'nɒriti/","pos":"n.","def_cn":"少数派；少数民族","example_en":"Only a minority of students agreed.","example_cn":"只有少数学生同意。","tags":["高考","四级"],"freq":1633}
-{"word":"straight","phonetic":"/streit/","pos":"n.","def_cn":"直线；直","example_en":"Go straight along this road.","example_cn":"沿着这条路一直走。","tags":["高考"],"freq":1634}
+{"word":"straight","phonetic":"/streit/","pos":"n.","def_cn":"直线；直","example_en":"Go straight along this road.","example_cn":"沿着这条路一直走。","tags":["高考","外研四上"],"freq":1634}
 {"word":"connect","phonetic":"/kə'nekt/","pos":"v.","def_cn":"连接；联合","example_en":"This road connects the two towns.","example_cn":"这条路连接着两个镇。","tags":["中考","高考","四级"],"freq":1636}
 {"word":"teaching","phonetic":"/'ti:tʃiŋ/","pos":"n.","def_cn":"教学；学说","example_en":"She has ten years of teaching experience.","example_cn":"她有十年的教学经验。","tags":["四级"],"freq":1638}
 {"word":"belong","phonetic":"/bi'lɒŋ/","pos":"vi.","def_cn":"属于；合适","example_en":"These books belong to the library.","example_cn":"这些书是图书馆的。","tags":["高考","四级"],"freq":1639}
@@ -135,7 +135,7 @@
 {"word":"storm","phonetic":"/stɒ:m/","pos":"n.","def_cn":"暴风雨；骚动","example_en":"A storm hit the coast yesterday.","example_cn":"昨天一场暴风雨袭击了海岸。","tags":["中考","高考","四级"],"freq":1656}
 {"word":"union","phonetic":"/'ju:njən/","pos":"n.","def_cn":"联盟；联合","example_en":"The union protects workers' rights.","example_cn":"工会保护工人的权利。","tags":["高考","四级"],"freq":1658}
 {"word":"desk","phonetic":"/desk/","pos":"n.","def_cn":"书桌；办公桌","example_en":"There is a lamp on the desk.","example_cn":"书桌上有一盏台灯。","tags":["中考","高考"],"freq":1659}
-{"word":"fruit","phonetic":"/fru:t/","pos":"n.","def_cn":"水果；果类","example_en":"Eat more fruit and vegetables.","example_cn":"多吃水果和蔬菜。","tags":["中考","高考"],"freq":1662}
+{"word":"fruit","phonetic":"/fru:t/","pos":"n.","def_cn":"水果；果类","example_en":"Eat more fruit and vegetables.","example_cn":"多吃水果和蔬菜。","tags":["中考","高考","外研四上"],"freq":1662}
 {"word":"expensive","phonetic":"/ik'spensiv/","pos":"adj.","def_cn":"贵的；奢华的","example_en":"The ticket is too expensive.","example_cn":"这张票太贵了。","tags":["中考","高考"],"freq":1664}
 {"word":"yellow","phonetic":"/'jeləu/","pos":"n.","def_cn":"黄色","example_en":"She bought a yellow dress.","example_cn":"她买了一条黄色的裙子。","tags":["中考","高考"],"freq":1665}
 {"word":"conclusion","phonetic":"/kən'klu:ʒən/","pos":"n.","def_cn":"结论；结尾","example_en":"What's your conclusion?","example_cn":"你的结论是什么？","tags":["高考","四级"],"freq":1666}
@@ -143,7 +143,7 @@
 {"word":"shadow","phonetic":"/'ʃædəu/","pos":"n.","def_cn":"阴影；荫","example_en":"The tree casts a long shadow.","example_cn":"这棵树投下长长的影子。","tags":["高考","四级"],"freq":1668}
 {"word":"struggle","phonetic":"/'strʌgl/","pos":"n.","def_cn":"斗争；努力","example_en":"It was a struggle to finish on time.","example_cn":"按时完成是件很吃力的事。","tags":["高考","四级"],"freq":1669}
 {"word":"conclude","phonetic":"/kən'klu:d/","pos":"vt.","def_cn":"结束；作结论","example_en":"The meeting concluded at five.","example_cn":"会议五点结束。","tags":["高考","四级"],"freq":1670}
-{"word":"dance","phonetic":"/dæns. dɑ:ns/","pos":"n.","def_cn":"跳舞；舞蹈","example_en":"They danced until midnight.","example_cn":"他们跳舞一直跳到午夜。","tags":["中考","高考"],"freq":1671}
+{"word":"dance","phonetic":"/dæns. dɑ:ns/","pos":"n.","def_cn":"跳舞；舞蹈","example_en":"They danced until midnight.","example_cn":"他们跳舞一直跳到午夜。","tags":["中考","高考","外研四上"],"freq":1671}
 {"word":"regulation","phonetic":"/.regju'leiʃən/","pos":"n.","def_cn":"规则；管理","example_en":"New safety regulations start today.","example_cn":"新的安全规定今天开始实施。","tags":["高考","四级"],"freq":1675}
 {"word":"being","phonetic":"/'bi:iŋ/","pos":"n.","def_cn":"存在；性质","example_en":"A human being needs sleep.","example_cn":"人需要睡眠。","tags":["高考","四级"],"freq":1676}
 {"word":"ring","phonetic":"/riŋ/","pos":"n.","def_cn":"戒指；环形物","example_en":"She wears a gold ring.","example_cn":"她戴着一枚金戒指。","tags":["中考","高考"],"freq":1678}
@@ -249,7 +249,7 @@
 {"word":"blame","phonetic":"/bleim/","pos":"v.","def_cn":"责备；归咎于","example_en":"Don't blame him for the mistake.","example_cn":"别把错误怪到他头上。","tags":["高考","四级"],"freq":1797}
 {"word":"estimate","phonetic":"/'estimeit/","pos":"n.","def_cn":"估计；判断","example_en":"The estimate was too low.","example_cn":"这个估计太低了。","tags":["四级"],"freq":1798}
 {"word":"basketball","phonetic":"/'bɑ:skitbɒ:l/","pos":"n.","def_cn":"篮球","example_en":"They play basketball after school.","example_cn":"他们放学后打篮球。","tags":["中考","高考"],"freq":1799}
-{"word":"hill","phonetic":"/hil/","pos":"n.","def_cn":"小山；丘陵","example_en":"There is a small hill behind the village.","example_cn":"村子后面有一座小山。","tags":["中考","高考"],"freq":1800}
+{"word":"hill","phonetic":"/hil/","pos":"n.","def_cn":"小山；丘陵","example_en":"There is a small hill behind the village.","example_cn":"村子后面有一座小山。","tags":["中考","高考","外研四上"],"freq":1800}
 {"word":"golf","phonetic":"/gɒlf/","pos":"n.","def_cn":"高尔夫球","example_en":"He plays golf on Sundays.","example_cn":"他周日打高尔夫球。","tags":["高考","四级"],"freq":1801}
 {"word":"investigate","phonetic":"/in'vestigeit/","pos":"v.","def_cn":"调查；审查","example_en":"The police investigated the case.","example_cn":"警方调查了这起案件。","tags":["四级"],"freq":1802}
 {"word":"crazy","phonetic":"/'kreizi/","pos":"adj.","def_cn":"发狂的；狂热的","example_en":"Are you crazy about football?","example_cn":"你对足球很着迷吗？","tags":["中考","高考","四级"],"freq":1803}
@@ -283,7 +283,7 @@
 {"word":"host","phonetic":"/həust/","pos":"n.","def_cn":"主持人；主人","example_en":"Our host made us feel at home.","example_cn":"主人让我们感到宾至如归。","tags":["高考","四级"],"freq":1840}
 {"word":"trust","phonetic":"/trʌst/","pos":"n.","def_cn":"信任；信赖","example_en":"Trust takes years to build.","example_cn":"信任需要很多年才能建立起来。","tags":["中考","高考","四级"],"freq":1841}
 {"word":"ocean","phonetic":"/'əuʃən/","pos":"n.","def_cn":"海洋；广阔","example_en":"They sailed across the ocean.","example_cn":"他们横渡了海洋。","tags":["中考","高考","四级"],"freq":1842}
-{"word":"row","phonetic":"/rəu. rau/","pos":"n.","def_cn":"排；行","example_en":"We sat in the front row.","example_cn":"我们坐在第一排。","tags":["中考","高考","四级"],"freq":1843}
+{"word":"row","phonetic":"/rəu. rau/","pos":"n.","def_cn":"排；行","example_en":"We sat in the front row.","example_cn":"我们坐在第一排。","tags":["中考","高考","四级","外研四上"],"freq":1843}
 {"word":"afford","phonetic":"/ə'fɒ:d/","pos":"vt.","def_cn":"买得起；足以","example_en":"I can't afford a new phone.","example_cn":"我买不起新手机。","tags":["中考","高考","四级"],"freq":1846}
 {"word":"meanwhile","phonetic":"/'mi:nhwail/","pos":"adv.","def_cn":"同时；于此时","example_en":"Meanwhile, she kept working.","example_cn":"与此同时，她继续工作。","tags":["高考","四级"],"freq":1847}
 {"word":"division","phonetic":"/di'viʒən/","pos":"n.","def_cn":"分；分开","example_en":"There is a division of labor here.","example_cn":"这里有劳动分工。","tags":["高考","四级"],"freq":1849}
@@ -298,3 +298,103 @@
 {"word":"association","phonetic":"/ə.səuʃə'eiʃən/","pos":"n.","def_cn":"协会","example_en":"He works for a medical association.","example_cn":"他在一家医学协会工作。","tags":["高考","四级"],"freq":1859}
 {"word":"complain","phonetic":"/kəm'plein/","pos":"v.","def_cn":"抱怨；抗议","example_en":"Customers complain about the price.","example_cn":"顾客抱怨价格。","tags":["四级"],"freq":1859}
 {"word":"topic","phonetic":"/'tɒpik/","pos":"n.","def_cn":"主题；论题","example_en":"The topic of today's class is water.","example_cn":"今天这堂课的主题是水。","tags":["高考","四级"],"freq":1860}
+{"word":"left","phonetic":"/left/","pos":"n. adv.","def_cn":"左边；向左","example_en":"Turn left at the cinema.","example_cn":"在电影院向左转。","tags":["外研四上"],"freq":7001}
+{"word":"right","phonetic":"/raɪt/","pos":"n. adv.","def_cn":"右边；向右","example_en":"Turn right at the station.","example_cn":"在车站向右转。","tags":["外研四上"],"freq":7002}
+{"word":"lost","phonetic":"/lɒst/","pos":"adj.","def_cn":"迷路的","example_en":"The little boy is lost.","example_cn":"那个小男孩迷路了。","tags":["外研四上"],"freq":7003}
+{"word":"live","phonetic":"/lɪv/","pos":"v.","def_cn":"居住","example_en":"I live near the park.","example_cn":"我住在公园附近。","tags":["外研四上"],"freq":7004}
+{"word":"street","phonetic":"/striːt/","pos":"n.","def_cn":"大街，街道","example_en":"The supermarket is in this street.","example_cn":"超市在这条街上。","tags":["外研四上"],"freq":7005}
+{"word":"turn","phonetic":"/tɜːn/","pos":"v.","def_cn":"转弯；转动","example_en":"Turn left, then turn right.","example_cn":"先向左转，再向右转。","tags":["外研四上"],"freq":7006}
+{"word":"supermarket","phonetic":"/ˈsuːpəmɑːkɪt/","pos":"n.","def_cn":"超市","example_en":"We buy food at the supermarket.","example_cn":"我们在超市买食物。","tags":["外研四上"],"freq":7007}
+{"word":"beside","phonetic":"/bɪˈsaɪd/","pos":"prep.","def_cn":"在……旁边","example_en":"The cat is beside the door.","example_cn":"猫在门旁边。","tags":["外研四上"],"freq":7008}
+{"word":"cinema","phonetic":"/ˈsɪnəmə/","pos":"n.","def_cn":"电影院","example_en":"Let us go to the cinema.","example_cn":"我们去看电影吧。","tags":["外研四上"],"freq":7009}
+{"word":"station","phonetic":"/ˈsteɪʃn/","pos":"n.","def_cn":"车站","example_en":"The train is at the station.","example_cn":"火车在车站里。","tags":["外研四上"],"freq":7010}
+{"word":"near","phonetic":"/nɪə/","pos":"prep.","def_cn":"接近，临近","example_en":"My school is near my home.","example_cn":"我的学校在我家附近。","tags":["外研四上"],"freq":7013}
+{"word":"house","phonetic":"/haʊs/","pos":"n.","def_cn":"房屋","example_en":"That house is very big.","example_cn":"那座房子很大。","tags":["外研四上"],"freq":7014}
+{"word":"read","phonetic":"/riːd/","pos":"v.","def_cn":"阅读","example_en":"I read a book every evening.","example_cn":"我每天晚上读一本书。","tags":["外研四上"],"freq":7015}
+{"word":"running","phonetic":"/ˈrʌnɪŋ/","pos":"n.","def_cn":"跑步","example_en":"He likes running in the morning.","example_cn":"他喜欢早上跑步。","tags":["外研四上"],"freq":7016}
+{"word":"these","phonetic":"/ðiːz/","pos":"pron.","def_cn":"这些","example_en":"These pictures are very nice.","example_cn":"这些图画很漂亮。","tags":["外研四上"],"freq":7017}
+{"word":"picture","phonetic":"/ˈpɪktʃə/","pos":"n.","def_cn":"图画，照片","example_en":"Look at this picture of my dog.","example_cn":"看这张我的狗的照片。","tags":["外研四上"],"freq":7018}
+{"word":"take","phonetic":"/teɪk/","pos":"v.","def_cn":"拍摄；拿走","example_en":"Take a picture of the flower.","example_cn":"给这朵花拍张照。","tags":["外研四上"],"freq":7019}
+{"word":"children","phonetic":"/ˈtʃɪldrən/","pos":"n.","def_cn":"孩子们（child 的复数）","example_en":"The children are playing football.","example_cn":"孩子们正在踢足球。","tags":["外研四上"],"freq":7020}
+{"word":"listen","phonetic":"/ˈlɪsn/","pos":"v.","def_cn":"听","example_en":"Listen to the teacher, please.","example_cn":"请听老师讲。","tags":["外研四上"],"freq":7021}
+{"word":"talk","phonetic":"/tɔːk/","pos":"v.","def_cn":"说话，交谈","example_en":"I want to talk to my friend.","example_cn":"我想和我的朋友说说话。","tags":["外研四上"],"freq":7022}
+{"word":"China","phonetic":"/ˈtʃaɪnə/","pos":"n.","def_cn":"中国","example_en":"We live in China.","example_cn":"我们住在中国。","tags":["外研四上"],"freq":7023}
+{"word":"kid","phonetic":"/kɪd/","pos":"n.","def_cn":"小孩","example_en":"The kids are on the boat.","example_cn":"孩子们在船上。","tags":["外研四上"],"freq":7024}
+{"word":"can","phonetic":"/kæn/","pos":"modal.","def_cn":"能够，可以","example_en":"I can see a big dragon boat.","example_cn":"我能看见一条大龙舟。","tags":["外研四上"],"freq":7025}
+{"word":"see","phonetic":"/siː/","pos":"v.","def_cn":"看见","example_en":"Can you see the clock?","example_cn":"你能看见那个钟吗？","tags":["外研四上"],"freq":7026}
+{"word":"interesting","phonetic":"/ˈɪntrəstɪŋ/","pos":"adj.","def_cn":"有趣的","example_en":"This book is very interesting.","example_cn":"这本书很有趣。","tags":["外研四上"],"freq":7027}
+{"word":"thing","phonetic":"/θɪŋ/","pos":"n.","def_cn":"东西，物品","example_en":"We can see lots of interesting things.","example_cn":"我们能看到许多有趣的东西。","tags":["外研四上"],"freq":7028}
+{"word":"people","phonetic":"/ˈpiːpl/","pos":"n.","def_cn":"人，人们","example_en":"Many people are in the park.","example_cn":"公园里有很多人。","tags":["外研四上"],"freq":7029}
+{"word":"dragon","phonetic":"/ˈdræɡən/","pos":"n.","def_cn":"龙","example_en":"The dragon boat is very long.","example_cn":"那条龙舟很长。","tags":["外研四上"],"freq":7031}
+{"word":"boat","phonetic":"/bəʊt/","pos":"n.","def_cn":"船","example_en":"Our boat is red and blue.","example_cn":"我们的船是红色和蓝色的。","tags":["外研四上"],"freq":7032}
+{"word":"men","phonetic":"/men/","pos":"n.","def_cn":"男人（man 的复数）","example_en":"The men are playing chess.","example_cn":"那些男人正在下象棋。","tags":["外研四上"],"freq":7033}
+{"word":"between","phonetic":"/bɪˈtwiːn/","pos":"prep.","def_cn":"在……之间","example_en":"The shop is between the two trees.","example_cn":"商店在两棵树之间。","tags":["外研四上"],"freq":7034}
+{"word":"chess","phonetic":"/tʃes/","pos":"n.","def_cn":"国际象棋","example_en":"Let us play chess after school.","example_cn":"放学后我们下象棋吧。","tags":["外研四上"],"freq":7035}
+{"word":"drink","phonetic":"/drɪŋk/","pos":"v.","def_cn":"喝","example_en":"I drink soya milk for breakfast.","example_cn":"我早餐喝豆浆。","tags":["外研四上"],"freq":7036}
+{"word":"milk","phonetic":"/mɪlk/","pos":"n.","def_cn":"牛奶","example_en":"She likes milk very much.","example_cn":"她非常喜欢牛奶。","tags":["外研四上"],"freq":7037}
+{"word":"clock","phonetic":"/klɒk/","pos":"n.","def_cn":"钟","example_en":"The clock is on the wall.","example_cn":"钟在墙上。","tags":["外研四上"],"freq":7038}
+{"word":"hungry","phonetic":"/ˈhʌŋɡri/","pos":"adj.","def_cn":"饥饿的","example_en":"I am hungry now.","example_cn":"我现在饿了。","tags":["外研四上"],"freq":7039}
+{"word":"draw","phonetic":"/drɔː/","pos":"v.","def_cn":"画","example_en":"Draw a big dragon, please.","example_cn":"请画一条大龙。","tags":["外研四上"],"freq":7040}
+{"word":"jump","phonetic":"/dʒʌmp/","pos":"v.","def_cn":"跳","example_en":"The cat can jump very high.","example_cn":"这只猫能跳得很高。","tags":["外研四上"],"freq":7041}
+{"word":"sing","phonetic":"/sɪŋ/","pos":"v.","def_cn":"唱歌","example_en":"They sing and dance together.","example_cn":"他们一起唱歌跳舞。","tags":["外研四上"],"freq":7042}
+{"word":"want","phonetic":"/wɒnt/","pos":"v.","def_cn":"想要","example_en":"I want some juice, please.","example_cn":"我想要一些果汁。","tags":["外研四上"],"freq":7044}
+{"word":"some","phonetic":"/sʌm/","pos":"det.","def_cn":"一些","example_en":"We need some eggs.","example_cn":"我们需要一些鸡蛋。","tags":["外研四上"],"freq":7045}
+{"word":"juice","phonetic":"/dʒuːs/","pos":"n.","def_cn":"果汁","example_en":"This apple juice is sweet.","example_cn":"这苹果汁很甜。","tags":["外研四上"],"freq":7046}
+{"word":"ice","phonetic":"/aɪs/","pos":"n.","def_cn":"冰","example_en":"The ice is very cold.","example_cn":"冰非常凉。","tags":["外研四上"],"freq":7047}
+{"word":"also","phonetic":"/ˈɔːlsəʊ/","pos":"adv.","def_cn":"也，还","example_en":"I also want some bread.","example_cn":"我还想要一些面包。","tags":["外研四上"],"freq":7048}
+{"word":"food","phonetic":"/fuːd/","pos":"n.","def_cn":"食物","example_en":"Chinese food is very nice.","example_cn":"中国菜非常好吃。","tags":["外研四上"],"freq":7049}
+{"word":"make","phonetic":"/meɪk/","pos":"v.","def_cn":"制作","example_en":"My mum can make dumplings.","example_cn":"我妈妈会包饺子。","tags":["外研四上"],"freq":7050}
+{"word":"tomato","phonetic":"/təˈmɑːtəʊ/","pos":"n.","def_cn":"番茄，西红柿","example_en":"I like tomato and egg soup.","example_cn":"我喜欢番茄鸡蛋汤。","tags":["外研四上"],"freq":7051}
+{"word":"egg","phonetic":"/eɡ/","pos":"n.","def_cn":"鸡蛋","example_en":"She eats an egg every morning.","example_cn":"她每天早上吃一个鸡蛋。","tags":["外研四上"],"freq":7052}
+{"word":"potato","phonetic":"/pəˈteɪtəʊ/","pos":"n.","def_cn":"马铃薯，土豆","example_en":"We buy three potatoes.","example_cn":"我们买三个土豆。","tags":["外研四上"],"freq":7053}
+{"word":"flower","phonetic":"/ˈflaʊə/","pos":"n.","def_cn":"花","example_en":"These flowers are beautiful.","example_cn":"这些花很漂亮。","tags":["外研四上"],"freq":7054}
+{"word":"dumpling","phonetic":"/ˈdʌmplɪŋ/","pos":"n.","def_cn":"水饺","example_en":"We eat dumplings at the Spring Festival.","example_cn":"我们在春节吃饺子。","tags":["外研四上"],"freq":7055}
+{"word":"help","phonetic":"/help/","pos":"v.","def_cn":"帮助","example_en":"Can I help you?","example_cn":"需要我帮忙吗？","tags":["外研四上"],"freq":7056}
+{"word":"buy","phonetic":"/baɪ/","pos":"v.","def_cn":"买","example_en":"I want to buy a flower.","example_cn":"我想买一朵花。","tags":["外研四上"],"freq":7057}
+{"word":"run","phonetic":"/rʌn/","pos":"v.","def_cn":"跑","example_en":"He can run very fast.","example_cn":"他能跑得很快。","tags":["外研四上"],"freq":7058}
+{"word":"fast","phonetic":"/fɑːst/","pos":"adv.","def_cn":"快","example_en":"Do not run so fast.","example_cn":"别跑那么快。","tags":["外研四上"],"freq":7059}
+{"word":"sky","phonetic":"/skaɪ/","pos":"n.","def_cn":"天空","example_en":"Birds fly in the sky.","example_cn":"鸟儿在天空中飞。","tags":["外研四上"],"freq":7060}
+{"word":"high","phonetic":"/haɪ/","pos":"adv. adj.","def_cn":"高","example_en":"She can jump very high.","example_cn":"她能跳得很高。","tags":["外研四上"],"freq":7061}
+{"word":"winner","phonetic":"/ˈwɪnə/","pos":"n.","def_cn":"冠军，获胜者","example_en":"He is the winner of the race.","example_cn":"他是这场比赛的冠军。","tags":["外研四上"],"freq":7062}
+{"word":"far","phonetic":"/fɑː/","pos":"adv.","def_cn":"远","example_en":"Can you jump far?","example_cn":"你能跳得远吗？","tags":["外研四上"],"freq":7063}
+{"word":"afraid","phonetic":"/əˈfreɪd/","pos":"adj.","def_cn":"害怕的","example_en":"I am afraid of the dark.","example_cn":"我怕黑。","tags":["外研四上"],"freq":7064}
+{"word":"strong","phonetic":"/strɒŋ/","pos":"adj.","def_cn":"强壮的","example_en":"My father is very strong.","example_cn":"我爸爸非常强壮。","tags":["外研四上"],"freq":7065}
+{"word":"star","phonetic":"/stɑː/","pos":"n.","def_cn":"明星；星星","example_en":"She is a sports star.","example_cn":"她是一位体育明星。","tags":["外研四上"],"freq":7066}
+{"word":"sweets","phonetic":"/swiːts/","pos":"n.","def_cn":"糖果（常用复数）","example_en":"Can I have some sweets?","example_cn":"我能吃些糖果吗？","tags":["外研四上"],"freq":7067}
+{"word":"soup","phonetic":"/suːp/","pos":"n.","def_cn":"汤","example_en":"The soup is very hot.","example_cn":"汤很烫。","tags":["外研四上"],"freq":7068}
+{"word":"sorry","phonetic":"/ˈsɒri/","pos":"adj.","def_cn":"抱歉的","example_en":"Sorry, we have no bread.","example_cn":"对不起，我们没有面包了。","tags":["外研四上"],"freq":7069}
+{"word":"bread","phonetic":"/bred/","pos":"n.","def_cn":"面包","example_en":"I eat bread and milk for breakfast.","example_cn":"我早餐吃面包喝牛奶。","tags":["外研四上"],"freq":7070}
+{"word":"dark","phonetic":"/dɑːk/","pos":"adj.","def_cn":"黑暗的","example_en":"The room is very dark.","example_cn":"这个房间很暗。","tags":["外研四上"],"freq":7071}
+{"word":"well","phonetic":"/wel/","pos":"int.","def_cn":"唔，噢（语气词）","example_en":"Well, you can turn on the light.","example_cn":"唔，你可以把灯打开。","tags":["外研四上"],"freq":7072}
+{"word":"light","phonetic":"/laɪt/","pos":"n.","def_cn":"灯","example_en":"Please turn on the light.","example_cn":"请把灯打开。","tags":["外研四上"],"freq":7073}
+{"word":"Halloween","phonetic":"/ˌhæləʊˈiːn/","pos":"n.","def_cn":"万圣节前夕","example_en":"We like Halloween very much.","example_cn":"我们非常喜欢万圣节。","tags":["外研四上"],"freq":7074}
+{"word":"give","phonetic":"/ɡɪv/","pos":"v.","def_cn":"给","example_en":"Give me some sweets, please.","example_cn":"请给我一些糖果。","tags":["外研四上"],"freq":7075}
+{"word":"horse","phonetic":"/hɔːs/","pos":"n.","def_cn":"马","example_en":"There is a horse in the photo.","example_cn":"照片里有一匹马。","tags":["外研四上"],"freq":7076}
+{"word":"sheep","phonetic":"/ʃiːp/","pos":"n.","def_cn":"羊，绵羊","example_en":"There are ten sheep on the hill.","example_cn":"小山上有十只羊。","tags":["外研四上"],"freq":7077}
+{"word":"vegetable","phonetic":"/ˈvedʒtəbl/","pos":"n.","def_cn":"蔬菜","example_en":"Eat more vegetables every day.","example_cn":"每天多吃蔬菜。","tags":["外研四上"],"freq":7078}
+{"word":"face","phonetic":"/feɪs/","pos":"n.","def_cn":"脸","example_en":"Wash your face before dinner.","example_cn":"晚饭前洗洗脸。","tags":["外研四上"],"freq":7080}
+{"word":"pig","phonetic":"/pɪɡ/","pos":"n.","def_cn":"猪","example_en":"The pig is very fat.","example_cn":"那头猪很肥。","tags":["外研四上"],"freq":7084}
+{"word":"visit","phonetic":"/ˈvɪzɪt/","pos":"v.","def_cn":"参观，拜访","example_en":"We visit the zoo tomorrow.","example_cn":"我们明天去参观动物园。","tags":["外研四上"],"freq":7085}
+{"word":"tomorrow","phonetic":"/təˈmɒrəʊ/","pos":"adv.","def_cn":"明天","example_en":"I get up at six tomorrow.","example_cn":"我明天六点起床。","tags":["外研四上"],"freq":7086}
+{"word":"plane","phonetic":"/pleɪn/","pos":"n.","def_cn":"飞机","example_en":"We go to Beijing by plane.","example_cn":"我们坐飞机去北京。","tags":["外研四上"],"freq":7087}
+{"word":"from","phonetic":"/frɒm/","pos":"prep.","def_cn":"来自；从","example_en":"I am from China.","example_cn":"我来自中国。","tags":["外研四上"],"freq":7088}
+{"word":"sea","phonetic":"/siː/","pos":"n.","def_cn":"大海","example_en":"We swim in the sea.","example_cn":"我们在大海里游泳。","tags":["外研四上"],"freq":7089}
+{"word":"swimsuit","phonetic":"/ˈswɪmsuːt/","pos":"n.","def_cn":"游泳衣","example_en":"My swimsuit is blue.","example_cn":"我的游泳衣是蓝色的。","tags":["外研四上"],"freq":7090}
+{"word":"sock","phonetic":"/sɒk/","pos":"n.","def_cn":"短袜","example_en":"Where is my other sock?","example_cn":"我的另一只袜子在哪儿？","tags":["外研四上"],"freq":7091}
+{"word":"fish","phonetic":"/fɪʃ/","pos":"n. v.","def_cn":"鱼；钓鱼","example_en":"We can fish by the sea.","example_cn":"我们可以在海边钓鱼。","tags":["外研四上"],"freq":7092}
+{"word":"win","phonetic":"/wɪn/","pos":"v.","def_cn":"获胜，赢","example_en":"I want to win the race.","example_cn":"我想赢得这场比赛。","tags":["外研四上"],"freq":7093}
+{"word":"month","phonetic":"/mʌnθ/","pos":"n.","def_cn":"月，月份","example_en":"Sports day is next month.","example_cn":"运动会在下个月。","tags":["外研四上"],"freq":7094}
+{"word":"hundred","phonetic":"/ˈhʌndrəd/","pos":"num.","def_cn":"一百","example_en":"He runs two hundred metres.","example_cn":"他跑两百米。","tags":["外研四上"],"freq":7095}
+{"word":"metre","phonetic":"/ˈmiːtə/","pos":"n.","def_cn":"米（长度单位）","example_en":"I can swim fifty metres.","example_cn":"我能游五十米。","tags":["外研四上"],"freq":7096}
+{"word":"every","phonetic":"/ˈevri/","pos":"det.","def_cn":"每个，每一","example_en":"I run every day.","example_cn":"我每天都跑步。","tags":["外研四上"],"freq":7097}
+{"word":"day","phonetic":"/deɪ/","pos":"n.","def_cn":"一天，一日","example_en":"Sports day is a happy day.","example_cn":"运动会是开心的一天。","tags":["外研四上"],"freq":7098}
+{"word":"luck","phonetic":"/lʌk/","pos":"n.","def_cn":"运气","example_en":"Good luck on sports day!","example_cn":"运动会祝你好运！","tags":["外研四上"],"freq":7099}
+{"word":"subject","phonetic":"/ˈsʌbdʒɪkt/","pos":"n.","def_cn":"学科，科目","example_en":"My favourite subject is English.","example_cn":"我最喜欢的学科是英语。","tags":["外研四上"],"freq":7100}
+{"word":"family","phonetic":"/ˈfæməli/","pos":"n.","def_cn":"家，家庭","example_en":"My family has dinner together.","example_cn":"我们全家一起吃晚餐。","tags":["外研四上"],"freq":7101}
+{"word":"dinner","phonetic":"/ˈdɪnə/","pos":"n.","def_cn":"晚餐，正餐","example_en":"Dinner is ready now.","example_cn":"晚饭准备好了。","tags":["外研四上"],"freq":7102}
+{"word":"year","phonetic":"/jɪə/","pos":"n.","def_cn":"年，年份","example_en":"Happy New Year!","example_cn":"新年快乐！","tags":["外研四上"],"freq":7103}
+{"word":"Chinese","phonetic":"/ˌtʃaɪˈniːz/","pos":"adj. n.","def_cn":"中国的；中文","example_en":"We have a Chinese festival.","example_cn":"我们有一个中国的节日。","tags":["外研四上"],"freq":7104}
+{"word":"festival","phonetic":"/ˈfestɪvl/","pos":"n.","def_cn":"节日","example_en":"The Spring Festival is coming.","example_cn":"春节就要到了。","tags":["外研四上"],"freq":7105}
+{"word":"peanut","phonetic":"/ˈpiːnʌt/","pos":"n.","def_cn":"花生","example_en":"We eat peanuts at the festival.","example_cn":"我们过节时吃花生。","tags":["外研四上"],"freq":7106}
+{"word":"merry","phonetic":"/ˈmeri/","pos":"adj.","def_cn":"愉快的","example_en":"Merry Christmas to you!","example_cn":"祝你圣诞快乐！","tags":["外研四上"],"freq":7107}
+{"word":"Christmas","phonetic":"/ˈkrɪsməs/","pos":"n.","def_cn":"圣诞节","example_en":"Christmas is in December.","example_cn":"圣诞节在十二月。","tags":["外研四上"],"freq":7108}

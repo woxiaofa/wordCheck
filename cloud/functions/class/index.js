@@ -192,7 +192,7 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
   if (ctx.err) return ctx.err;
 
   // --- 入参校验 ---
-  const VALID_TAGS = ['全部', '中考', '高考', '四级'];
+  const VALID_TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
   if (!VALID_TAGS.includes(tag)) return fail('BAD_PARAM', '词库标签无效');
   count = parseInt(count, 10);
   if (!(count >= LIMITS.ASSIGN_COUNT_MIN && count <= LIMITS.ASSIGN_COUNT_MAX)) {

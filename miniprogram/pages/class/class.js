@@ -13,7 +13,7 @@ var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 
-var TAGS = ['全部', '中考', '高考', '四级'];
+var TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
 var CREATE_KEY = 'class_create_reqid';   // 建班幂等 ID 持久化：重进页面不产生第二个班
 var CREATE_ID_PREFIX = 'class-create:';
 

@@ -93,4 +93,39 @@ ok('currentName() 与当前 key 对应', function () {
   assert.strictEqual(books.currentName(), '全部');
 });
 
+ok('外研四上：词书可选、词条字段完整、与已有词不重复出词', function () {
+  var wy = books.getWords('wy4a');
+  assert.ok(wy.length >= 100, '外研四上应有 100+ 词，实际 ' + wy.length);
+  wy.forEach(function (w) {
+    assert.ok(w.word && w.def_cn && w.phonetic,
+      '教材词必须有词形/释义/音标，缺字段的是：' + JSON.stringify(w));
+    assert.ok((w.tags || []).indexOf('外研四上') >= 0, w.word + ' 缺教材标签');
+  });
+  // 同一个词只允许一条：否则"同一个词两个进度"，抽查还会连出两遍
+  var seen = {};
+  WORDS.forEach(function (w) {
+    assert.ok(!seen[w.word], '词库里有重复词条：' + w.word);
+    seen[w.word] = 1;
+  });
+  // 教材词不该挤掉"全部"的取词顺序：新增的教材词 freq 排在 ECDICT 词之后
+  // （原有词被补教材标签的，freq 保持不动 —— 它们本来就在中考/高考段里）
+  var ecdictMax = WORDS.filter(function (w) { return (w.tags || []).indexOf('外研四上') < 0; })
+    .reduce(function (m, w) { return Math.max(m, w.freq || 0); }, 0);
+  var onlyWy = wy.filter(function (w) { return (w.tags || []).length === 1; });
+  assert.ok(onlyWy.length >= 90, '应有 90+ 个纯教材词，实际 ' + onlyWy.length);
+  onlyWy.forEach(function (w) {
+    assert.ok(w.freq > ecdictMax, w.word + ' 的 freq 会挤掉原词库取词顺序：' + w.freq);
+  });
+});
+
+ok('布置作业的词库选项必须包含外研四上（否则老师选不到教材词）', function () {
+  var fs = require('fs');
+  var src = fs.readFileSync(require('path').join(__dirname,
+    '../cloud/functions/class/index.js'), 'utf8');
+  assert.ok(/VALID_TAGS\s*=\s*\[[^\]]*外研四上/.test(src), '云端 VALID_TAGS 缺外研四上');
+  var page = fs.readFileSync(require('path').join(__dirname,
+    '../miniprogram/pages/class/class.js'), 'utf8');
+  assert.ok(/var TAGS\s*=\s*\[[^\]]*外研四上/.test(page), '前端词库选项缺外研四上');
+});
+
 console.log('\n全部通过：' + pass + ' 项 ✓');

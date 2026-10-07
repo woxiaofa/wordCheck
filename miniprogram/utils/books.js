@@ -24,7 +24,8 @@ var BOOKS = [
   { key: 'all', name: '全部', desc: '中考 + 高考 + 四级混合', tag: null },
   { key: 'zk', name: '中考', desc: '初中核心词', tag: '中考' },
   { key: 'gk', name: '高考', desc: '高中核心词', tag: '高考' },
-  { key: 'cet4', name: '四级', desc: '大学四级词', tag: '四级' }
+  { key: 'cet4', name: '四级', desc: '大学四级词', tag: '四级' },
+  { key: 'wy4a', name: '外研四上', desc: '外研版四年级上册（三起）', tag: '外研四上' }
 ];
 
 /**
