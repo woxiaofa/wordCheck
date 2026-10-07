@@ -38,7 +38,7 @@ ok('清单非空（本地音频已生成）', function () {
   assert.ok(tts.hasLocalAudio(), 'audio-manifest.js 为空 —— 先跑 gen_audio_piper.py + build-audio-manifest.js');
 });
 
-ok('本地命中的词：播放器 src 指向 /assets/audio/，回调 true', function () {
+ok('本地命中的词：播放器 src 指向 /pkg-media/assets/audio/，回调 true', function () {
   if (!localWord) { throw new Error('清单为空，跳过条件不成立'); }
   calls.length = 0;
   var result = null;
@@ -47,7 +47,7 @@ ok('本地命中的词：播放器 src 指向 /assets/audio/，回调 true', fun
   assert.strictEqual(calls.length, 1, '应调用一次 play');
   // mock 里记录格式为 "play:<src>"
   var src = calls[0].replace(/^play:/, '');
-  assert.ok(src.indexOf('/assets/audio/' + localWord + '.mp3') === 0,
+  assert.ok(src.indexOf('/pkg-media/assets/audio/' + localWord + '.mp3') === 0,
     'src 应为包内音频路径，实际: ' + src);
 });
 
@@ -57,7 +57,19 @@ ok('本地命中时不再走插件额度（重复 speak 只重新 play）', func
   tts.speak(localWord, function () {});
   tts.speak(localWord, function () {});
   assert.strictEqual(calls.length, 2);
-  assert.ok(calls.every(function (c) { return c.replace(/^play:/, '').indexOf('/assets/audio/') === 0; }));
+  assert.ok(calls.every(function (c) { return c.replace(/^play:/, '').indexOf('/pkg-media/assets/audio/') === 0; }));
+});
+
+ok('大写词（China/Halloween）也能命中发音：查清单大小写不敏感，src 用原样文件名', function () {
+  var cap = Object.keys(manifest).filter(function (k) { return k !== k.toLowerCase(); })[0];
+  if (!cap) return; // 清单全小写时本用例无对象
+  calls.length = 0;
+  var result = null;
+  assert.strictEqual(tts.hasAudio(cap), true, 'hasAudio 应大小写不敏感');
+  tts.speak(cap, function (okFlag) { result = okFlag; });
+  assert.strictEqual(result, true, 'speak 回调应为 true');
+  assert.ok(calls[0] === 'play:/pkg-media/assets/audio/' + cap + '.mp3',
+    'src 应保留原样大小写，实际: ' + calls[0]);
 });
 
 ok('清单外 + 无插件：同步回调 false，不抛异常', function () {

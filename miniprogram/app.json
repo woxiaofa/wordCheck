@@ -1,13 +1,26 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/drill/drill",
-    "pages/study/study",
-    "pages/quiz/quiz",
     "pages/stats/stats",
     "pages/class/class",
     "pages/test-card/test-card"
   ],
+  "subpackages": [
+    {
+      "root": "pkg-media",
+      "pages": [
+        "pages/drill/drill",
+        "pages/study/study",
+        "pages/quiz/quiz"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/index/index": {
+      "network": "all",
+      "packages": ["pkg-media"]
+    }
+  },
   "window": {
     "navigationBarBackgroundColor": "#0f1620",
     "navigationBarTitleText": "单词抽查",

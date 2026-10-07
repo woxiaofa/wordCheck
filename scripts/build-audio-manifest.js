@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const dir = path.join(__dirname, '..', 'miniprogram', 'assets', 'audio');
+const dir = path.join(__dirname, '..', 'miniprogram', 'pkg-media', 'assets', 'audio');
 const outFile = path.join(__dirname, '..', 'miniprogram', 'data', 'audio-manifest.js');
 
 if (!fs.existsSync(dir)) {

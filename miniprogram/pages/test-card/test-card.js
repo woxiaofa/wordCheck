@@ -40,7 +40,7 @@ Page({
   },
 
   goStudy: function () {
-    wx.redirectTo({ url: '/pages/study/study' });
+    wx.redirectTo({ url: '/pkg-media/pages/study/study' });
   },
 
   resetProgress: function () {

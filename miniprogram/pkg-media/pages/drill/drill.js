@@ -25,18 +25,18 @@
  *   拼写本来就要花时间，写这一步放宽到 10 秒提示 / 25 秒判不会
  */
 
-var api = require('../../utils/cloud').api;
-var srs = require('../../utils/srs');
-var quizLib = require('../../utils/quiz');
-var time = require('../../utils/time');
-var WORDS = require('../../data/words');
-var books = require('../../utils/books');
-var tts = require('../../utils/tts');
-var report = require('../../utils/report');
-var learnlog = require('../../utils/learnlog');
-var assignParam = require('../../utils/assign');
-var layout = require('../../utils/layout');
-var profile = require('../../utils/profile');
+var api = require('../../../utils/cloud').api;
+var srs = require('../../../utils/srs');
+var quizLib = require('../../../utils/quiz');
+var time = require('../../../utils/time');
+var WORDS = require('../../../data/words');
+var books = require('../../../utils/books');
+var tts = require('../../../utils/tts');
+var report = require('../../../utils/report');
+var learnlog = require('../../../utils/learnlog');
+var assignParam = require('../../../utils/assign');
+var layout = require('../../../utils/layout');
+var profile = require('../../../utils/profile');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -790,7 +790,7 @@ Page({
 /** 键盘难度文案（复用组件里的实现，避免两处各写一套） */
 function levelLabel(level) {
   try {
-    return require('../../components/letter-keyboard/keys').levelLabel(level);
+    return require('../../../components/letter-keyboard/keys').levelLabel(level);
   } catch (e) {
     return level === 'easy' ? '仅正确字母' : (level === 'medium' ? '含易混字母' : '全键盘');
   }

@@ -20,6 +20,16 @@
 var manifest = {};
 try { manifest = require('../data/audio-manifest.js'); } catch (e) { manifest = {}; }
 
+// 大小写映射：清单里有首字母大写的词（China / Halloween / Christmas…），
+// 而 speak() 统一转小写查询 —— 直接查会把 "China" 查成 "china" 然后判无音频。
+// 这里建一份 小写 → 原样 的映射，src 必须用原样文件名（真机文件系统大小写敏感）。
+var byLower = {};
+(function buildLowerMap() {
+  for (var k in manifest) {
+    if (Object.prototype.hasOwnProperty.call(manifest, k)) byLower[k.toLowerCase()] = k;
+  }
+})();
+
 var plugin = null;
 try { plugin = requirePlugin('WechatSI'); } catch (e) { plugin = null; }
 
@@ -33,15 +43,15 @@ function hasLocalAudio() {
   return false;
 }
 
-/** 这个词有没有本地发音（没有的词不能出听写题 —— 一道哑巴题只能错） */
+/** 这个词有没有本地发音（大小写不敏感；没有的词不能出听写题 —— 一道哑巴题只能错） */
 function hasAudio(word) {
-  return !!(manifest && manifest[word]);
+  return !!(word && byLower[String(word).toLowerCase()]);
 }
 
-/** 本地音频路径；不在清单里返回 '' */
+/** 本地音频路径（用清单里的原样文件名）；不在清单里返回 '' */
 function localSrc(word) {
-  if (manifest && manifest[word]) return '/assets/audio/' + word + '.mp3';
-  return '';
+  var orig = word ? byLower[String(word).toLowerCase()] : '';
+  return orig ? '/pkg-media/assets/audio/' + orig + '.mp3' : '';
 }
 
 /** 发音能力是否可用（本地音频 或 插件，任一即可） */

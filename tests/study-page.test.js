@@ -64,7 +64,7 @@ function makePage() {
 /** 从学习页源码里把 showCurrent 抽出来单独跑（避免加载整个页面依赖） */
 function loadShowCurrent() {
   var src = require('fs').readFileSync(
-    path.resolve(__dirname, '../miniprogram/pages/study/study.js'), 'utf8');
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/study/study.js'), 'utf8');
 
   // 取 showCurrent 与 describeTag 两个函数体
   function extract(name) {

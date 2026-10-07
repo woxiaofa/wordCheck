@@ -11,12 +11,12 @@
   1.18.1 跑 Reshape/GatherElements 会算错 shape（特定词必挂）；
   1.20+ 在本机 DLL 初始化失败；只有 1.19.2 既稳定又算得对）：
   node -e "console.log(JSON.stringify(require('./miniprogram/data/words.js')))" > scripts/words.json
-  python scripts/gen_audio_piper.py scripts/words.json miniprogram/assets/audio
+  python scripts/gen_audio_piper.py scripts/words.json miniprogram/pkg-media/assets/audio
 
 模型：scripts/piper-models/en_US-amy-medium.onnx（+ .onnx.json）
   下载：https://hf-mirror.com/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/
 
-产物：miniprogram/assets/audio/<word>.mp3（16kHz 单声道 48kbps，去首尾静音）
+产物：miniprogram/pkg-media/assets/audio/<word>.mp3（16kHz 单声道 48kbps，去首尾静音）
   已存在的文件跳过（增量生成），删掉某个 mp3 重跑即可单独重生成。
 """
 import json
@@ -36,8 +36,10 @@ MODEL = ROOT / "scripts" / "piper-models" / "en_US-amy-medium.onnx"
 SILENCE_AMP = 120
 # 目标采样率：16kHz 对"听清单个单词"绰绰有余，体积比 22.05k 小 27%
 TARGET_RATE = 16000
-# mp3 比特率：48kbps 单声道语音足够清晰
-BITRATE = 48
+# mp3 比特率：16kHz 单声道人声 32kbps 依旧清晰。
+# 曾经 48kbps：300 词 ≈1.4MB；外研四上再加 100 词就顶穿 pkg-media 分包 2MB 红线，
+# 新增词一律 32kbps（旧文件是 48kbps 的，增量生成时不重编码，两档混用无感）
+BITRATE = 32
 # 保险起见每合成 N 个词重载一次模型会话（1.19.2 下连续 300 词也稳，但开销仅几秒）
 RELOAD_EVERY = 20
 

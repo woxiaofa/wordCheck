@@ -9,17 +9,17 @@
  *   同时流程不打断（看完自动进下一题），报告与错词回流都照旧。
  */
 
-var api = require('../../utils/cloud').api;
-var srs = require('../../utils/srs');
-var quizLib = require('../../utils/quiz');
-var keysLib = require('../../components/letter-keyboard/keys');
-var time = require('../../utils/time');
-var WORDS = require('../../data/words');
-var books = require('../../utils/books');
-var tts = require('../../utils/tts');
-var report = require('../../utils/report');
-var learnlog = require('../../utils/learnlog');
-var layout = require('../../utils/layout');
+var api = require('../../../utils/cloud').api;
+var srs = require('../../../utils/srs');
+var quizLib = require('../../../utils/quiz');
+var keysLib = require('../../../components/letter-keyboard/keys');
+var time = require('../../../utils/time');
+var WORDS = require('../../../data/words');
+var books = require('../../../utils/books');
+var tts = require('../../../utils/tts');
+var report = require('../../../utils/report');
+var learnlog = require('../../../utils/learnlog');
+var layout = require('../../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';

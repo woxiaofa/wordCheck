@@ -355,12 +355,12 @@ Page({
     var ids = (a.word_ids || []).join(',');
     if (!ids) {
       // 旧版服务端不下发词单：退回普通学习页，至少有得学
-      wx.redirectTo({ url: '/pages/drill/drill' });
+      wx.redirectTo({ url: '/pkg-media/pages/drill/drill' });
       return;
     }
     var name = a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业');
     wx.redirectTo({
-      url: '/pages/drill/drill?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
+      url: '/pkg-media/pages/drill/drill?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
         '&name=' + encodeURIComponent(name)
     });
   },

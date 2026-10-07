@@ -142,7 +142,7 @@ Page({
     // 注意：a.ids 已经 buildIdsParam 编码过（含 %2C），这里不能再编码一次，
     // 否则 %2C → %252C 双重编码，学习页解码后逗号回不来，整串又变成"一个词"
     wx.redirectTo({
-      url: '/pages/drill/drill?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
+      url: '/pkg-media/pages/drill/drill?ids=' + a.ids + '&name=' + encodeURIComponent(a.name)
     });
   },
 
@@ -336,10 +336,10 @@ Page({
   goStudy: function () {
     // 点"开始背单词"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
-    wx.redirectTo({ url: '/pages/drill/drill' });
+    wx.redirectTo({ url: '/pkg-media/pages/drill/drill' });
   },
 
   goQuiz: function () {
-    wx.redirectTo({ url: '/pages/quiz/quiz' });
+    wx.redirectTo({ url: '/pkg-media/pages/quiz/quiz' });
   }
 });

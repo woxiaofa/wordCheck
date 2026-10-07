@@ -40,9 +40,12 @@ page {
 .mt-s { margin-top: 12rpx; }
 
 /* 按钮。white-space:nowrap：按钮文案换行（"去抽查 · 10 题，交卷才判分"那种两行）非常难看，
-   文案统一控制在一行内，超长就改文案而不是让它折行 */
+   文案统一控制在一行内，超长就改文案而不是让它折行。
+   width:100% 必须显式给：原生 button 在部分环境（Pad/PC 宽屏）默认宽度不是撑满，
+   会缩成一小条贴在卡片右边（2026-10-07 iPad Pro 实锤"开始背单词"按钮被裁）。 */
 .btn {
   display: flex; align-items: center; justify-content: center;
+  width: 100%; box-sizing: border-box; padding: 0; margin-left: 0; margin-right: 0;
   height: 96rpx; border-radius: 24rpx; font-size: 32rpx; font-weight: 600;
   color: #ffffff; background: linear-gradient(135deg, #3ea6ff, #7c5cff);
   border: none; white-space: nowrap;
@@ -99,7 +102,7 @@ page {
 .wide .hero-label { font-size: 14px; }
 .wide .hero-num { font-size: 46px; }
 .wide .hero-unit { font-size: 17px; }
-.wide .book-chips { margin-top: 12px; }
+.wide .book-chips { margin-top: 12px; gap: 7px 8px; }
 .wide .book-chip { padding: 6px 12px; font-size: 14px; }
 
 /* 学习页/抽查页/班级页的关键元素 */

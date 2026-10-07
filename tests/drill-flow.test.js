@@ -122,7 +122,7 @@ cloud.api.drillScore = function (p) {
   return syncResolve({ rank: 1, total: 1, beat: 100, badge: '🏅 全对通关', detail: '' });
 };
 
-var def = loadPage('miniprogram/pages/drill/drill.js');
+var def = loadPage('miniprogram/pkg-media/pages/drill/drill.js');
 var POOL = require('../miniprogram/data/words');
 
 /** 每道题的用时：用改 qStartAt 的方式模拟（不动真实时间） */
@@ -266,7 +266,7 @@ test('⑦ 第 1 步认完 → 自动进第 2 步「写」：题面只给音标+�
     assert.strictEqual(q.answerText, q.word.word, '答案是单词本身');
     // 题面不能出现单词：wxml 里 dictation 走的是"✏️ 拼写"分支
     var wxml = require('fs').readFileSync(
-      path.resolve(__dirname, '../miniprogram/pages/drill/drill.wxml'), 'utf8');
+      path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxml'), 'utf8');
     assert.ok(/q\.type === 'dictation' \? '✏️ 拼写'/.test(wxml), '「写」的题面必须隐藏单词');
     // 这一档要自动读音（它就是一道带提示的听写）
     spoken.length = 0;
@@ -466,7 +466,7 @@ test('⑰ 巩固轮 spell 不泄题：不自动读音、题面不出单词', fun
     assert.strictEqual(p.speak(), undefined);
     assert.strictEqual(spoken.length, 0, '点喇叭也不能念');
     var wxml = require('fs').readFileSync(
-      path.resolve(__dirname, '../miniprogram/pages/drill/drill.wxml'), 'utf8');
+      path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxml'), 'utf8');
     assert.ok(/q\.type === 'spell' \? '✏️ 拼写'/.test(wxml), '拼写题题面必须隐藏单词');
   } finally {
     tts.speak = origSpeak;

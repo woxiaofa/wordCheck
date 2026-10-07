@@ -11,17 +11,17 @@
  *      本地镜像只作为缓存和离线补传，不能作为真相来源。
  */
 
-var api = require('../../utils/cloud').api;
-var humanError = require('../../utils/cloud').humanError;
-var srs = require('../../utils/srs');
-var time = require('../../utils/time');
-var WORDS = require('../../data/words');
-var books = require('../../utils/books');
-var tts = require('../../utils/tts');
-var report = require('../../utils/report');
-var assignParam = require('../../utils/assign');
-var learnlog = require('../../utils/learnlog');
-var layout = require('../../utils/layout');
+var api = require('../../../utils/cloud').api;
+var humanError = require('../../../utils/cloud').humanError;
+var srs = require('../../../utils/srs');
+var time = require('../../../utils/time');
+var WORDS = require('../../../data/words');
+var books = require('../../../utils/books');
+var tts = require('../../../utils/tts');
+var report = require('../../../utils/report');
+var assignParam = require('../../../utils/assign');
+var learnlog = require('../../../utils/learnlog');
+var layout = require('../../../utils/layout');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -501,6 +501,6 @@ Page({
 
   /** 学完一轮后引导去抽查：真正决定复习间隔的是抽查结果，不是自评 */
   onGoQuiz: function () {
-    wx.redirectTo({ url: '/pages/quiz/quiz' });
+    wx.redirectTo({ url: '/pkg-media/pages/quiz/quiz' });
   }
 });

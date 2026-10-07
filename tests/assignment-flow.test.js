@@ -43,7 +43,7 @@ ok('③ 班级页：去做这份作业要带词单和作业名给学习页', fun
 });
 
 ok('④ 学习页：作业模式按词单组队，没学过的优先（断点续学）', function () {
-  var js = read('miniprogram/pages/study/study.js');
+  var js = read('miniprogram/pkg-media/pages/study/study.js');
   assert.ok(/onLoad[\s\S]*?options\.ids/.test(js), 'onLoad 应解析作业词单参数');
   assert.ok(js.indexOf('assignmentQueue') >= 0, '应有作业队列组装');
   assert.ok(js.indexOf('updateAssignProgress') >= 0, '应有作业进度计算');
@@ -53,7 +53,7 @@ ok('④ 学习页：作业模式按词单组队，没学过的优先（断点续
 });
 
 ok('⑤ 学习页：作业进度条有 UI（名字 + done/total）', function () {
-  var wxml = read('miniprogram/pages/study/study.wxml');
+  var wxml = read('miniprogram/pkg-media/pages/study/study.wxml');
   assert.ok(wxml.indexOf('assignName') >= 0, '应渲染作业名');
   assert.ok(wxml.indexOf('assignDone') >= 0 && wxml.indexOf('assignTotal') >= 0, '应渲染进度数字');
 });
@@ -117,14 +117,15 @@ ok('⑨ 同步时机：班级页/首页 onShow 先补传再拉云端数据', fun
 });
 
 ok('⑩ 学习页：作业词单参数必须解码（0/1 + 进去就学完了的根因）', function () {
-  var js = read('miniprogram/pages/study/study.js');
+  var js = read('miniprogram/pkg-media/pages/study/study.js');
   // ids 是 encodeURIComponent 过的（逗号 → %2C），不解码整串就是一个"词"。
   // 解析已抽成 utils/assign.js 的纯函数（可单测），这里钉死"必须走它"：
   // 谁要是图省事改回 String(options.ids).split(',')，就会退回 0/1 那个 bug。
   var region = js.slice(js.indexOf('onLoad: function'), js.indexOf('onShow: function'));
   assert.ok(region.indexOf('assignParam.parseIdsParam(options.ids)') >= 0,
     'onLoad 必须用 assignParam.parseIdsParam 解析 ids（自带解码 + 去重 + 容错）');
-  assert.ok(js.indexOf("require('../../utils/assign')") >= 0, '学习页应引入 utils/assign');
+  // 2026-10-07 起 study 页迁入 pkg-media 分包，相对层级多了一级（../../../）
+  assert.ok(/require\('\.\.\/\.\.\/(\.\.\/)?utils\/assign'\)/.test(js), '学习页应引入 utils/assign');
   // 作业模式空队列的文案必须点名作业，不能说"300 个词全部学过"
   assert.ok(js.indexOf('的词都学过了') >= 0 && js.indexOf('_assign.name') >= 0,
     '作业空队列应有专属文案');

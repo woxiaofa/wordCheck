@@ -211,7 +211,7 @@ function syncToComponent(page) {
    ============================================================ */
 
 var componentDef = loadRegistration('miniprogram/components/word-card/index.js', 'Component');
-var pageDef = loadRegistration('miniprogram/pages/study/study.js', 'Page');
+var pageDef = loadRegistration('miniprogram/pkg-media/pages/study/study.js', 'Page');
 
 /** 造一轮队列并启动页面 */
 function startRound(queue) {

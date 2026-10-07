@@ -3,10 +3,9 @@
 /* ---- 词书选择 ---- */
 .books { padding: 24rpx 28rpx; margin-bottom: 20rpx; }
 .books-title { font-size: 28rpx; font-weight: 700; }
-.book-chips { display: flex; flex-wrap: wrap; margin-top: 18rpx; }
+.book-chips { display: flex; flex-wrap: wrap; gap: 14rpx 16rpx; margin-top: 18rpx; }
 .book-chip {
   padding: 12rpx 28rpx;
-  margin: 0 16rpx 16rpx 0;
   font-size: 26rpx;
   color: #8fa3b7;
   background: #131c27;

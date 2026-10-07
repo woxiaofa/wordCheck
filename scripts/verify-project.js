@@ -94,6 +94,19 @@ function checkReferences() {
     });
   });
 
+  // 1b) 分包声明的页面（分包页面文件缺失同样会让该分包整包加载失败）
+  (app.subpackages || []).forEach((sp) => {
+    (sp.pages || []).forEach((p) => {
+      const full = sp.root + '/' + p;
+      referenced.add(full.split('/').slice(0, -1).join('/'));
+      ['.js', '.json', '.wxml', '.wxss'].forEach((ext) => {
+        if (!exists(path.join(MP, full + ext))) {
+          problems.push('app.json 分包声明的页面文件缺失：miniprogram/' + full + ext);
+        }
+      });
+    });
+  });
+
   // 2) 各页面/组件 usingComponents 引用的组件
   const walkJson = (dir) => {
     fs.readdirSync(dir, { withFileTypes: true }).forEach((ent) => {
@@ -148,7 +161,13 @@ function checkPages() {
   try { app = JSON.parse(appJson); } catch (e) { problems.push('app.json 不是合法 JSON：' + e.message); return; }
   if (!Array.isArray(app.pages) || !app.pages.length) { problems.push('app.json 的 pages 为空'); return; }
 
-  app.pages.forEach((p) => {
+  // 主包 + 各分包的页面都过一遍（分包页面同样要四件套齐全、绑定齐全）
+  const allPages = (app.pages || []).slice();
+  (app.subpackages || []).forEach((sp) => {
+    (sp.pages || []).forEach((p) => allPages.push(sp.root + '/' + p));
+  });
+
+  allPages.forEach((p) => {
     const base = path.join(MP, p);
     const name = path.basename(p);
     ['.js', '.json', '.wxml', '.wxss'].forEach((ext) => {
@@ -162,7 +181,7 @@ function checkPages() {
       checkData('pages/' + name, js, wxml, base + '.js');
     }
   });
-  notes.push('app.json 声明了 ' + app.pages.length + ' 个页面');
+  notes.push('app.json 声明了 ' + allPages.length + ' 个页面（含分包）');
 }
 
 /* ---------------- 3. 事件处理函数与数据字段 ---------------- */
@@ -327,15 +346,18 @@ function checkAllWxml() {
 }
 
 /**
- * 4. 主包体积红线
+ * 4. 包体积红线（主包 + 各分包各自 2MB）
  *
- * 为什么查：小程序主包上限 2MB。单词发音 mp3 打进主包后占大头（300 词 ≈1.4MB），
- * 词库一扩就会撞线，而且撞线是在"上传体验版"那一步才炸，本地看不出来。
- * 这里提前告警：>1.5MB 提示搬去分包/云存储，>2MB 直接算问题。
+ * 为什么查：小程序主包/单个分包上限都是 2MB。单词发音 mp3 打进主包后占大头
+ * （300 词 ≈1.4MB），词库一扩就会撞线，而且撞线是在"上传体验版"那一步才炸，
+ * 本地看不出来。2026-10-07 起音频与三个练习页已迁入 pkg-media 分包，
+ * 这里按包分别统计并各自告警。
  */
-const AUDIO_DIR = path.join(MP, 'assets', 'audio');
-const MAIN_PKG_LIMIT = 2048 * 1024;   // 2MB
-const AUDIO_WARN = 1500 * 1024;       // 1.5MB：留出余量给代码增长
+const AUDIO_DIR = path.join(MP, 'pkg-media', 'assets', 'audio');
+const SUBPKG_ROOT = path.join(MP, 'pkg-media');
+const PKG_LIMIT = 2048 * 1024;        // 2MB
+const PKG_WARN = 1500 * 1024;         // 1.5MB：留出余量给代码增长
+const kb = (n) => (n / 1024).toFixed(0) + 'KB';
 
 function dirSize(dir) {
   let total = 0;
@@ -350,20 +372,24 @@ function dirSize(dir) {
 }
 
 function checkPackageSize() {
-  if (!exists(AUDIO_DIR)) {
-    notes.push('未生成本地发音音频（assets/audio 不存在，发音走插件兜底）');
-    return;
+  if (!exists(SUBPKG_ROOT)) {
+    notes.push('pkg-media 分包不存在（音频与练习页仍在主包）');
+  } else {
+    // 分包：音频 + 三个练习页
+    const sub = dirSize(SUBPKG_ROOT);
+    notes.push('pkg-media 分包体积：' + kb(sub) + '（发音音频 ' + kb(dirSize(AUDIO_DIR)) + '），上限 2MB');
+    if (sub > PKG_LIMIT) {
+      problems.push('pkg-media 分包体积 ' + kb(sub) + ' 超过 2MB 上限：音频降码率或拆分词库');
+    } else if (sub > PKG_WARN) {
+      notes.push('提示：pkg-media 分包已占 ' + kb(sub) + '，继续加音频前先估算体积');
+    }
   }
-  const audio = dirSize(AUDIO_DIR);
-  const others = dirSize(MP) - audio;
-  const total = audio + others;
-  const kb = (n) => (n / 1024).toFixed(0) + 'KB';
-  notes.push('主包体积：' + kb(total) + '（代码 ' + kb(others) + ' + 发音音频 ' + kb(audio) + '），上限 2MB');
 
-  if (total > MAIN_PKG_LIMIT) {
-    problems.push('主包体积 ' + kb(total) + ' 超过 2MB 上限：把 assets/audio 挪进分包（配 preloadRule）或改云存储按需拉取');
-  } else if (audio > AUDIO_WARN) {
-    notes.push('提示：发音音频已占 ' + kb(audio) + '，词库继续扩充前建议搬去分包/云存储');
+  // 主包：整个 miniprogram 减去分包目录
+  const others = dirSize(MP) - (exists(SUBPKG_ROOT) ? dirSize(SUBPKG_ROOT) : 0);
+  notes.push('主包体积：' + kb(others) + '，上限 2MB');
+  if (others > PKG_LIMIT) {
+    problems.push('主包体积 ' + kb(others) + ' 超过 2MB 上限');
   }
 }
 
