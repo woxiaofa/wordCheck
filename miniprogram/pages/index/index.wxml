@@ -6,7 +6,7 @@
     <view class="t1">每天 5 分钟，{{target}} 个词</view>
     <view class="muted mt-s">
       今天该复习什么，系统按遗忘曲线排好了，你只需要开始。
-      先快刷：看单词选意思，选对就过；答错或想不起来才看详情，看完接着考。
+      先认后写：听读音选出意思，再听音把单词拼出来；卡住的词会带你读音、跟读，直到学会。
     </view>
     <button class="btn mt" bindtap="goStudy">开始背单词</button>
     <view class="link center mt-s" bindtap="toggleHowto">先看看它怎么运作</view>
@@ -139,29 +139,29 @@
       <view class="step">
         <text class="step-no">1</text>
         <view class="step-body">
-          <text class="step-t">看单词，先想意思</text>
-          <text class="step-d">别急着翻面，先在心里说一遍它是什么意思</text>
+          <text class="step-t">「认」听读音选意思</text>
+          <text class="step-d">先听发音，从两个意思里选对的；拿不准就点【不会】，诚实比硬猜有用</text>
         </view>
       </view>
       <view class="step">
         <text class="step-no">2</text>
         <view class="step-body">
-          <text class="step-t">点开看答案，如实评价</text>
-          <text class="step-d">想得很快 / 想起来但费劲 / 没想起来，三个里选一个</text>
+          <text class="step-t">「写」听音拼单词</text>
+          <text class="step-d">从只给正确字母的键盘开始，越熟练键盘越难，随时点喇叭听音</text>
         </view>
       </view>
       <view class="step">
         <text class="step-no">3</text>
         <view class="step-body">
-          <text class="step-t">学完去抽查</text>
-          <text class="step-d">抽查答对的词 15 天后再见，答错的 10 分钟后回来</text>
+          <text class="step-t">错词当场回炉</text>
+          <text class="step-d">答错、超时、点「不会」的词现场重讲，最后再测一轮，全对才算学完</text>
         </view>
       </view>
     </view>
     <view class="howto-more" wx:if="{{howtoOpen}}">
       每个词都有一条自己的复习时间线：你越熟练，它出现得越少
-      （10 分钟 → 1 天 → 4 天 → … → 120 天）。评价越如实，排期越准，
-      所以在"想起来了但费劲"时别选"想得很快"——那只会骗过系统，让你重复背已经会的词。
+      （10 分钟 → 1 天 → 4 天 → … → 120 天）。
+      答错、超时、点「不会」都会让它提前回来 —— 如实作答，排期才准。
     </view>
   </view>
 
@@ -198,11 +198,11 @@
       <text class="link" bindtap="copyLearnLog">复制</text>
     </view>
     <view class="muted mt-s" bindtap="toggleRule">
-      进度口径：学过即算 —— 每个词评价一次（认识/模糊都算完成）；抽查答"忘了"的词不算完成，重新学会后自动回到完成。
+      进度口径：学过即算 —— 一个词「认」「写」都过了就算完成；点「不会」、答错、超时的词先不算，回炉过关后自动补回进度。
       <text class="link">{{ruleOpen ? '收起' : '举例'}}</text>
     </view>
     <view class="muted mt-s" wx:if="{{ruleOpen}}">
-      例：作业 10 个词，点"继续学"后每个词翻面 + 任选一个评价 = 该词完成，10 个词都评价过就是 10/10。
+      例：作业 10 个词，点"继续学"后每个词认一遍、写一遍（错的重学到过关）= 该词完成，10 个词都过关就是 10/10。
       流水里出现"云端✗"表示这次评分还没同步上云（会自动补传），进度条要等补传成功才会动。
     </view>
 

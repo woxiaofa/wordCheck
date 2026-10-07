@@ -39,14 +39,18 @@ page {
 .mt { margin-top: 24rpx; }
 .mt-s { margin-top: 12rpx; }
 
-/* 按钮。white-space:nowrap：按钮文案换行（"去抽查 · 10 题，交卷才判分"那种两行）非常难看，
-   文案统一控制在一行内，超长就改文案而不是让它折行。
-   width:100% 必须显式给：原生 button 在部分环境（Pad/PC 宽屏）默认宽度不是撑满，
-   会缩成一小条贴在卡片右边（2026-10-07 iPad Pro 实锤"开始背单词"按钮被裁）。 */
+/* 按钮。2026-10-07 按用户规范重做：不写死宽度 —— 宽度自适应文案，
+   靠左右 padding 撑起按钮，整颗在卡片里居中（margin auto）。
+   width:fit-content 不被支持时该行被丢弃，回退成块级撑满，不会更坏。
+   white-space:nowrap 保留：按钮文案换行非常难看，超长就改文案。 */
 .btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; box-sizing: border-box; padding: 0; margin-left: 0; margin-right: 0;
-  height: 96rpx; border-radius: 24rpx; font-size: 32rpx; font-weight: 600;
+  display: block;
+  width: fit-content;
+  margin-left: auto; margin-right: auto;
+  padding: 0 64rpx;
+  box-sizing: border-box;
+  height: 96rpx; line-height: 96rpx; text-align: center;
+  border-radius: 999rpx; font-size: 32rpx; font-weight: 600;
   color: #ffffff; background: linear-gradient(135deg, #3ea6ff, #7c5cff);
   border: none; white-space: nowrap;
 }
@@ -57,7 +61,7 @@ page {
 .btn.ok { background: linear-gradient(135deg, #2fd07a, #22a862); }
 .btn.warn { background: linear-gradient(135deg, #ffb020, #e08b00); }
 .btn.bad { background: linear-gradient(135deg, #ff5c72, #e03a52); }
-.btn.sm { height: 72rpx; font-size: 28rpx; border-radius: 18rpx; }
+.btn.sm { height: 72rpx; line-height: 72rpx; padding: 0 44rpx; font-size: 28rpx; border-radius: 999rpx; }
 .btn[disabled] { opacity: .45; }
 
 /* 数据块 */
@@ -89,8 +93,8 @@ page {
 .wide .card-title { font-size: 17px; }
 .wide .t1 { font-size: 19px; }
 .wide .t2, .wide .muted { font-size: 14px; }
-.wide .btn { height: 46px; border-radius: 12px; font-size: 17px; }
-.wide .btn.sm { height: 36px; font-size: 15px; border-radius: 10px; }
+.wide .btn { height: 46px; line-height: 46px; padding: 0 30px; border-radius: 999px; font-size: 17px; }
+.wide .btn.sm { height: 36px; line-height: 36px; padding: 0 20px; font-size: 15px; }
 .wide .kpi { padding: 14px 16px; border-radius: 12px; }
 .wide .kpi .num { font-size: 26px; }
 .wide .kpi .label { font-size: 13px; }
