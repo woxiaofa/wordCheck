@@ -30,3 +30,6 @@ scripts/piper-models/
 
 # 词表导出（由 words.js 生成，是生成音频的中间产物）
 scripts/words.json
+
+# 开发者工具生成的预览二维码（临时产物）
+.preview/
