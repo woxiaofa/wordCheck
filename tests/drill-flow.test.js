@@ -710,5 +710,52 @@ test('㉖ 抄写区空输入点确认要有提示（抄完清空后按钮不能�
     '已抄过要提示"再拼一遍"：' + p.data.detail.copyMsg);
 });
 
+test('㉗ 抄写时单词悬浮置顶且可遮住默写（遮住仍知道几个字母）', function () {
+  var p = startedPage();
+  var w = p.data.q.word.word;
+  p.onDontKnow();
+  p.onDetailWrite();
+
+  // 屏蔽态：圆点数 = 字母数，全遮成空白会让人瞎猜
+  var dots = p.data.detail.maskText.replace(/\s/g, '');
+  assert.strictEqual(dots.length, w.length,
+    '遮住时圆点数要等于字母数：' + p.data.detail.maskText + ' vs ' + w);
+  assert.strictEqual(p.data.detail.wordHidden, false, '默认显示（先照着抄）');
+
+  p.onToggleWord();
+  assert.strictEqual(p.data.detail.wordHidden, true, '点一下要遮住');
+  assert.ok(p.data.detail.copyMsg.indexOf('凭记忆') >= 0, '遮住后要说明是默写：' + p.data.detail.copyMsg);
+
+  p.onToggleWord();
+  assert.strictEqual(p.data.detail.wordHidden, false, '再点一下要能显示回来');
+
+  // 悬浮条只在抄写时出现，且页面要为它让出高度（否则盖住顶部进度条）
+  var wxml = require('fs').readFileSync(
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxml'), 'utf8');
+  assert.ok(/class="copy-pin"\s+wx:if="\{\{detail\.writing\}\}"/.test(wxml),
+    '悬浮词条必须只在抄写态出现');
+  assert.ok(/detail\.writing \? 'pinned' : ''/.test(wxml), '抄写态页面要加 pinned 让出顶部空间');
+  var wxss = require('fs').readFileSync(
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxss'), 'utf8');
+  assert.ok(/\.copy-pin\s*\{[^}]*position:\s*fixed/.test(wxss), '悬浮词条要用 fixed 钉住，不被划走');
+  assert.ok(/\.drill\.pinned\s*\{[^}]*padding-top/.test(wxss), '钉住后页面顶部要让位');
+});
+
+test('㉘ 退格键与字母之间要留出明显空档（误触会删掉最后一个字母）', function () {
+  var wxss = require('fs').readFileSync(
+    path.resolve(__dirname, '../miniprogram/components/letter-keyboard/index.wxss'), 'utf8');
+  var del = wxss.match(/\.kb-del\s*\{([^}]*)\}/);
+  assert.ok(del, '要有退格键样式');
+  var ml = del[1].match(/margin-left:\s*(\d+)rpx/);
+  assert.ok(ml && Number(ml[1]) >= 24,
+    '退格必须与字母拉开距离（≥24rpx），实际 ' + (ml ? ml[1] + 'rpx' : '没有 margin-left'));
+  var gap = wxss.match(/\.kb-keys\s*\{[^}]*gap:\s*(\d+)rpx/);
+  assert.ok(gap && Number(gap[1]) >= 16, '字母间距也要够，实际 ' + (gap && gap[1]));
+  // 宽屏同规范：apply-shared 下走 app.wxss
+  var app = require('fs').readFileSync(
+    path.resolve(__dirname, '../miniprogram/app.wxss'), 'utf8');
+  assert.ok(/\.wide \.kb-del\s*\{[^}]*margin-left/.test(app), '宽屏也要拉开退格距离');
+});
+
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));
 if (failed.length) process.exitCode = 1;

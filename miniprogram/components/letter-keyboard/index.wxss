@@ -11,7 +11,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 14rpx;
+  gap: 18rpx;
 }
 
 .kb-key {
@@ -32,9 +32,13 @@
   color: #ffffff;
 }
 
-/* 退格跟在字母后面，宽度稍大一点方便连按 */
+/* 退格跟在字母后面，宽度稍大一点方便连按。
+   margin-left 必须另外加一大截：它紧挨着最后一个字母，
+   gap 那点距离不够区分"最后一个字母"和"删除"，孩子一着急就误触
+   （2026-10-08 实锤：拼到最后一个字母想再按一个，结果按到退格全没了）。 */
 .kb-del {
-  width: 128rpx;
+  width: 140rpx;
+  margin-left: 30rpx;
   background: #2b3949;
   color: #cfe0f0;
   font-size: 34rpx;

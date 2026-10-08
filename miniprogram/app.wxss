@@ -121,6 +121,9 @@ page {
 .wide .assign { padding: 14px; border-radius: 12px; }
 
 /* 拼写键盘：大屏上按键不该跟着放大成麻将牌 */
+.wide .kb-keys { gap: 9px; }
 .wide .kb-key { height: 44px; border-radius: 10px; font-size: 18px; }
 .wide .kb-bar { height: 40px; }
 .wide .kb-del, .wide .kb-clear { height: 40px; font-size: 15px; }
+/* 退格与字母之间要留出明显的空档：挨太近会误触（拼到最后一个字母被删掉） */
+.wide .kb-del { margin-left: 18px; width: 68px; }

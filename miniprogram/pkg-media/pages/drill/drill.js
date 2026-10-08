@@ -603,7 +603,10 @@ Page({
       'detail.writing': true,
       'detail.copyOk': false,
       'detail.copyMsg': '照着上面的词，用键盘拼一遍',
-      'detail.copyLength': String(d.word.word || '').length
+      'detail.copyLength': String(d.word.word || '').length,
+      // 抄写时单词悬浮置顶（页面再长也不会划走）；可一键遮住自己默写
+      'detail.wordHidden': false,
+      'detail.maskText': maskOf(d.word.word)
     });
     this.speak();     // 抄之前先念一遍，耳朵带着手走
   },
@@ -645,6 +648,23 @@ Page({
     this.setData({
       'detail.writing': false,
       kbValue: [], kbText: '', kbCaret: 0
+    });
+  },
+
+  /**
+   * 抄写时切换"看词 / 遮住默写"。
+   * 遮住时按字母数摆一排圆点 —— 还是知道有几个字母，只是得自己想，
+   * 这才是默写的意义；全遮成一片空白只会让人瞎猜。
+   */
+  onToggleWord: function () {
+    var d = this.data.detail;
+    if (!d) return;
+    var hide = !d.wordHidden;
+    this.setData({
+      'detail.wordHidden': hide,
+      'detail.copyMsg': hide
+        ? '词已经遮住了 —— 凭记忆拼一遍，实在想不起来点「显示」'
+        : '照着上面的词，用键盘拼一遍'
     });
   },
 
@@ -910,6 +930,14 @@ Page({
 
   onSpeak: function () { this.speak(); }
 });
+
+/**
+ * 抄写遮住单词时的占位：一个字母一个圆点，中间留空好数
+ * @param {string} word
+ */
+function maskOf(word) {
+  return String(word || '').split('').map(function () { return '●'; }).join(' ');
+}
 
 /**
  * 抄写打错时的提示：直接说第几个字母不对，别让孩子自己对着找

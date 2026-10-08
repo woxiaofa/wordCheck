@@ -115,6 +115,33 @@
   border-left: 6rpx solid #ffb020;
 }
 .copy-title { font-size: 26rpx; color: #cfe0f0; margin-bottom: 8rpx; }
+/* 抄写时的悬浮词条：钉在屏幕顶部，页面再长也不会划走（position:fixed） */
+.copy-pin {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 50;
+  display: flex; align-items: center;
+  padding: 18rpx 24rpx;
+  background: #101a24;
+  border-bottom: 1rpx solid #2b3949;
+  box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, .35);
+}
+.pin-word {
+  flex: 1; min-width: 0;
+  display: flex; align-items: baseline; flex-wrap: wrap;
+}
+.pin-text { font-size: 44rpx; font-weight: 700; color: #3ea6ff; letter-spacing: 2rpx; }
+.pin-ph { margin-left: 14rpx; font-size: 24rpx; color: #8fa3b7; }
+.pin-mask { font-size: 40rpx; font-weight: 700; color: #5b7387; letter-spacing: 10rpx; }
+.pin-tip { margin-left: 14rpx; font-size: 22rpx; color: #8fa3b7; }
+.pin-toggle {
+  flex-shrink: 0;
+  padding: 12rpx 20rpx; margin-left: 16rpx;
+  font-size: 25rpx; color: #cfe0f0;
+  background: #243040; border: 1rpx solid #2b3949; border-radius: 999rpx;
+}
+.pin-toggle:active { background: #3a4a5e; }
+/* 悬浮条占位：不给页面让出高度，顶部的进度条会被盖住 */
+.drill.pinned { padding-top: 120rpx; }
+
 /* 输入框为空时的占位：抄完清空后不至于是一片空白，不知道下一步干嘛 */
 .typed-ph { font-size: 26rpx; color: #5b6b7d; margin-left: 8rpx; }
 .copy-msg { margin-top: 12rpx; font-size: 25rpx; line-height: 1.5; }
@@ -138,6 +165,13 @@
 .wide .dyour { font-size: 13px; padding: 10px; gap: 4px; }
 .wide .rg-count { font-size: 11px; }
 .wide .copy-box { padding: 12px; margin-top: 12px; }
+.wide .copy-pin { padding: 10px 16px; }
+.wide .pin-text { font-size: 24px; }
+.wide .pin-ph { font-size: 12px; }
+.wide .pin-mask { font-size: 22px; letter-spacing: 5px; }
+.wide .pin-tip { font-size: 11px; }
+.wide .pin-toggle { font-size: 13px; padding: 6px 12px; }
+.wide.drill.pinned { padding-top: 64px; }
 .wide .copy-title { font-size: 13px; }
 .wide .typed-ph { font-size: 13px; }
 .wide .copy-msg { font-size: 13px; }

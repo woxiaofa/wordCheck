@@ -6,7 +6,23 @@
     完成：时长 + 错题本 + 荣誉/排名 + 分享 + 继续学习 / 下一个任务
   答题中与答错看答案后，喇叭都无限次可点 —— 记单词不看读音频次等于只记一半。
 -->
-<view class="page drill {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+<view class="page drill {{layoutWide ? 'wide' : ''}} {{detail.writing ? 'pinned' : ''}}" style="{{layoutStyle}}">
+
+  <!-- 抄写时把单词钉在顶部：页面长了也不会划走，边抄边看得见。
+       点「隐藏默写」遮成圆点，凭记忆拼；想不起来再点「显示」。 -->
+  <view class="copy-pin" wx:if="{{detail.writing}}">
+    <view class="pin-word {{detail.wordHidden ? 'hidden' : ''}}" bindtap="onToggleWord">
+      <block wx:if="{{detail.wordHidden}}">
+        <text class="pin-mask">{{detail.maskText}}</text>
+        <text class="pin-tip">已遮住 · 凭记忆拼</text>
+      </block>
+      <block wx:else>
+        <text class="pin-text">{{detail.word.word}}</text>
+        <text class="pin-ph" wx:if="{{detail.word.phonetic}}">{{detail.word.phonetic}}</text>
+      </block>
+    </view>
+    <text class="pin-toggle" catchtap="onToggleWord">{{detail.wordHidden ? '👁 显示' : '🙈 隐藏默写'}}</text>
+  </view>
 
   <view class="bar row-between">
     <text class="tag-line">
@@ -118,7 +134,7 @@
       <!-- 抄写：照着上面的词用键盘拼一遍，想抄几遍抄几遍（念是耳朵记，抄是手记） -->
       <block wx:if="{{detail.writing}}">
         <view class="copy-box">
-          <view class="copy-title">✍ 照着上面的词拼一遍（可以抄好几遍）</view>
+          <view class="copy-title">{{detail.wordHidden ? '✍ 凭记忆拼一遍（想不起来点「显示」）' : '✍ 照着上面的词拼一遍（可以抄好几遍）'}}</view>
           <view class="typed {{kbText ? 'typed-full' : ''}}" bindtap="onTypedEndTap">
             <block wx:for="{{kbValue}}" wx:key="index">
               <text wx:if="{{index === kbCaret}}" class="caret"></text>
