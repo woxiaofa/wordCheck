@@ -33,3 +33,6 @@ scripts/words.json
 
 # 开发者工具生成的预览二维码（临时产物）
 .preview/
+
+# WorkBuddy 会话/记忆/LS 索引（本机工程数据，不进仓库）
+.workbuddy/
