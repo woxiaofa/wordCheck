@@ -2,21 +2,38 @@
      为什么必须自研：系统输入法会联想、纠错、自动首字母大写，
      用它来做拼写题等于把题目难度交给输入法 —— 用户打出前三个字母就被补全了。
 
-     布局（v3）：
-       字母键按 a~z 排列（keys.planKeys 保证），flex 自动换行；
-       退格键跟在字母后面；光标移动 ◀ ▶ 和清空、确定放在键盘下方的操作行 ——
-       编辑键与字母键分区，避免孩子按字母时误碰到编辑键。 -->
+     布局（v6，2026-10-10）：全键盘，键位与电脑 QWERTY 完全一致 ——
+     小孩普遍接触电脑，QWERTY 已有肌肉记忆，跟电脑一致 = 零学习成本。
+     第三行左端 ⇧ 大小写键（真键盘同位），word 含大写字母时自动亮起（如 Mr）；
+     第四行是连字符 + 空格长条（新版教材词表收录短语：to-do list / ice cream）。
+     退格在第三行末尾（电脑键盘位置）；◀ ▶ / 清空 / 确定在下方操作行。
+     整体贴底弹出式：去左右边距、键加高 —— 用户反馈旧卡片边框吃宽度、键太小。 -->
+<wxs module="cs" src="./case.wxs" />
 <view class="kb">
-  <view class="kb-keys">
+  <view class="kb-row {{ri === 1 ? 'kb-row2' : (ri === 2 ? 'kb-row3' : '')}}"
+        wx:for="{{rows}}" wx:for-item="row" wx:for-index="ri" wx:key="*this">
+    <view wx:if="{{ri === 2}}" class="kb-key kb-shift {{shift ? 'kb-shift-on' : ''}}"
+          data-action="shift" bindtap="onAction">⇧</view>
     <view
       class="kb-key"
-      wx:for="{{keys}}"
+      wx:for="{{row}}"
       wx:for-item="k"
       wx:key="*this"
       data-letter="{{k}}"
       bindtap="onLetter"
-    >{{k}}</view>
-    <view class="kb-key kb-del" data-action="del" bindtap="onAction">⌫</view>
+    >{{shift ? cs.up(k) : k}}</view>
+    <view wx:if="{{ri === 2}}" class="kb-key kb-del" data-action="del" bindtap="onAction">⌫</view>
+  </view>
+
+  <view class="kb-row kb-row4">
+    <view
+      wx:for="{{extraRow}}"
+      wx:for-item="k"
+      wx:key="id"
+      class="kb-key {{k.id === 'space' ? 'kb-space' : 'kb-hyphen'}}"
+      data-char="{{k.id}}"
+      bindtap="onChar"
+    >{{k.label}}</view>
   </view>
 
   <view class="kb-bar">

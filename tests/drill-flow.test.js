@@ -117,7 +117,9 @@ cloud.api.submitReview = function (p) {
   return syncResolve({ ok: true });
 };
 cloud.api.todayTask = function () {
-  return syncResolve({ words: [{ word: 'train' }, { word: 'street' }] });
+  // 2026-10-10 换版：street 是旧教材词已从词库删除（byTexts 会静默丢弃），
+  // 换成新词库的 jump —— 两个词都在库且有 mp3，题面行为等价
+  return syncResolve({ words: [{ word: 'train' }, { word: 'jump' }] });
 };
 cloud.api.drillScore = function (p) {
   scores.push(p);
@@ -291,7 +293,8 @@ test('⑧ 第 2 步拼对 → known；拼错 → 进详情且下次该词键盘�
   assert.strictEqual(p.data.state, 'detail', '拼错必须进详情');
   assert.strictEqual(p.mirror[w].last_feedback, 'forgot');
   assert.ok(p._spellTries[w] >= 1, '要记下拼错过');
-  assert.strictEqual(p.spellLevel(q.word, 0, 10), 'easy', '拼错后键盘必须降回最简单');
+  // 2026-10-09 键盘恒全键盘（与电脑键位一致），拼错不再降键位 —— 分级函数已删
+  assert.strictEqual(p.spellLevel, undefined, '难度分档已下线，不该再有 spellLevel');
   // 再来一个新页面：同一个词拼对 → known
   var p2 = startedPage();
   assert.ok(runTo(p2, 'spell'));
@@ -304,18 +307,14 @@ test('⑧ 第 2 步拼对 → known；拼错 → 进详情且下次该词键盘�
   assert.strictEqual(p2.mirror[q2.wordId].last_feedback, 'known', '拼对必须记 known');
 });
 
-test('⑨ 键盘难度由简单到复杂：没学过 easy、学过几次 medium、已掌握 hard', function () {
+test('⑨ 键盘恒全键盘（2026-10-09 难度分档下线，与电脑 QWERTY 一致）', function () {
   var p = startedPage();
-  var w = p.data.words[0];
-  assert.strictEqual(p.spellLevel(w, 0, 10), 'easy', '没学过的词给最简单的键盘');
-  p.mirror[w.word] = { stage: 2, last_feedback: 'known', correct_count: 2, next_review_at: Date.now() + 1e8 };
-  assert.strictEqual(p.spellLevel(w, 0, 10), 'medium', '学过几次 → 加易混字母');
-  p.mirror[w.word] = { stage: 6, last_feedback: 'known', correct_count: 6, next_review_at: Date.now() + 1e8 };
-  assert.strictEqual(p.spellLevel(w, 0, 10), 'hard', '已掌握 → 全键盘');
-  // 一轮之内后 1/3 的词至少提到 medium（这一轮本身也是由简到难）
-  var fresh = { word: 'zzz-fresh', def_cn: 'x' };
-  assert.strictEqual(p.spellLevel(fresh, 0, 10), 'easy');
-  assert.strictEqual(p.spellLevel(fresh, 8, 10), 'medium', '一轮末尾至少要 medium');
+  assert.strictEqual(p.spellLevel, undefined, 'spellLevel 分级函数已删');
+  assert.strictEqual(p.data.kbLevel, undefined, '页面不再有 kbLevel 字段');
+  assert.strictEqual(p.data.kbLevelLabel, undefined, '页面不再有难度文案字段');
+  var keysLib = require('../miniprogram/components/letter-keyboard/keys');
+  var flat = [].concat.apply([], keysLib.planRows());
+  assert.strictEqual(flat.length, 26, '键盘恒 26 键，任何掌握程度都不减键位');
 });
 
 test('⑩ 两步都走完还有没拿下的词 → 自动进巩固轮（换现有抽查方式）', function () {
@@ -628,7 +627,8 @@ test('㉔ 详情页「✍ 抄写一遍」：出键盘照抄，抄对记一遍可
   p.onDetailWrite();
   assert.strictEqual(p.data.detail.writing, true, '点抄写要展开键盘和输入框');
   assert.strictEqual(p.data.detail.copyLength, w.length, '键盘长度要等于词长');
-  assert.strictEqual(p.data.kbLevel, 'easy', '第一遍给最简单的键盘（只有正确字母）');
+  // 2026-10-09 起键盘恒全键盘（与电脑键位一致），不再有难度递进 —— kbLevel 字段已删
+  assert.strictEqual(p.data.kbLevel, undefined, '难度分档已下线，不该再有 kbLevel');
 
   // 抄错一次：不算一遍、不清空，直接指出第几个字母不对
   p.onKeyInput({ detail: { value: ['x'].concat(w.slice(1).split('')) } });
@@ -648,11 +648,9 @@ test('㉔ 详情页「✍ 抄写一遍」：出键盘照抄，抄对记一遍可
   copyRight();
   assert.strictEqual(p.data.detail.copyCount, 1, '抄对要记一遍，实际 ' + p.data.detail.copyCount);
   assert.strictEqual(p.data.kbText, '', '抄完要清空，才好比照着抄下一遍');
-  assert.strictEqual(p.data.kbLevel, 'medium', '抄熟了键盘要变难一点');
 
   copyRight();
   assert.strictEqual(p.data.detail.copyCount, 2, '想抄几遍抄几遍');
-  assert.strictEqual(p.data.kbLevel, 'hard', '抄两遍后给全键盘');
 
   p.onCopyClose();
   assert.strictEqual(p.data.detail.writing, false, '收起键盘');
@@ -741,20 +739,58 @@ test('㉗ 抄写时单词悬浮置顶且可遮住默写（遮住仍知道几个�
   assert.ok(/\.drill\.pinned\s*\{[^}]*padding-top/.test(wxss), '钉住后页面顶部要让位');
 });
 
-test('㉘ 退格键与字母之间要留出明显空档（误触会删掉最后一个字母）', function () {
-  var wxss = require('fs').readFileSync(
+test('㉘ QWERTY 布局：退格在第三行末尾且比字母键宽（防误触），三行阶梯结构', function () {
+  var fs = require('fs');
+  var wxml = fs.readFileSync(
+    path.resolve(__dirname, '../miniprogram/components/letter-keyboard/index.wxml'), 'utf8');
+  var wxss = fs.readFileSync(
     path.resolve(__dirname, '../miniprogram/components/letter-keyboard/index.wxss'), 'utf8');
+  // 退格只出现在第三行（电脑键盘位置）
+  assert.ok(/ri === 2.*kb-del/s.test(wxml.replace(/\s+/g, ' ')),
+    '退格应放在第三行末尾（与电脑键盘一致）');
+  // 退格宽度大于普通字母键（flex 1.7），连按不容易误触
   var del = wxss.match(/\.kb-del\s*\{([^}]*)\}/);
   assert.ok(del, '要有退格键样式');
-  var ml = del[1].match(/margin-left:\s*(\d+)rpx/);
-  assert.ok(ml && Number(ml[1]) >= 24,
-    '退格必须与字母拉开距离（≥24rpx），实际 ' + (ml ? ml[1] + 'rpx' : '没有 margin-left'));
-  var gap = wxss.match(/\.kb-keys\s*\{[^}]*gap:\s*(\d+)rpx/);
-  assert.ok(gap && Number(gap[1]) >= 16, '字母间距也要够，实际 ' + (gap && gap[1]));
+  var flex = del[1].match(/flex:\s*([\d.]+)/);
+  assert.ok(flex && Number(flex[1]) > 1, '退格要比字母键宽（flex > 1），实际 ' + (flex && flex[1]));
+  // 三行阶梯：行 2/行 3 有 padding 偏移（与电脑键盘的 home row / bottom row 一致）
+  assert.ok(/\.kb-row2\s*\{[^}]*padding/.test(wxss), '第二行要有阶梯偏移');
+  assert.ok(/\.kb-row3\s*\{[^}]*padding/.test(wxss), '第三行要有阶梯偏移');
+  // 键间距：QWERTY 键多 gap 比旧 wrap 布局小是预期，但必须有
+  var gap = wxss.match(/\.kb-row\s*\{[^}]*gap:\s*(\d+)rpx/);
+  assert.ok(gap && Number(gap[1]) >= 6, '行内键间距要够（≥6rpx），实际 ' + (gap && gap[1]));
   // 宽屏同规范：apply-shared 下走 app.wxss
-  var app = require('fs').readFileSync(
+  var app = fs.readFileSync(
     path.resolve(__dirname, '../miniprogram/app.wxss'), 'utf8');
-  assert.ok(/\.wide \.kb-del\s*\{[^}]*margin-left/.test(app), '宽屏也要拉开退格距离');
+  assert.ok(/\.wide \.kb-row\s*\{[^}]*gap/.test(app), '宽屏也要有行间距适配');
+});
+
+test('㉙ 答对庆祝（#36）：动画层 + 音效 + 停约 1 秒再跳题；答错低沉音 + 震动', function () {
+  var fs = require('fs');
+  var js = fs.readFileSync(
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.js'), 'utf8');
+  var wxml = fs.readFileSync(
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxml'), 'utf8');
+  var wxss = fs.readFileSync(
+    path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxss'), 'utf8');
+  // 音效接入
+  assert.ok(/require\('\.\.\/\.\.\/\.\.\/utils\/sfx'\)/.test(js), 'drill.js 要引入 utils/sfx');
+  assert.ok(/sfx\.playCorrect\(\)/.test(js), '答对要播庆祝音');
+  assert.ok(/sfx\.playWrong\(\)/.test(js), '答错要播低沉提示音');
+  // 答对跳题节奏：从 180ms 放慢到约 1 秒（用户：犹豫的一下就过去了，下一题没反应过来）
+  var m = js.match(/celebrate:\s*true[\s\S]*?setTimeout\(function \(\)\s*\{[\s\S]*?\},\s*(\d+)\)/);
+  assert.ok(m, '答对分支要亮 celebrate 并用 setTimeout 延迟跳题');
+  assert.ok(Number(m[1]) >= 800, '跳题延迟要 ≥800ms（实际 ' + m[1] + '）');
+  // 动画层
+  assert.ok(/wx:if="\{\{celebrate\}\}" class="celebrate"/.test(wxml), 'wxml 要有庆祝动画层');
+  assert.ok(/@keyframes celebrate-pop/.test(wxss), 'wxss 要有 ✓ 缩放弹跳动画');
+  // 音效文件真实存在且极小（随主包走，不能拖体积）
+  ['correct', 'wrong'].forEach(function (n) {
+    var p = path.resolve(__dirname, '../miniprogram/assets/sfx/' + n + '.mp3');
+    assert.ok(fs.existsSync(p), n + '.mp3 要存在');
+    var size = fs.statSync(p).size;
+    assert.ok(size > 500 && size < 10240, n + '.mp3 要极小（实际 ' + size + 'B）');
+  });
 });
 
 console.log('\n通过：' + passed + ' 项' + (failed.length ? '，失败 ' + failed.length + ' 项：' + failed.join('、') : ' ✓'));

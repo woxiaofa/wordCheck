@@ -32,11 +32,14 @@ var time = require('../../../utils/time');
 var WORDS = require('../../../data/words');
 var books = require('../../../utils/books');
 var tts = require('../../../utils/tts');
+var sfx = require('../../../utils/sfx');
 var report = require('../../../utils/report');
 var learnlog = require('../../../utils/learnlog');
 var assignParam = require('../../../utils/assign');
 var layout = require('../../../utils/layout');
 var profile = require('../../../utils/profile');
+var fit = require('../../../utils/fit');
+var asgcache = require('../../../utils/asgcache');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -57,7 +60,6 @@ var WRITE_MAX_MS = 45000;
 var MAX_ROUNDS = 3;
 
 /** 详情页「抄写」的键盘难度递进：抄得越多，键盘越接近真实（要自己找字母） */
-var COPY_LEVELS = ['easy', 'medium', 'hard'];
 /** 默认任务词数（没人布置作业时） */
 var DEFAULT_WORDS = 10;
 
@@ -100,13 +102,13 @@ Page({
     kbValue: [],             // 键盘输入（拼写/听写题）
     kbText: '',              // 已输入字母的拼接串（WXML 表达式不支持 .join()，必须算好再给）
     kbCaret: 0,              // 插入光标位置（0~kbValue.length），支持从中间插入字母
-    kbLevel: 'easy',         // 拼写键盘难度（简单 → 复杂）
-    kbLevelLabel: '',
     slowHint: false,         // 是否已超过提示时间
     detail: null,            // 详情态数据
     wrongBook: [],           // 全程曾错的词（去重，结果页展示）
     roundWrong: [],          // 本轮待巩固的词
+    landscape: false,        // iPad 横屏提示条
     assignName: '',          // 班级作业名（空 = 默认任务）
+    offline: false,          // 这一轮是不是断网练（词单来自本机快照）
     progressPct: 0,
     stepText: '',            // "第 1 步 认 · 3/10"
     elapsedText: '',         // 结果页时长
@@ -122,6 +124,8 @@ Page({
 
   onLoad: function (options) {
     this.mirror = wx.getStorageSync(STORAGE_KEY) || {};
+    // iPad 横屏：内容按宽度自适应会放得特别大（2026-10-09 用户反馈），提示竖屏
+    this.setData({ landscape: fit.isLandscape() });
     this.startedAt = 0;
     this._spellTries = {};       // 每个词本轮拼错的次数（决定键盘难度）
     this._honest = false;        // 本次作答是不是点了【不会】
@@ -141,6 +145,7 @@ Page({
   },
 
   onUnload: function () { this.clearTimers(); },
+  onResize: function () { this.setData({ landscape: fit.isLandscape() }); },
   onHide: function () { this.clearTimers(); },
 
   clearTimers: function () {
@@ -171,10 +176,25 @@ Page({
       if (!texts.length) throw new Error('EMPTY');
       self.startRound(self.byTexts(texts), 'recog');
     }).catch(function (err) {
-      console.warn('[drill] 云端任务取不到，用本地默认任务：',
-        (err && (err.errMsg || err.message)) || err);
+      console.warn('[drill] 云端任务取不到：', (err && (err.errMsg || err.message)) || err);
+      // 断网时优先接本机留存的作业词单：孩子该练的是老师布置的那批词，
+      // 直接退回默认词库等于"联网时一批、断网时另一批"，进度对不上又要解释一遍。
+      // 还是没有才退回本地默认任务 —— 任何情况下都得有得练。
+      if (self.startCachedAssignment()) return;
       self.startRound(self.localWords(DEFAULT_WORDS), 'recog');
     });
+  },
+
+  /** @returns {boolean} 是否成功启动了本机留存的作业 */
+  startCachedAssignment: function () {
+    var cached = asgcache.latest();
+    if (!cached || !cached.ids.length) return false;
+    var words = this.assignmentWords(cached.ids);
+    if (!words.length) return false;
+    this._assign = { ids: cached.ids, name: cached.name };
+    this.setData({ assignName: cached.name, offline: true });
+    this.startRound(words, 'recog');
+    return true;
   },
 
   /** 作业词单：没学过的排前面，已掌握的排后面（作业是"把这些词学会"） */
@@ -295,7 +315,6 @@ Page({
         word: w,
         stem: w.def_cn,
         length: String(w.word || '').length,
-        level: this.spellLevel(w, i || 0, total || 0),
         answerText: w.word
       };
     }
@@ -333,16 +352,6 @@ Page({
    * 拼错过就降回 easy —— 目的是让他拼出来，不是把他难住。
    * 另外一轮之内后 1/3 的词至少提到 medium，让这一轮本身也是由简到难。
    */
-  spellLevel: function (w, i, total) {
-    if ((this._spellTries && this._spellTries[w.word]) > 0) return 'easy';
-    var st = this.mirror[w.word];
-    var lv = 'easy';
-    if (st && srs.isMastered(st)) lv = 'hard';
-    else if (st && ((st.stage || 0) >= 2 || (st.correct_count || 0) >= 2)) lv = 'medium';
-    if (lv === 'easy' && total >= 6 && i >= Math.ceil(total * 2 / 3)) lv = 'medium';
-    return lv;
-  },
-
   showQuestion: function () {
     var i = this.data.idx;
     var q = this._qs[i];
@@ -353,7 +362,6 @@ Page({
       binary: '选意思', meaning: '选意思',
       spell: '看中文拼写', listen: '听写', dictation: '听音拼写'
     };
-    var kbLevel = q.level || 'easy';
     this.setData({
       state: 'run',
       q: q,
@@ -361,8 +369,6 @@ Page({
       kbValue: [],
       kbText: '',
       kbCaret: 0,
-      kbLevel: kbLevel,
-      kbLevelLabel: levelLabel(kbLevel),
       slowHint: false,
       detail: null,
       typeLabel: labels[q.type] || '',
@@ -510,7 +516,17 @@ Page({
       }
     }
 
-    this.record(word, fb, q.type, wordMs);
+    // 错拼原文：这是字母级诊断（错在第几个字母 / 少写还是写错）唯一的原料，
+    // 也是拍照批改类产品拿不到的东西 —— 云端只有在客户端把它交上去时才有。
+    // 只对"没答对"的词记：拼对的词谈"错在哪"没有意义。
+    var wrongInput = '';
+    if (!ok || timeout || honest) {
+      wrongInput = q.options
+        ? (q.options[this.data.pickedIdx] || '')
+        : (this.data.kbValue || []).join('');
+    }
+
+    this.record(word, fb, q.type, wordMs, wrongInput);
 
     // 错题本：凡是没被判 known 的都要再巩固
     var wrongBook = this.data.wrongBook.slice();
@@ -546,6 +562,11 @@ Page({
       // 是"选"出来的错还是"拼"出来的错：文案不一样，混着说孩子看不懂
       var pickVerb = q.options ? '选' : '拼';
 
+      // 答错反馈：低沉提示音 + 中震（#36）—— 与答对的"叮！"形成对比，
+      // 孩子不看屏幕也知道这题没对，接下来要看详情了
+      sfx.playWrong();
+      if (wx.vibrateShort) wx.vibrateShort({ type: 'medium' });
+
       this.setData({
         state: 'detail',
         detail: {
@@ -573,9 +594,16 @@ Page({
     }
 
     var self = this;
-    // 答对：极短的确认反馈（让"换词"看得见，又不拖慢节奏）
-    this.setData({ judgedOk: true });
-    setTimeout(function () { self.setData({ judgedOk: false }); self.next(); }, 180);
+    // 答对：中央 ✓ 庆祝动画 + 清脆音效 + 轻震，停 ~1 秒再跳下一词 ——
+    // 2026-10-10 用户反馈：之前 180ms 一闪而过，"有点犹豫的一下就过去了，
+    // 下一题没反应过来"。答对是值得看见的事，节奏放慢一点。
+    this.setData({ judgedOk: true, celebrate: true });
+    sfx.playCorrect();
+    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    setTimeout(function () {
+      self.setData({ judgedOk: false, celebrate: false });
+      self.next();
+    }, 1000);
   },
 
   /** 详情页「跟着念完了，继续」：把看详情的时长记进总学习时长（简报口径） */
@@ -590,16 +618,14 @@ Page({
 
   /**
    * 详情页「✍ 抄写一遍」：照着上面的词用键盘拼一遍。
-   * 念是耳朵记，抄是手记 —— 两样都做了才算真过一遍。
-   * 想抄几遍抄几遍（键盘难度随遍数递进：仅正确字母 → 含易混字母 → 全键盘）。
+   * 念是耳朵记，抄是手记 —— 两样都做了才算真过一遍。想抄几遍抄几遍。
+   * 键盘 2026-10-09 起恒全键盘（与电脑键位一致），抄写不再分难度档。
    */
   onDetailWrite: function () {
     var d = this.data.detail;
     if (!d || !d.word) return;
-    var lv = COPY_LEVELS[Math.min(d.copyCount || 0, COPY_LEVELS.length - 1)];
     this.setData({
       kbValue: [], kbText: '', kbCaret: 0,
-      kbLevel: lv,
       'detail.writing': true,
       'detail.copyOk': false,
       'detail.copyMsg': '照着上面的词，用键盘拼一遍',
@@ -631,7 +657,6 @@ Page({
       var n = (d.copyCount || 0) + 1;
       this.setData({
         kbValue: [], kbText: '', kbCaret: 0,
-        kbLevel: COPY_LEVELS[Math.min(n, COPY_LEVELS.length - 1)],
         'detail.copyCount': n,
         'detail.copyOk': true,
         'detail.copyMsg': n < 3
@@ -857,7 +882,7 @@ Page({
    * 与学习页 applyRating 同一套口径，保证三处（学习/抽查/快刷）的状态一致。
    * durationMs：这个词花了多久 —— 学习简报"经过 X 分钟"的唯一数据来源。
    */
-  record: function (word, fb, type, durationMs) {
+  record: function (word, fb, type, durationMs, wrongInput) {
     if (!word) return;
     var prev = this.mirror[word.word] || null;
     var next = srs.nextState(prev, fb, Date.now());
@@ -893,6 +918,8 @@ Page({
       feedback: fb,
       mode: 'learn',
       durationMs: Math.max(0, Math.round(Number(durationMs) || 0)),
+      // 服务端只在 fb !== 'known' 时落库；这里无条件带上，少一层分支就少一处漏
+      wrongAnswer: String(wrongInput || ''),
       clientReqId: reqId
     }).then(function (res) {
       var errCode = (res && res.ok === false) ? (res.code || 'CLOUD_FAIL') : '';
@@ -951,17 +978,15 @@ function copyDiffHint(input, target) {
   while (i < a.length && i < b.length && a[i] === b[i]) i++;
   if (i >= b.length) return '多打了字母，对着上面的词改一下';
   if (i >= a.length) return '还差 ' + (b.length - a.length) + ' 个字母，接着拼';
+  // 短语收录后 target 里会有空格/连字符：直接说"第 4 个应该是（空白）"孩子看不懂
+  if (b[i] === ' ') {
+    return '第 ' + (i + 1) + ' 个位置是空格 —— 点键盘下面那根长条，改一下再确定';
+  }
+  if (b[i] === '-') {
+    return '第 ' + (i + 1) + ' 个位置是连字符 -（键盘左下角），改一下再确定';
+  }
   return '第 ' + (i + 1) + ' 个字母应该是 ' + b[i] +
     '，你写的是 ' + a[i] + ' —— 改一下再确定';
-}
-
-/** 键盘难度文案（复用组件里的实现，避免两处各写一套） */
-function levelLabel(level) {
-  try {
-    return require('../../../components/letter-keyboard/keys').levelLabel(level);
-  } catch (e) {
-    return level === 'easy' ? '仅正确字母' : (level === 'medium' ? '含易混字母' : '全键盘');
-  }
 }
 
 /**

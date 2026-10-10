@@ -12,7 +12,6 @@
 var api = require('../../../utils/cloud').api;
 var srs = require('../../../utils/srs');
 var quizLib = require('../../../utils/quiz');
-var keysLib = require('../../../components/letter-keyboard/keys');
 var time = require('../../../utils/time');
 var WORDS = require('../../../data/words');
 var books = require('../../../utils/books');
@@ -47,7 +46,6 @@ Page({
     feedbackOk: false,
     feedbackCorrect: '',
     feedbackUser: '',
-    keyboardLabel: '',
     // 结果
     correct: 0,
     total: 0,
@@ -165,9 +163,10 @@ Page({
       pos: q.pos || '',
       options: q.options || [],
       length: Number(q.length) || String(q.wordId || '').length,
+      // 纯字母数（短语收录后 length 含空格/连字符）：占位格数用 length，"N 个字母"提示用 letters
+      letters: (String(q.wordId || '').match(/[a-zA-Z]/g) || []).length,
       slots: [],
-      wordId: q.wordId,
-      level: this.resolveLevel(q.wordId)
+      wordId: q.wordId
     };
 
     if (cur.type === 'spell' || cur.type === 'listen') {
@@ -178,7 +177,6 @@ Page({
     this.setData({
       cur: cur,
       typeLabel: this.typeLabelOf(cur.type),
-      keyboardLabel: keysLib.levelLabel(cur.level),
       judged: false,
       feedbackOk: false,
       feedbackCorrect: '',
@@ -189,24 +187,6 @@ Page({
       played: this.playedCount[cur.wordId] || 0,
       playHint: cur.type === 'listen' ? this.playHintFor(cur.wordId) : ''
     });
-  },
-
-  /**
-   * 拼写/听写的键盘难度：按这个词的掌握情况递进，答错过的自动降一档。
-   *   新词 / 错过的词 → easy（只给正确字母，先保证"顺序"被记住）
-   *   档位 ≥ 4        → hard（全键盘）
-   *   其余            → medium（正确字母 + 形近易混字母）
-   * 内测期可用 wx.setStorageSync('keyboard_level', 'easy'|'medium'|'hard') 强制指定。
-   */
-  resolveLevel: function (wordId) {
-    var forced = wx.getStorageSync('keyboard_level');
-    if (forced === 'easy' || forced === 'medium' || forced === 'hard') return forced;
-
-    var st = this.mirror[wordId];
-    if (!st) return 'easy';
-    if (st.wrong_count >= 1) return 'easy';
-    if (typeof st.stage === 'number' && st.stage >= 4) return 'hard';
-    return 'medium';
   },
 
   buildSlots: function (word, len, typed) {

@@ -1,0 +1,5 @@
+/* WXS：键盘字母的大小写渲染（WXML 里调不了 toUpperCase）。
+   单独成文件是因为工程检查把 <wxs> 当自闭合标签，内联写法过不了配平校验。 */
+module.exports = {
+  up: function (s) { return String(s).toUpperCase(); }
+};

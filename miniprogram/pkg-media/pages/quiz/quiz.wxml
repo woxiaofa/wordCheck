@@ -63,7 +63,7 @@
         <block wx:for="{{cur.slots}}" wx:for-item="s" wx:key="i">
           <text class="{{s.show ? 'slot-fill' : 'slot-empty'}}">{{s.show ? s.ch : (s.dot ? '·' : '_')}}</text>
         </block>
-        <text class="slots-hint">{{cur.length}} 个字母</text>
+        <text class="slots-hint">{{cur.letters}} 个字母</text>
       </view>
     </view>
 
@@ -93,16 +93,12 @@
       wx:if="{{cur.type !== 'meaning'}}"
       class="mt"
       length="{{cur.length || 0}}"
-      word="{{cur.wordId || ''}}"
-      level="{{cur.level || 'hard'}}"
       value="{{answers[index] || []}}"
+      word="{{cur.wordId}}"
       confirm-label="{{judged ? (isLast ? '看报告' : '下一题') : (isLast ? '交卷' : '下一题')}}"
       bind:input="onKeyInput"
       bind:confirm="onKeyConfirm"
     />
-    <view class="muted center mt-s" wx:if="{{cur.type !== 'meaning'}}">
-      键盘难度：{{keyboardLabel}}（按这个词你掌握的程度自动调整）
-    </view>
   </block>
 
   <!-- ============ 交卷结果 ============ -->

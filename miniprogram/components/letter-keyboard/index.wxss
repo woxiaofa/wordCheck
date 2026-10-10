@@ -1,28 +1,45 @@
-/* 字母区：flex 自动换行。键数随难度变化（5～26 个），
-   硬切行会在难度低时留半行空位，所以交给换行规则，不用 JS 算列数。
-   v3：键加大、间距拉开 —— 挤在一起是孩子拼错词的一大来源（误触邻键）。 */
+/* QWERTY 全键盘（v6，2026-10-10）：三行字母 + ⇧ + 第四行空格，与电脑键位一致。
+   贴底弹出式（用户反馈"键太小，像输入法一样从下面弹出来边距就可以大了"）：
+   去掉旧卡片边框，负边距吃掉页面侧距（.page 左右各 24rpx），只留顶部圆角，
+   左右几乎到屏边，省下的宽度全给按键 —— 键高 88→104rpx、字号 34→38rpx。
+   行 2 的阶梯偏移用行 padding 实现（真键盘 home row 也是偏的）；
+   行 3 左端 ⇧、右端 ⌫（真键盘同位），不再需要额外的行缩进。 */
 .kb {
   background: #1a2432;
-  border: 1rpx solid #2b3949;
-  border-radius: 20rpx;
-  padding: 14rpx;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 16rpx 10rpx 14rpx;
+  margin: 0 -24rpx;
 }
-.kb-keys {
+.kb-row {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 18rpx;
+  gap: 8rpx;
+  margin-bottom: 10rpx;
 }
+.kb-row:last-of-type { margin-bottom: 0; }
+.kb-row2 { padding: 0 18rpx; }
+/* 行 3 阶梯：真键盘 bottom row 靠更宽的 ⇧/⌫ 实现偏移，这里 ⇧ 之外再补一点左缩进，
+   让 z 列大致对齐 x 列节奏（也是 drill-flow ㉘ 钉住的结构约定） */
+.kb-row3 { padding-left: 22rpx; }
+
+/* 第四行：连字符 + 空格长条（收录短语后必须有）。
+   空格键是真键盘那根长条的样子 —— 宽（flex:5）、无字，孩子不用学也知道是空格。 */
+.kb-row4 { padding: 0 48rpx; margin-bottom: 0; }
+.kb-hyphen {
+  flex: 1;
+  max-width: 150rpx;
+  font-size: 34rpx;
+}
+.kb-space { flex: 5; }
 
 .kb-key {
-  width: 96rpx;
+  flex: 1;
   height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #243040;
   border: 1rpx solid #2b3949;
-  border-radius: 14rpx;
+  border-radius: 12rpx;
   color: #e8eef5;
   font-size: 38rpx;
   font-weight: 600;
@@ -32,23 +49,34 @@
   color: #ffffff;
 }
 
-/* 退格跟在字母后面，宽度稍大一点方便连按。
-   margin-left 必须另外加一大截：它紧挨着最后一个字母，
-   gap 那点距离不够区分"最后一个字母"和"删除"，孩子一着急就误触
-   （2026-10-08 实锤：拼到最后一个字母想再按一个，结果按到退格全没了）。 */
+/* ⇧ 大小写（第三行左端，真键盘同位）：亮起 = 大写态， accent 蓝底白底箭头 */
+.kb-shift {
+  flex: 1.5;
+  background: #2b3949;
+  color: #cfe0f0;
+  font-size: 36rpx;
+}
+.kb-shift:active { background: #3a4a5e; }
+.kb-shift-on {
+  background: #3ea6ff;
+  color: #ffffff;
+}
+.kb-shift-on:active { background: #3ea6ff; opacity: .85; }
+
+/* 退格：第三行末尾（电脑键盘位置）。与 ⇧ 同宽，方便连按。 */
 .kb-del {
-  width: 140rpx;
-  margin-left: 30rpx;
+  flex: 1.5;
   background: #2b3949;
   color: #cfe0f0;
   font-size: 34rpx;
 }
+.kb-del:active { background: #3a4a5e; }
 
 /* 键盘下方的操作行：光标移动（编辑用）+ 清空（次要）+ 下一题/交卷（主要） */
 .kb-bar {
   display: flex;
   gap: 12rpx;
-  margin-top: 14rpx;
+  margin-top: 12rpx;
 }
 .kb-nav {
   width: 96rpx;
