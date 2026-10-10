@@ -63,7 +63,7 @@ exports.main = async (event, context) => {
 /* ------------------------------------------------------------------ */
 /* 复习反馈提交                                                        */
 /* ------------------------------------------------------------------ */
-async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqId }) {
+async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqId, wrongAnswer }) {
   // --- 入参校验：服务端不能相信客户端传来的任何值 ---
   if (!wordId) return fail('BAD_PARAM', '缺少 wordId');
   if (!['forgot', 'vague', 'known'].includes(feedback)) return fail('BAD_PARAM', '非法 feedback');
@@ -113,6 +113,11 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
   }
 
   // --- 记录明细（用于错词本与后续算法调优；保留策略见《设计约定》） ---
+  // wrong_answer：孩子实际拼出来的字符串 —— 这是字母级诊断的唯一原料。
+  // 只有它才能回答"错在第几个字母、是少字母还是单个字母写错"，
+  // 拍照批改类产品永远拿不到这一层（它们只有"对/错"两个值）。
+  // 只在没拼对时记：答对的词谈"错在哪"没有意义，白占存储。
+  const wrong = (typeof wrongAnswer === 'string' ? wrongAnswer : '').slice(0, 40).trim();
   await db.collection(COLL.logs).add({
     data: {
       user_id: user._id,
@@ -121,6 +126,7 @@ async function onSubmit(openid, { wordId, feedback, mode, durationMs, clientReqI
       mode: mode || 'review',
       duration_ms: Math.max(0, Number(durationMs) || 0),
       review_date: today,
+      wrong_answer: (feedback === 'known' ? '' : wrong),
       created_at: now
     }
   });

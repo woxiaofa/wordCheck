@@ -20,6 +20,7 @@ const db = cloud.database();
 const _ = db.command;
 const { getLocalDate, getLocalDayStart } = require('./time');
 const { queryStates, STATE_COLL, ensureCollection } = require('./state-store');
+const wrongLib = require('./wrong');
 
 const COLL = {
   users: 'users',
@@ -29,7 +30,9 @@ const COLL = {
   asgStudents: 'assignment_students',
   state: STATE_COLL,           // v5：读走合并查询（v2+legacy），写不经本函数
   requests: 'request_dedup',
-  logs: 'review_logs'
+  logs: 'review_logs',
+  /** 每日简报订阅：{user_id, openid, student_id, template_id, last_sent_at} */
+  briefSubs: 'brief_subs'
 };
 
 const LIMITS = {
@@ -45,10 +48,45 @@ const LIMITS = {
   PERSONAL_POOL_FACTOR: 3
 };
 
+/**
+ * 教材三级结构的白名单（服务端必须自己校验，不能信客户端传来的 volume/unit）
+ *
+ * 为什么不查库验证：布置作业是高频动作，每次多一次 count 查询不值；
+ * 而这份映射本身很小，改动时也方便一眼看完。
+ * 新增一册要同时改这里 + 重新导入 words 集合（词表必须带 volume/unit/unit_order）。
+ */
+const TEXTBOOKS = {
+  // 2026-10-10 换新版教材（2024 版·孙有中主编）：Unit 1~6（旧版是 Module 1~10）
+  wy4a: { tag: '外研四上', units: 6, name: '外研版（三起）·四年级上册' }
+};
+
 // 邀请码 → 班级 文档的缓存有效期（沿用 request_dedup 的清理思路，靠 TTL 惰性过期）
 const REQ_TTL_MS = 2 * 86400000;
 
+/**
+ * 每日简报推送配置
+ *
+ * ⚠️ TEMPLATE_ID 必须替换：微信公众平台 → 订阅消息 → 选模板 → 复制模板 ID 填到这里。
+ * 留空时整条链路**安全降级**（不报错、不打扰用户，接口返回 skipped），
+ * 这样"还没申请到模板"不会变成"点了订阅却什么也没发生"。
+ *
+ * 为什么要这一层：简报文案早就有了，但只出现在孩子的手机上。
+ * 家长/老师是同一个微信号时也一样 —— 他们不可能每天记得打开小程序去看，
+ * 所以简报要能被送到微信会话里。
+ */
+const BRIEF = {
+  TEMPLATE_ID: '',
+  PAGE: 'pages/index/index',
+  /** 订阅一次最多管多少天（微信一次订阅只发一条，这里只当显示用） */
+  MAX_DAYS: 7
+};
+
 exports.main = async (event) => {
+  // 定时触发（config.json 里的 timer）：没有用户身份，只做"给所有订阅者发当天简报"。
+  // 必须放在取 OPENID 之前 —— 定时器调用方不是人，拿不到也不该要求 OPENID。
+  if (event && (event.Type === 'Timer' || event.triggerName)) {
+    return onTimerTick();
+  }
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
 
@@ -64,6 +102,9 @@ exports.main = async (event) => {
     case 'studentDetail': return onStudentDetail(OPENID, event);
     case 'nudge':         return onNudge(OPENID, event);
     case 'summary':       return onSummary(OPENID, event);
+    case 'subscribeBrief': return onSubscribeBrief(OPENID, event);
+    case 'briefSubs':     return onBriefSubs(OPENID);
+    case 'sendBriefs':    return onSendBriefs(OPENID, event);
     default:              return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
@@ -185,16 +226,42 @@ async function onMyClass(openid) {
 /* ------------------------------------------------------------------ */
 /* 布置任务（教练端）                                                    */
 /* ------------------------------------------------------------------ */
-async function onAssign(openid, { tag, count, deadline, note, clientReqId, personalized }) {
+async function onAssign(openid, { tag, count, deadline, note, clientReqId, personalized, volume, unit, words }) {
   if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
 
   const ctx = await requireCoach(openid);
   if (ctx.err) return ctx.err;
 
   // --- 入参校验 ---
-  const VALID_TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
-  if (!VALID_TAGS.includes(tag)) return fail('BAD_PARAM', '词库标签无效');
-  count = parseInt(count, 10);
+  // 取词范围有两种：① 老方式按词库标签；② 新方式按教材单元（老师的真实动作）。
+  // 两条路最终都归一出一个 scope，后面的幂等/写库/个性化完全共用。
+  const scope = resolveScope(tag, volume, unit);
+  if (scope.err) return scope.err;
+
+  // --- 自定义词单（布置预览编辑后的产物，2026-10-09）---
+  // 前端把"预览词单"整份传上来：所见即所得。没编辑过时前端不传 words，
+  // 走下面的 tag/unit 服务端选词老路径 —— 两条路不混用。
+  let customWords = null;
+  if (Array.isArray(words) && words.length) {
+    if (words.length > LIMITS.ASSIGN_COUNT_MAX) {
+      return fail('BAD_PARAM', '自定义词单最多 ' + LIMITS.ASSIGN_COUNT_MAX + ' 个词');
+    }
+    const cleaned = [];
+    const seen = new Set();
+    for (const w of words) {
+      if (typeof w !== 'string') continue;
+      const t = w.trim().slice(0, 40);
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      cleaned.push(t);
+    }
+    if (cleaned.length < LIMITS.ASSIGN_COUNT_MIN) {
+      return fail('BAD_PARAM', '编辑后至少保留 ' + LIMITS.ASSIGN_COUNT_MIN + ' 个词');
+    }
+    customWords = cleaned;
+  }
+
+  count = customWords ? customWords.length : parseInt(count, 10);
   if (!(count >= LIMITS.ASSIGN_COUNT_MIN && count <= LIMITS.ASSIGN_COUNT_MAX)) {
     return fail('BAD_PARAM', '词数需在 ' + LIMITS.ASSIGN_COUNT_MIN + '~' + LIMITS.ASSIGN_COUNT_MAX + ' 之间');
   }
@@ -211,7 +278,11 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
 
   // 作业名：备注优先；没写备注就自动按"日期 时间·词库"命名。
   // 此前所有作业都叫"全部作业"，两份并排完全同名，家长分不清哪份是哪份（2026-10-07 反馈）。
-  const name = note || autoAssignName(tag, now, personal);
+  // 编辑过词单的作业加"自定义"后缀 —— 家长一眼看出这份和课本词单不完全一样。
+  const effScope = customWords
+    ? Object.assign({}, scope, { label: (scope.label || scope.tag) + '·自定义' })
+    : scope;
+  const name = note || autoAssignName(effScope, now, personal);
 
   // --- 幂等闸 ---
   const dup = await db.collection(COLL.requests)
@@ -222,28 +293,35 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     if (prev && prev.data) return ok({ assignment: publicAssignment(prev.data), dedup: true });
   }
 
-  // --- 选词：按词频升序取前 count 个（简单可解释，学生先学高频词）---
+  // --- 选词 ---
+  // 按词库：按词频升序取前 count 个（简单可解释，学生先学高频词）
+  // 按单元：按 unit_order 升序 —— 词序必须跟课本一致，否则孩子练的顺序不是老师讲的顺序
   // 个性化作业要多拉一些候选：好让"已掌握的词跳过、易错词补进来"有挑选余地
   const fetchMax = personal
     ? Math.min(LIMITS.WORDS_FETCH_MAX, count * LIMITS.PERSONAL_POOL_FACTOR)
     : Math.min(LIMITS.WORDS_FETCH_MAX, count);
-  const wordsRes = await db.collection('words')
-    .where(tag === '全部' ? {} : { tags: tag })
-    .orderBy('freq', 'asc')
-    .limit(fetchMax)
-    .get();
+  // 自定义词单：按词文本查库、保持老师排好的顺序；查不到的如实回报（不静默丢）
+  const pickRes = customWords
+    ? await chooseWordsByList(customWords)
+    : await chooseWords(scope, fetchMax);
+  const missingWords = customWords ? (pickRes.missing || []) : [];
   // 关键：存 word 文本而非 _id —— user_word_state.word_id / task snapshot /
   // 客户端本地词库匹配全都用文本，进度查询与"继续学"队列才能对上
-  const poolTexts = (wordsRes.data || []).map(w => w.word).slice(0, fetchMax);
+  const poolTexts = (pickRes.data || []).map(w => w.word).slice(0, fetchMax);
   const wordIds = poolTexts.slice(0, count);   // 基础词单（全班默认 / 教师端展示用）
   if (wordIds.length < LIMITS.ASSIGN_COUNT_MIN) {
-    return fail('WORDS_EMPTY', '该词库暂无可布置的单词');
+    return fail('WORDS_EMPTY', customWords
+      ? '词单里的词几乎都不在词库中（收到 ' + customWords.length + ' 个、配上 ' + wordIds.length + ' 个）'
+      : '该词库暂无可布置的单词');
   }
 
   const addRes = await db.collection(COLL.assignments).add({
     data: {
       class_id: ctx.cls._id,
-      tag,
+      tag: scope.tag,
+      // 教材单元：没走这条路的作业保持老结构（不带这两个字段），老数据安全
+      volume: scope.mode === 'unit' ? scope.volume : '',
+      unit: scope.mode === 'unit' ? scope.unit : 0,
       name,
       word_ids: wordIds,
       count: wordIds.length,
@@ -287,7 +365,9 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     assignment: publicAssignment(created.data),
     dedup: false,
     personalized: personal,
-    student_count: personal ? (ctx.cls.student_ids || []).length : 0
+    student_count: personal ? (ctx.cls.student_ids || []).length : 0,
+    // 自定义词单里有词配不上库时如实带回，前端提示 —— 不静默、不假成功
+    missing: missingWords.length ? missingWords : undefined
   });
 }
 
@@ -307,16 +387,117 @@ async function onAssignments(openid) {
   if (!assignments.length) return ok({ assignments: [] });
 
   const studentIds = ctx.cls.student_ids || [];
+
+  // 字母级诊断的原料：全班在这些作业词上答错时**实际拼出来的字符串**。
+  // 一次拉齐（班级上限 50 人）而不是每份作业查一次 —— N 份作业 N 次查询会明显拖慢打开速度。
+  const allWords = [];
+  assignments.forEach((a) => (a.word_ids || []).forEach((w) => {
+    if (w && allWords.indexOf(w) === -1 && allWords.length < 300) allWords.push(w);
+  }));
+  const wrongRes = (studentIds.length && allWords.length)
+    ? await db.collection(COLL.logs)
+        .where({ user_id: _.in(studentIds), word_id: _.in(allWords), feedback: 'forgot' })
+        .limit(1000)
+        .field({ word_id: true, wrong_answer: true })
+        .get().catch(() => ({ data: [] }))
+    : { data: [] };
+  const wrongRows = (wrongRes.data || []).filter((r) => !!r.wrong_answer);
+
   const withProgress = [];
   for (const a of assignments) {
     const per = await progressForAssignment(a, studentIds);
+    // 分级点名（2026-10-10 用户反馈：9/10·忘 1 的孩子和 0/10 的混在同一句"还没完成"
+    // 里点名，老师看着像都没交 —— 实际人家把 10 个词全学了一遍，只是 1 个抽查答了忘）。
+    // 完成口径不变（忘词不算完成，重学自动回完成），只把"学过但有忘词"单独分层：
+    //   pending —— 真没怎么动的（done+forgot 连一半都不到）：红标催
+    //   review  —— 词全学过但有忘词（done+forgot>=count 且 done<count）：黄标温和提醒巩固
+    //   done    —— 全部答对
+    per.forEach(p => {
+      if (p.count > 0 && p.done >= p.count) p.state = 'done';
+      else if (p.count > 0 && p.done + p.forgot >= p.count) p.state = 'review';
+      else p.state = 'pending';
+    });
+    const pend = per.filter(p => p.state === 'pending').map(p => p.nickname);
+    const review = per.filter(p => p.state === 'review')
+      .map(p => p.nickname + '（忘 ' + p.forgot + '）');
     withProgress.push(Object.assign(publicAssignment(a), {
-      finished: per.filter(p => p.count > 0 && p.done >= p.count).length,
+      finished: per.filter(p => p.state === 'done').length,
       total_students: studentIds.length,
-      per_student: per
+      per_student: per,
+      // 老师打开页面 5 秒内要能答的三个问题，都在这里一次性给全：
+      //   谁没交 / 错得最多的是哪几个词 / 错成什么样（少字母？顺序颠倒？）
+      pending_names: pend,
+      review_names: review,
+      class_wrong: await wrongSummaryFor(a, wrongRows)
     }));
   }
   return ok({ assignments: withProgress });
+}
+
+/**
+ * 一份作业的班级级错因汇总。
+ * @param {object} a 作业
+ * @param {Array} wrongRows [{ word_id, wrong_answer }]，已按班级成员过滤
+ *
+ * 刻意只给"有据可查"的结论：没有 wrong_answer（老版本客户端没上报）的行会被跳过，
+ * 于是这份汇总可能比"班上答错的总次数"少 —— 少而准，好过全而猜。
+ */
+async function wrongSummaryFor(a, wrongRows) {
+  // 词文本统一去首尾空白（2026-10-10 用户实锤：错词 chip 样式被撑坏，
+  // 根因之一是日志里的 word_id 带空格 —— 统计、配释义、展示三处都会跟着错）
+  const norm = (w) => String(w || '').trim();
+  const scope = {};
+  (a.word_ids || []).forEach((w) => { scope[norm(w)] = 1; });
+  const rows = wrongRows
+    .map((r) => Object.assign({}, r, { word_id: norm(r.word_id) }))
+    .filter((r) => scope[r.word_id]);
+  if (!rows.length) return { wrong_top: [], mistake_top: [], letter_top: [], counted: 0 };
+
+  const kinds = [];
+  const pairs = [];
+  rows.forEach((r) => {
+    const kind = wrongLib.mistakeKind(r.word_id, r.wrong_answer);
+    if (kind && kind !== '其它' && kind !== '相同') kinds.push(kind);
+    const pair = wrongLib.singleLetterPair(r.word_id, r.wrong_answer);
+    if (pair) pairs.push(pair);
+  });
+
+  const words = wrongLib.topWords(rows.map(r => ({ word: r.word_id })), 5);
+  // 错词配释义：老师拿着这张表要能直接开讲，不该再去翻字典
+  const trans = await translationsOf(words.map(w => w.word));
+  return {
+    counted: rows.length,
+    wrong_top: words.map(w => ({ word: w.word, cnt: w.cnt, trans: trans[w.word] || '' })),
+    // 取 4 类：班里常见的错法一般不超过 4 种，全列出来老师才说得准"这次是普遍问题"
+    mistake_top: wrongLib.topBy(kinds, 4),
+    // 字母混淆对（如 o→u）：这是最细的一条诊断，只有确实错单个字母时才出
+    letter_top: wrongLib.topBy(pairs, 3)
+  };
+}
+
+/** 词文本 → 中文释义（补习信息缺失时给空串，前端不显示而不是显示 undefined） */
+async function translationsOf(words) {
+  const out = {};
+  if (!words.length) return out;
+  const res = await db.collection('words')
+    .where({ word: _.in(words) })
+    .limit(100)
+    .field({ word: true, translation: true, def_cn: true })
+    .get().catch(() => ({ data: [] }));
+  (res.data || []).forEach((w) => {
+    if (!w.word) return;
+    // ECDICT 的 translation 常是"多词义竖排"（含 \n），有的还带前导空行 ——
+    // 直接塞进 chip 会把它撑成大气泡（2026-10-10 用户实锤"样式不对，单词前有空格"）。
+    // 清洗：换行分词义 → 顿号连接；压平所有空白；掐头去尾；限长防止 chip 换行。
+    const raw = String(w.translation || w.def_cn || '');
+    out[w.word] = raw
+      .split(/\n+/)
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .join('、')
+      .slice(0, 24);
+  });
+  return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -558,6 +739,10 @@ async function onStudentDetail(openid, { studentId }) {
       translation: (wordMap[l.word_id] || {}).trans || '',
       feedback: l.feedback,
       mode: l.mode,
+      // 错拼原文（2026-10-10）：独立报告页要按它做字母级诊断 ——
+      // 错在哪几个词、错成什么样（少字母？相邻颠倒？），只能靠客户端上报的原文。
+      // 老版本客户端没上报 → 空串，诊断部分自动不显示（少而准，好过全而猜）。
+      wrong_answer: l.wrong_answer || '',
       created_at: l.created_at
     })),
     assignments: withProgress
@@ -671,6 +856,12 @@ async function onNudge(openid, { studentId }) {
   }
   parts.push('（上次活跃：' + seenAgo + '）');
 
+  // 微信聊天里的 #小程序:// 文本会被微信自动变成可点链接（2026-10-10 用户拍板）：
+  // 家长把催学文案发给孩子，孩子点一下就直接打开小程序，不用再找入口。
+  // 它带不了参数（邀请码场景仍走分享卡片），所以这里只做"直接打开"的引导。
+  // 必须放在最后一行：链接是收尾的行动指引，插中间会打断文案的故事线。
+  parts.push('点这里直接打开小程序 👉 #小程序://功课抽查/');
+
   return ok({ text: parts.join('\n') });
 }
 
@@ -700,6 +891,185 @@ async function onSummary(openid, { studentId }) {
   // 两端同口径的凭证：谁看都应当拿到同一句话与同一份荣誉词
   return ok(Object.assign({ user_id: target._id, date: today, viewer: user.role || '' }, summary));
 }
+
+/* ------------------------------------------------------------------ */
+/* 每日学习简报：订阅 + 推送                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 订阅某个孩子的每日简报。
+ *
+ * 前置：前端必须先 wx.requestSubscribeMessage 拿到用户授权 ——
+ * 微信只允许"用户点一下同意"之后发一条，我们不在后台偷偷攒名额。
+ * 这里的职责只是记账：谁订阅了谁的简报。
+ */
+async function onSubscribeBrief(openid, { studentId, unsubscribe }) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+  if (!studentId) return fail('BAD_PARAM', '缺少学员 id');
+
+  // 权限：只能订阅自己班级里的学员
+  const cls = await findOwnedClass(user._id);
+  if (!cls) return fail('NOT_COACH', '只有班级创建者可以订阅学员简报');
+  if ((cls.student_ids || []).indexOf(studentId) === -1) {
+    return fail('FORBIDDEN', '该学生不在你的班级');
+  }
+
+  const id = user._id + ':' + studentId;
+
+  // 退订优先，且必须写在模板校验之前：哪怕模板已经下架（或压根没配），
+  // 用户也已经决定不再收了 —— 这时候回"服务端没配模板"等于把人锁在里面。
+  if (unsubscribe) {
+    await db.collection(COLL.briefSubs).doc(id).remove().catch(() => {});
+    return ok({ subscribed: false, student_id: studentId });
+  }
+
+  if (!BRIEF.TEMPLATE_ID) {
+    return fail('NO_TEMPLATE', '服务端还没配置订阅消息模板 ID，暂时用不了每日简报推送');
+  }
+
+  try {
+    await db.collection(COLL.briefSubs).doc(id).set({
+      data: {
+        user_id: user._id,
+        openid: openid,
+        student_id: studentId,
+        template_id: BRIEF.TEMPLATE_ID,
+        created_at: Date.now(),
+        last_sent_at: 0
+      }
+    });
+  } catch (e) {
+    // 不许吞错误：集合不存在时如果还回"订阅成功"，家长会在每天 20:30
+    // 等一条永远不来的简报 —— 这比直接告诉他"还没开通"糟得多。
+    if (String(e.errCode || e.code) === '-502005') {
+      return fail('NO_COLLECTION', '云端还没建 brief_subs 集合，现在订阅不会生效（云开发控制台 → 数据库 → 新建 brief_subs）');
+    }
+    return fail('DB_ERR', '订阅写入失败：' + String(e.message || e).slice(0, 80));
+  }
+  return ok({ subscribed: true, student_id: studentId });
+}
+
+/** 我订阅了哪些孩子的简报（前端据此渲染开关状态） */
+async function onBriefSubs(openid) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先 login');
+  let list = [];
+  let colErr = '';
+  try {
+    const res = await db.collection(COLL.briefSubs)
+      .where({ user_id: user._id }).limit(50).get();
+    list = res.data || [];
+  } catch (e) {
+    // 读不到集合时降级为"没订阅过"（这就是事实），但要把原因带回去，
+    // 前端才好提示去建集合 —— 否则开关永远关着，人会以为是点了没反应。
+    if (String(e.errCode || e.code) === '-502005') colErr = 'NO_COLLECTION';
+    list = [];
+  }
+  const templateReady = !!BRIEF.TEMPLATE_ID;
+  return ok({
+    template_ready: templateReady,
+    collections_ready: !colErr,
+    subs: list.map((s) => ({
+      student_id: s.student_id,
+      created_at: s.created_at || 0,
+      last_sent_at: s.last_sent_at || 0
+    }))
+  });
+}
+
+/**
+ * 给订阅者发当天简报。
+ * @param {string} [openid] 有值时只发这个人（手动触发/调试用）；空 = 定时器给所有人发
+ */
+async function onSendBriefs(openid, event) {
+  if (!BRIEF.TEMPLATE_ID) {
+    // 没配模板不能算成功，也不能算业务失败 —— 明确回 skipped，前端/日志都能看懂
+    return ok({ skipped: true, reason: 'NO_TEMPLATE', sent: 0 });
+  }
+  const today = getLocalDate(Date.now());
+
+  const query = {};
+  if (openid) {
+    const user = await getUser(openid);
+    if (!user) return fail('NO_USER', '用户不存在，请先 login');
+    query.user_id = user._id;
+  }
+  const base = Object.keys(query).length
+    ? db.collection(COLL.briefSubs).where(query)
+    : db.collection(COLL.briefSubs);
+  const res = await base.limit(100).get().catch(() => ({ data: [] }));
+  const subs = res.data || [];
+  if (!subs.length) return ok({ sent: 0, skipped: false, total: 0 });
+
+  let sent = 0, skippedToday = 0;
+  const failures = [];
+  for (const s of subs) {
+    // 同一天不重复发：定时器重跑 / 用户手动点都不会把家长手机刷爆
+    if (getLocalDate(s.last_sent_at || 0) === today) { skippedToday++; continue; }
+    const uRes = await db.collection(COLL.users).doc(s.student_id).get().catch(() => null);
+    const stu = uRes && uRes.data ? uRes.data : null;
+    if (!stu) continue;
+
+    const summary = await summaryLib.learnSummary(
+      db, s.student_id, stu.nickname || '同学', today
+    );
+    try {
+      await cloud.openapi.subscribeMessage.send({
+        touser: s.openid,
+        templateId: BRIEF.TEMPLATE_ID,
+        page: BRIEF.PAGE,
+        data: briefTemplateData(summary, today)
+      });
+      sent++;
+      await db.collection(COLL.briefSubs).doc(s._id)
+        .update({ data: { last_sent_at: Date.now() } }).catch(() => {});
+    } catch (e) {
+      // 单个失败不中断整批：一个人授权失效不该让全班都收不到
+      failures.push(String(s.student_id).slice(-6) + ':' + String((e && e.errMsg) || e).slice(0, 60));
+    }
+  }
+  return ok({ sent: sent, skippedToday: skippedToday, total: subs.length, failures: failures });
+}
+
+/** 定时触发入口（config.json 的 timer 每天调一次） */
+function onTimerTick() {
+  return onSendBriefs(null, {});
+}
+
+/**
+ * 订阅消息模板数据。
+ * ⚠️ 这里的字段名（thing/date/time 等编号）必须和你在公众平台选用的模板一致，
+ *    不一致会报 47003 data format error —— 换了模板就改这个函数，别改别的地方。
+ */
+function briefTemplateData(summary, date) {
+  const now = new Date(Date.now() + 8 * 3600 * 1000);
+  const hh = ('0' + now.getUTCHours()).slice(-2);
+  const mi = ('0' + now.getUTCMinutes()).slice(-2);
+  return {
+    thing1: { value: cut(summary.honor ? summary.honor.title : '今日学习简报', 20) },
+    thing2: { value: cut(briefHeadline(summary), 20) },
+    date3: { value: date },
+    time4: { value: hh + ':' + mi }
+  };
+}
+
+/** 一句话摘要：Push 上只放得下 20 个字，必须是"今天练了多少、还要不要练"。
+ *  口径与 shared/summary 一致（2026-10-09）："抽查"是练习里的拼写环节，
+ *  不是学完之后要另外去做的事。 */
+function briefHeadline(s) {
+  if (!s.learned && !s.quiz_total) return '今天还没学习记录';
+  const base = '练了 ' + s.learned + ' 个词 / ' + s.minutes + ' 分钟';
+  if (!s.quiz_total) return base + '，还没拼写';
+  return base + '，抽查 ' + s.mastered + '/' + s.quiz_total + ' 掌握' +
+    (s.need_loop ? '，还要巩固' : '，已全掌握');
+}
+
+function cut(s, n) {
+  return String(s || '').slice(0, n);
+}
+
+exports.setBriefTemplateForTest = setBriefTemplateForTest;
 
 /* ------------------------------------------------------------------ */
 /* 工具                                                                */
@@ -851,18 +1221,91 @@ function publicClass(c) {
   };
 }
 
-/** 作业下发字段：word_ids 明细只给学生端 myAssignments 用，教练列表不给 */
+/* ------------------------------------------------------------------ */
+/* 取词范围：按词库标签 / 按教材单元                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 把客户端传来的 (tag, volume, unit) 归一成一个 scope。
+ * 返回 { err } 或 { mode:'tag'|'unit', tag, volume, unit, label }
+ *
+ * 为什么必须服务端裁决：客户端可以同时传 tag 和 unit，甚至传一个库里没有的 volume。
+ * 只靠前端保证等于没保证 —— 幂等之外的所有业务参数都得服务端认定一次。
+ */
+function resolveScope(tag, volume, unit) {
+  const VALID_TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
+  const u = parseInt(unit, 10);
+  const v = typeof volume === 'string' ? volume.trim() : '';
+
+  // 走教材单元：必须给出合法册 + 合法单元号
+  if (u > 0) {
+    const book = TEXTBOOKS[v];
+    if (!book) return { err: fail('BAD_PARAM', '教材册无效：' + (v || '(空)')) };
+    if (u > book.units) return { err: fail('BAD_PARAM', '单元号超出该册范围（最大 Unit ' + book.units + '）') };
+    // 客户端顺手传的 tag 与教材不符时以教材为准，避免"作业名说 Unit 3、范围却是中考词"
+    return {
+      mode: 'unit', tag: book.tag, volume: v, unit: u,
+      label: scopeLabel({ mode: 'unit', tag: book.tag, volume: v, unit: u })
+    };
+  }
+
+  if (!VALID_TAGS.includes(tag)) return { err: fail('BAD_PARAM', '词库标签无效') };
+  return { mode: 'tag', tag, volume: '', unit: 0, label: tag };
+}
+
+/** 范围的可读名：作业自动命名与前端展示共用，避免两端写出两种叫法 */
+function scopeLabel(scope) {
+  if (scope.mode !== 'unit') return scope.tag;
+  const book = TEXTBOOKS[scope.volume];
+  return (book ? book.name : scope.volume) + '·Unit ' + scope.unit;
+}
+
+async function chooseWords(scope, fetchMax) {
+  if (scope.mode === 'unit') {
+    // 索引提醒：words 集合需建 {volume:1, unit:1, unit_order:1} 复合索引，否则大数据量下会慢查
+    return db.collection('words')
+      .where({ volume: scope.volume, unit: scope.unit })
+      .orderBy('unit_order', 'asc')
+      .limit(fetchMax)
+      .get();
+  }
+  return db.collection('words')
+    .where(scope.tag === '全部' ? {} : { tags: scope.tag })
+    .orderBy('freq', 'asc')
+    .limit(fetchMax)
+    .get();
+}
+
+/** 自定义词单选词：按词文本查库，返回顺序 = 老师排的顺序（预览里看到什么顺序就存什么顺序） */
+async function chooseWordsByList(list) {
+  const _ = db.command;
+  const res = await db.collection('words')
+    .where({ word: _.in(list) })
+    .limit(list.length)
+    .get();
+  const byText = new Map((res.data || []).map(w => [w.word, w]));
+  return {
+    data: list.filter(t => byText.has(t)).map(t => byText.get(t)),
+    missing: list.filter(t => !byText.has(t))
+  };
+}
+
 /** 作业自动命名：按 UTC+8 取"10月7日 12:10·全部·个性化"这样的名字，见名知时知范围 */
-function autoAssignName(tag, nowMs, personal) {
+function autoAssignName(scope, nowMs, personal) {
   const d = new Date(nowMs + 8 * 3600 * 1000);          // UTC+8
   const mm = d.getUTCMonth() + 1;
   const dd = d.getUTCDate();
   const hh = ('0' + d.getUTCHours()).slice(-2);
   const mi = ('0' + d.getUTCMinutes()).slice(-2);
-  return mm + '月' + dd + '日 ' + hh + ':' + mi + '·' + tag + (personal ? '·个性化' : '');
+  return mm + '月' + dd + '日 ' + hh + ':' + mi + '·' + (scope.label || scope.tag) +
+    (personal ? '·个性化' : '');
 }
 
 function publicAssignment(a) {
+  // 单元 Mode的作业：前端要显示"外研四上 Unit 3"，让人一眼看出这份覆盖到哪课。
+  // 标签直接由服务端算好下发，不允许前端自己拼（拼法两边不一致就是两个名字）。
+  const vol = a.volume && TEXTBOOKS[a.volume] ? a.volume : '';
+  const no = Number(a.unit) || 0;
   return {
     id: a._id,
     tag: a.tag,
@@ -875,10 +1318,21 @@ function publicAssignment(a) {
     word_ids: a.word_ids || [],
     created_at: a.created_at,
     // 个性化作业：前端要标注"每人词单不同"，别让家长以为两份进度对不上是 bug
-    personalized: !!a.personalized
+    personalized: !!a.personalized,
+    unit: vol && no ? no : 0,
+    unit_label: vol && no ? scopeLabel({ mode: 'unit', tag: a.tag, volume: vol, unit: no }) : ''
   };
 }
 
-const VERSION = 'class-20261007-summary';
+/**
+ * 仅测试用：注入模板 ID，让推送链路在没有真实模板的情况下也能被完整验证
+ * （生产环境不会被调用；发放 localhost 外的调用一律走 config.json 里的账号配置）。
+ */
+function setBriefTemplateForTest(id) {
+  BRIEF.TEMPLATE_ID = id;
+  return BRIEF.TEMPLATE_ID;
+}
+
+const VERSION = 'class-20261010-wy4a6';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

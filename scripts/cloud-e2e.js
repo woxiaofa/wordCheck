@@ -72,11 +72,23 @@ function localRequireCheck(name) {
   return { fails: fails, version: version };
 }
 
+/**
+ * 指定的 IDE 服务端口。
+ * 为什么必须显式指定：只认默认的 39749 会在"从没开过服务端口"的机器上连不上，
+ * 而 IDE 真实的端口写在你本机配置里（形如 port:15717），跟默认值没关系。
+ * 端口在哪看：%LOCALAPPDATA%\微信开发者工具\User Data\<hash>\WeappLocalData\
+ * localstorage_b72d….json 里的 "security":{"enableServicePort":true,"port":15717}。
+ * 好处是不需要 IDE 真的开着 GUI：CLI 会自己把 HTTP server 拉起来。
+ */
+const portIdx = process.argv.indexOf('--port');
+const PORT = portIdx !== -1 ? process.argv[portIdx + 1] : null;
+
 function runCli(args) {
   // shell:true 是必须的：新版 Node 出于安全（CVE-2024-27980）禁止直接 spawn .bat。
   // 但 spawnSync(file, args, {shell:true}) 会把带空格的路径原样拼接（"Program Files" 断开），
   // 导致 CLI 一个字都吐不出来 —— 所以这里自己拼整条命令并对含空格参数加引号。
-  const quoted = args.map((a) => (/\s/.test(a) ? '"' + a + '"' : a)).join(' ');
+  const all = PORT ? args.concat(['--port', PORT]) : args;
+  const quoted = all.map((a) => (/\s/.test(a) ? '"' + a + '"' : a)).join(' ');
   const cmd = '"' + CLI + '" ' + quoted;
   const r = spawnSync(cmd, { encoding: 'utf8', timeout: 10 * 60 * 1000, shell: true });
   const out = String(r.stdout || '') + String(r.stderr || '');

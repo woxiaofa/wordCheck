@@ -344,15 +344,72 @@ var api = {
   /** 教练：生成催学文案（只返回文本，不推送） */
   nudgeText: function (studentId) {
     return call('class', 'nudge', { studentId: studentId });
+  },
+
+  /* ------------- 每日简报订阅（2026-10-08） ------------- */
+
+  /**
+   * 订阅某个孩子的每日简报。
+   * 前置必须由页面先 wx.requestSubscribeMessage 拿到授权 —— 这里只记账。
+   */
+  subscribeBrief: function (studentId, unsubscribe) {
+    return call('class', 'subscribeBrief', { studentId: studentId, unsubscribe: !!unsubscribe });
+  },
+
+  /** 我订阅了哪些孩子（含服务端是否已配好模板） */
+  briefSubs: function () {
+    return call('class', 'briefSubs', {});
+  },
+
+  /**
+   * 立刻发一次今天的简报给我（不配等的用法；正常由云端定时器每天 20:30 发）
+   */
+  sendBriefs: function () {
+    return call('class', 'sendBriefs', {});
   }
 };
 
+/**
+ * 订阅消息的模板 ID —— 服务端的同一份这份要在云端 class/index.js 的 BRIEF.TEMPLATE_ID 里保持一致
+ * （云端那份才是发消息的真正依据；这里只是请求授权时要用同一个 ID）。
+ * ⚠️ 上线前必须改成你在微信公众平台选用后的模板 ID
+ * （公众平台 → 订阅消息 → 公共模板库 → 选模板 → 复制模板 ID）。
+ * 留空时前端会给出"该功能还没开"的明确提示，而不是静默失败。
+ */
+var BRIEF_TEMPLATE_ID = '';
+
+/** 小程序wx.requestSubscribeMessage 的封装：统一处理"不愿授权"与"旧基础库不支持" */
+function requestSubscribe() {
+  return new Promise(function (resolve, reject) {
+    if (!BRIEF_TEMPLATE_ID) {
+      reject(makeError('NO_TEMPLATE', '每日简报推送还没开通（服务端未配置模板）'));
+      return;
+    }
+    if (!wx.requestSubscribeMessage) {
+      reject(makeError('NOT_SUPPORT', '当前微信版本不支持订阅消息，请升级微信'));
+      return;
+    }
+    wx.requestSubscribeMessage({
+      tmplIds: [BRIEF_TEMPLATE_ID],
+      success: function (res) {
+        if (res[BRIEF_TEMPLATE_ID] === 'accept') resolve(true);
+        else reject(makeError('SUB_REJECT', '没有勾选「总是保持以上选择」，这次不会推送'));
+      },
+      fail: function (err) {
+        reject(makeError('SUB_FAIL', (err && (err.errMsg || err.message)) || '订阅失败'));
+      }
+    });
+  });
+}
+
 module.exports = {
   ENV_ID: ENV_ID,
+  BRIEF_TEMPLATE_ID: BRIEF_TEMPLATE_ID,
   initCloud: initCloud,
   getInitError: getInitError,
   call: call,
   humanError: humanError,
+  requestSubscribe: requestSubscribe,
   api: api,
   // 补传队列：app 启动/回前台时重放，保证学习数据最终一定到云端
   flushPending: flushPending,

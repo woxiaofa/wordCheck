@@ -69,4 +69,105 @@ ok('学生段有"空态 vs 加错班"的区分文案', function () {
     '学生段应能显示加错班的诊断提示');
 });
 
+ok('学员卡：状态图标 + 箭头，不再有会折行的"（点看报告）"（2026-10-10）', function () {
+  assert.ok(COACH.indexOf('stu-status') >= 0, '学员卡要有状态图标行');
+  assert.ok(COACH.indexOf('{{item.status.icon}}') >= 0, '状态行要渲染状态图标');
+  assert.ok(COACH.indexOf('（点看报告）</text>') < 0, '旧的"（点看报告）"小字要删掉（会折行）');
+  assert.ok(COACH.indexOf('stu-arrow') >= 0, '名字旁要有展开箭头（可发现性）');
+  // 状态五档在 js 里都要算出来
+  ['还没同步数据', '今天还没学', "staleDays >= 3", 't.forgot', '掌握'].forEach(function (k) {
+    assert.ok(js.indexOf(k) >= 0, 'js 里缺状态分支标记：' + k);
+  });
+});
+
+ok('学员报告走独立页：点学员卡 navigateTo /pages/report/report?sid=（2026-10-10）', function () {
+  assert.ok(COACH.indexOf('bindtap="openReport"') >= 0, '学员卡应绑 openReport');
+  assert.ok(js.indexOf('/pages/report/report?sid=') >= 0, 'js 应跳报告页并带上 sid');
+  // 内联报告已下线：班级页不该再留报告展开区与相关状态
+  assert.ok(COACH.indexOf('{{reports[') < 0, '班级页不该再渲染内联报告区');
+  assert.ok(js.indexOf('toggleReport') < 0, '内联 toggleReport 应删除');
+  assert.ok(js.indexOf("reports: {}") < 0, 'reports 状态应删除');
+
+  // 页面必须真的存在且已注册（注册了却没文件 = 启动即白屏）
+  var app = JSON.parse(fs.readFileSync(path.join(ROOT, 'miniprogram/app.json'), 'utf8'));
+  assert.ok(app.pages.indexOf('pages/report/report') >= 0, 'app.json 要注册 pages/report/report');
+  ['.js', '.json', '.wxml', '.wxss'].forEach(function (ext) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'miniprogram/pages/report/report' + ext)),
+      '报告页缺少 report' + ext);
+  });
+});
+
+ok('报告页支持外发：转发卡片带 sid + canvas 生成可打印长图', function () {
+  var rjs = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/report/report.js'), 'utf8');
+  var rwxml = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/report/report.wxml'), 'utf8');
+  assert.ok(/onShareAppMessage:\s*function/.test(rjs), '报告页要支持转发');
+  assert.ok(rjs.indexOf("'/pages/report/report?sid='") >= 0, '转发 path 要带 sid 直达这份报告');
+  assert.ok(rjs.indexOf('canvasToTempFilePath') >= 0, '要有导出长图的能力');
+  assert.ok(rjs.indexOf('saveImageToPhotosAlbum') >= 0, '长图要能存相册（打印/发家长的落点）');
+  assert.ok(rjs.indexOf('openSetting') >= 0, '拒绝相册权限要引导去设置，而不是静默失败');
+  assert.ok(rwxml.indexOf('type="2d" id="shareCanvas"') >= 0, '报告页要有 2d 画布');
+  // 分区齐全：家长/老师打印出来要能一页看全
+  ['今日简报', '作业完成度', '错在哪', '最近评分'].forEach(function (sec) {
+    assert.ok(rwxml.indexOf(sec) >= 0, '报告页缺少分区：' + sec);
+  });
+});
+
+/**
+ * chip 高度回归：以前用 <text class="wt-chip">，里面再套不同字号的 <text>（释义 20rpx / 次数 ×N），
+ * 外层 text 的行盒被撑到约两倍高 —— 截图里就是那个 44px 的"大气泡"，肉眼看着像样式写错，
+ * 其实是 text 的行盒行为。对策：chip 一律 view + flex 定高，字元素各占一段。
+ * 这里钉死三件事：① 不许再出现 <text class="wt-chip">；② CSS 必须 flex + 固定 height；
+ * ③ 全工程不许再有"text 里套 text"（嵌套一律走 view）。
+ */
+function rule(name, fn) { ok(name, fn); }
+
+function allWxmlFiles(dir, out) {
+  out = out || [];
+  fs.readdirSync(dir).forEach(function (f) {
+    var p = path.join(dir, f);
+    if (fs.statSync(p).isDirectory()) allWxmlFiles(p, out);
+    else if (f.slice(-5) === '.wxml') out.push(p);
+  });
+  return out;
+}
+
+rule('⑪ chip 是 view+flex 定高，不是 text 套 text（大气泡回归，2026-10-10）', function () {
+  [['班级页', 'miniprogram/pages/class/class.wxml', 'miniprogram/pages/class/class.wxss'],
+   ['报告页', 'miniprogram/pages/report/report.wxml', 'miniprogram/pages/report/report.wxss']]
+  .forEach(function (t) {
+    var name = t[0];
+    var x = fs.readFileSync(path.join(ROOT, t[1]), 'utf8');
+    var s = fs.readFileSync(path.join(ROOT, t[2]), 'utf8');
+    assert.ok(!/<text[^>]*\bclass="[^"]*wt-chip/.test(x),
+      name + '：chip 不能再用 <text class="wt-chip">（text 行盒会被内部字号撑高）');
+    assert.ok(/<view[^>]*\bclass="[^"]*wt-chip/.test(x), name + '：chip 要是 view 容器');
+    assert.ok(x.indexOf('class="wt-word"') >= 0, name + '：词要单独一段 wt-word');
+    assert.ok(x.indexOf('class="wt-cnt"') >= 0, name + '：次数要单独一段 wt-cnt');
+
+    var i = s.indexOf('.wt-chip {');
+    assert.ok(i >= 0, name + '：找不到 .wt-chip 样式');
+    var css = s.slice(i, s.indexOf('}', i));
+    assert.ok(/display:\s*flex/.test(css), name + '：.wt-chip 必须 flex（别再靠行盒）');
+    assert.ok(/height:\s*\d+rpx/.test(css), name + '：.wt-chip 必须写死高度');
+    assert.ok(/line-height:\s*1\b/.test(css), name + '： chip 内 line-height 要为 1');
+    assert.ok(/\.wt-chip \.wt-word[^{]*\{[^}]*nowrap|white-space: nowrap/.test(s),
+      name + '：wt-word 要 nowrap，长词不许换行撑高');
+  });
+});
+
+rule('⑫ 全工程零「text 里套 text」（混排字号会把行盒撑到两倍高）', function () {
+  var bad = [];
+  allWxmlFiles(path.join(ROOT, 'miniprogram')).forEach(function (f) {
+    var src = fs.readFileSync(f, 'utf8');
+    var re = /<text\b([^>]*)>((?:(?!<\/text>)[\s\S])*?)<\/text>/g;
+    var m;
+    while ((m = re.exec(src))) {
+      if (/<text[\s>]/.test(m[2])) {
+        bad.push(path.relative(ROOT, f) + ':' + src.slice(0, m.index).split('\n').length);
+      }
+    }
+  });
+  assert.deepStrictEqual(bad, [], '以下位置 text 里还套着 text，改成 view 再排：' + bad.join('、'));
+});
+
 console.log('\n全部通过：' + pass + ' 项 ✓');

@@ -44,9 +44,10 @@
         <view class="seg forgot" style="width:{{rpt.forgot / (rpt.total || 1) * 100}}%"></view>
       </view>
       <view class="rpt-legend">
-        <text><text class="dot known"></text>答对 {{rpt.known}}</text>
-        <text><text class="dot vague"></text>模糊 {{rpt.vague}}</text>
-        <text><text class="dot forgot"></text>忘了 {{rpt.forgot}}</text>
+        <!-- 圆点是有宽高的块，放进 text 里尺寸不生效/撑行盒 → 外层一律 view -->
+        <view class="legend-item"><view class="dot known"></view><text>答对 {{rpt.known}}</text></view>
+        <view class="legend-item"><view class="dot vague"></view><text>模糊 {{rpt.vague}}</text></view>
+        <view class="legend-item"><view class="dot forgot"></view><text>忘了 {{rpt.forgot}}</text></view>
       </view>
     </view>
     <view wx:else class="rpt-bars">

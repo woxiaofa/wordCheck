@@ -15,8 +15,10 @@ var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var books = require('../../utils/books');
 var cloud = require('../../utils/cloud');
+var asgcache = require('../../utils/asgcache');
 var learnlog = require('../../utils/learnlog');
 var layout = require('../../utils/layout');
+var fit = require('../../utils/fit');
 
 var STORAGE_KEY = 'word_state_mirror';
 /** 首次引导卡：点"开始学"或关闭后写入，之后永不再现 */
@@ -30,6 +32,7 @@ var SECONDS_PER_WORD = 15;
 Page({
   behaviors: [layout.behavior()],
   data: {
+    landscape: false,        // iPad 横屏提示条（utils/fit）
     totalCount: 0,
     dueCount: 0,
     wrongCount: 0,
@@ -59,8 +62,10 @@ Page({
     bookDesc: '',
     bookCount: 0,
 
-    /** 班级作业入口：{name, done, count, ids, finished}；非学生或没作业时为 null */
+    /** 班级作业入口：{name, done, count, ids, finished, offline?, stale?}；非学生或没作业时为 null */
     clsAssign: null,
+    /** 同步状态一行字：断网/待上传几句话说清，不让家长对着 0 词猜 */
+    syncState: '',
     /** 教练/家长（班级创建者）在首页只给"看学员进度"的入口，不给作业卡 */
     coachCls: null,
     /** 学习流水：最近若干条"我学了什么 → 云端有没有确认"，进度对不上时用它对质 */
@@ -73,8 +78,10 @@ Page({
   },
 
   onShow: function () {
+    this.setData({ landscape: fit.isLandscape() });
     this.refresh();
     this.maybeShowIntro();
+    this.setData({ syncState: syncStateText() });
     // 学习流水：每次进首页都刷新一次，孩子刚学的那几条立刻可见（含云端是否确认）
     this.setData({ learnLog: learnlog.lines(8) });
     // 作业进度读的是云端学习记录：先补传本地积压的（最多等 1.2 秒），
@@ -104,6 +111,11 @@ Page({
       var role = (r && r.role) || '';
       var list = (r && r.assignments) || [];
 
+      // 云端可用：以云端为准，并顺手把最新作业快照落到本机（断网时的退路）
+      asgcache.markOk();
+      if (list.length) asgcache.save(list);
+      self.setData({ syncState: syncStateText() });
+
       // 身份闸门：家长/老师是布置作业的人，不是做作业的人。
       // 他们自己背单词就走默认词库 + 今日任务，首页只给一条"去看学员进度"的入口。
       if (role === 'coach') {
@@ -127,13 +139,56 @@ Page({
           done: done,
           count: count,
           ids: ids,
-          finished: count > 0 && done >= count
+          finished: count > 0 && done >= count,
+          offline: false
         }
       });
     }).catch(function (err) {
-      // 首页的辅助入口，失败不打扰主流程，但必须留线索
       console.warn('[index] 班级作业加载失败：', (err && (err.errMsg || err.message)) || err);
+      self.fallbackToCachedAssign();
     });
+  },
+
+  /**
+   * 断网（或云函数异常）时的退路：用本机留存的作业快照继续让孩子有得练。
+   * 为什么不是直接显示"联网才能看作业"：
+   *   孩子练单词的场景常常在车上、在老家，网络很差是常态而不是意外。
+   *   显示"请联网"等于把这段时间变成彻底没练；而有快照时他照样能完成作业，
+   *   进度由已有的补传队列在联网后自动回传 —— 家长那边的数字只会晚到，不会丢。
+   */
+  fallbackToCachedAssign: function () {
+    asgcache.markFail();
+    var cached = asgcache.latest();
+    if (!cached || !cached.ids.length) {
+      this.setData({ clsAssign: null, syncState: syncStateText() });
+      return;
+    }
+    var mirror = wx.getStorageSync(STORAGE_KEY) || {};
+    var prog = asgcache.localProgress(cached.ids, mirror);
+    this.setData({
+      clsAssign: {
+        name: cached.name,
+        done: prog.done,
+        count: prog.count,
+        ids: assignParam.buildIdsParam(cached.ids),
+        finished: prog.count > 0 && prog.done >= prog.count,
+        offline: true,
+        stale: !!cached.stale
+      },
+      syncState: syncStateText()
+    });
+  },
+
+  /** 手动重试：网络恢复后不用重进小程序 */
+  retryCloud: function () {
+    var self = this;
+    cloud.flushPending().catch(function () {});
+    this.loadClassAssignment();
+    this.loadMySummary();
+    wx.showToast({ title: '正在重新连接…', icon: 'none' });
+    setTimeout(function () {
+      self.setData({ syncState: syncStateText() });
+    }, 1500);
   },
 
   goClassAssign: function () {
@@ -175,6 +230,8 @@ Page({
     var text = s.honor
       ? s.text + '\n' + s.honor.badge + ' · ' + s.honor.detail
       : s.text;
+    // 末尾带上 #小程序:// 文本链接：粘贴到微信聊天会变成可点链接，对方一点就开
+    text += '\n点这里打开小程序看详情 👉 #小程序://功课抽查/';
     wx.setClipboardData({
       data: text,
       success: function () {
@@ -341,5 +398,31 @@ Page({
 
   goQuiz: function () {
     wx.redirectTo({ url: '/pkg-media/pages/quiz/quiz' });
+  },
+
+  /**
+   * 分享今天的学习简报。
+   * 为什么要有：简报的服务对象是家长，而家长通常不在孩子手机上。
+   * 转发卡片是零成本把这句话送到家长微信里的通道（不用申请模板、不用订阅授权）。
+   */
+  onShareAppMessage: function () {
+    var s = this.data.mySummary;
+    var title = (s && s.text) ? String(s.text).slice(0, 28) : '单词抽查 · 每天五分钟，单词真记住';
+    return { title: title, path: '/pages/index/index' };
   }
 });
+
+/**
+ * 同步状态的一句话。
+ * 为什么非要写这一句：家长最常见的误解是"孩子说学了，这里却 0 词 = 数据丢了"。
+ * 实际上记录在手机里排队，联网自动补上。与其等家长来问，不如先说清楚。
+ */
+function syncStateText() {
+  var s = asgcache.state();
+  if (s.offline && s.pending > 0) {
+    return '断网中：还能接着练，' + s.pending + ' 条记录联网后自动补传';
+  }
+  if (s.offline) return '断网中：还能接着练，记录会在联网后上传';
+  if (s.pending > 0) return '有 ' + s.pending + ' 条记录还没传上去（联网自动补）';
+  return '';
+}

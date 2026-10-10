@@ -84,7 +84,7 @@
 }
 .log-time { width: 140rpx; color: #8fa3b7; }
 .log-word { flex: 1; font-weight: 600; color: #e8eef5; }
-.log-mode { color: #8fa3b7; margin-right: 12rpx; font-size: 22rpx; }
+.log-mode { display: flex; align-items: center; color: #8fa3b7; margin-right: 12rpx; font-size: 22rpx; }
 .log-fb { color: #8fa3b7; margin-right: 12rpx; }
 .log-cloud {
   padding: 4rpx 14rpx; border-radius: 999rpx;
@@ -111,3 +111,25 @@
 .honor-badge { font-size: 30rpx; font-weight: 700; color: #ffd166; }
 .honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
 .loop-tip { margin-top: 10rpx; font-size: 22rpx; color: #ffb0b0; }
+
+/* 离线练习提示：断网时孩子也能接着练，这里只是把"为什么家长那边数字没变"说清 */
+.offline-tip {
+  margin-top: 10rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 10rpx;
+  background: #2e2416;
+  border: 1rpx solid #5a4520;
+  color: #ffb020;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+.sync-card { padding: 16rpx 24rpx; }
+
+/* iPad 横屏提示（utils/fit.js 检测） */
+.rotate-tip {
+  background: #FFF7E6;
+  color: #8A6116;
+  font-size: 24rpx;
+  padding: 12rpx 24rpx;
+  text-align: center;
+}

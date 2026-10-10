@@ -1,0 +1,125 @@
+<view class="page report">
+  <!-- 加载 / 失败 -->
+  <view wx:if="{{loading}}" class="card center">
+    <view class="muted" style="padding:80rpx 0">正在生成报告…</view>
+  </view>
+  <view wx:elif="{{error}}" class="card center">
+    <view class="big-emoji">🔒</view>
+    <view class="t2">{{error}}</view>
+    <view class="muted mt-s">这份报告只有本班老师能看；如果是别人转发给你的，请让老师从班级页发给你。</view>
+    <button class="btn ghost mt" bindtap="reload">重试</button>
+  </view>
+
+  <block wx:else>
+    <!-- 报告头：姓名 + 状态 + 班级 + 日期（打印出来第一眼就是"谁的、哪天"） -->
+    <view class="card rhead">
+      <view class="rh-left">
+        <view class="rh-ava">{{student.nickname[0] || '学'}}</view>
+        <view>
+          <view class="rh-name">{{student.nickname || '学员'}}</view>
+          <view class="muted" style="font-size:22rpx">{{clsName || '功课抽查'}} · {{dateText}}</view>
+        </view>
+      </view>
+      <view wx:if="{{status}}" class="rh-status t-{{status.tone}}">{{status.icon}} {{status.label}}</view>
+    </view>
+
+    <!-- 三个核心数字 -->
+    <view class="kpi-row2" wx:if="{{kpis.length}}">
+      <view class="kpi2" wx:for="{{kpis}}" wx:key="label">
+        <view class="num">{{item.num}}</view>
+        <view class="label">{{item.label}}</view>
+      </view>
+    </view>
+
+    <!-- 今日简报：与学员端同一句文案、同一份荣誉词（可直接复制发给家长） -->
+    <view wx:if="{{summary}}" class="card">
+      <view class="row-between">
+        <text class="card-title">今日简报</text>
+        <text class="link" bindtap="copySummary">复制发给家长</text>
+      </view>
+      <view class="sum-text mt-s">{{summary.text}}</view>
+      <view wx:if="{{summary.honor}}" class="honor-box">
+        <text class="honor-badge">{{summary.honor.badge}}</text>
+        <view class="honor-detail">{{summary.honor.detail}}</view>
+      </view>
+      <view wx:elif="{{summary.need_loop}}" class="loop-tip">
+        还有 {{summary.failed + summary.forgot_today}} 个没过关，明天继续循环练。
+      </view>
+    </view>
+
+    <!-- 作业完成度 -->
+    <view wx:if="{{assignments.length}}" class="card">
+      <text class="card-title">作业完成度</text>
+      <view class="ra" wx:for="{{assignments}}" wx:key="name">
+        <view class="row-between">
+          <!-- 「个性化」小标签带 padding，放进 text 里会把行盒撑高 → 外层改 view -->
+          <view class="ra-name">
+            <text>{{item.name}}</text>
+            <text wx:if="{{item.personalized}}" class="tag-mini">个性化</text>
+          </view>
+          <text class="muted" style="font-size:22rpx">
+            {{item.done}}/{{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}
+          </text>
+        </view>
+        <view class="bar"><view class="bar-in {{item.done >= item.count ? 'ok' : ''}}" style="width:{{item.pct}}%"></view></view>
+      </view>
+      <view wx:if="{{!assignments.length}}" class="muted mt-s">这个班还没布置作业。</view>
+    </view>
+
+    <!-- 字母级诊断：错在哪几个词、错成什么样（拍照批改类产品拿不到的东西） -->
+    <view wx:if="{{hasWrongStat}}" class="card">
+      <text class="card-title">错在哪</text>
+      <view class="muted mt-s" style="font-size:22rpx">依据 {{wrongCounted}} 条错拼记录（老版本客户端没上报原文的不计入）</view>
+      <view wx:if="{{wrongTop.length}}" class="chip-line mt-s">
+        <!-- chip 一律 view+flex 定高：text 里混排不同字号的 text，外层行盒会被撑到两倍高（大气泡的根因，2026-10-10 实锤） -->
+        <view class="wt-chip" wx:for="{{wrongTop}}" wx:key="word">
+          <text class="wt-word">{{item.word}}</text>
+          <text wx:if="{{item.trans}}" class="wt-trans">{{item.trans}}</text>
+          <text class="wt-cnt">×{{item.cnt}}</text>
+        </view>
+      </view>
+      <view wx:if="{{mistakeTop.length}}" class="chip-line">
+        <view class="wt-chip alt" wx:for="{{mistakeTop}}" wx:key="key">
+          <text class="wt-word">{{item.key}}</text><text class="wt-cnt">×{{item.cnt}}</text>
+        </view>
+      </view>
+      <view wx:if="{{letterTop.length}}" class="chip-line">
+        <view class="wt-chip danger" wx:for="{{letterTop}}" wx:key="key">
+          <text class="wt-word">{{item.key}}</text><text class="wt-cnt">×{{item.cnt}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 最近评分 -->
+    <view wx:if="{{logs.length}}" class="card">
+      <text class="card-title">最近评分</text>
+      <view class="rlog" wx:for="{{logs}}" wx:key="index">
+        <text class="log-mark {{item.ok ? 'ok' : 'bad'}}">{{item.ok ? '✓' : '✗'}}</text>
+        <view class="rlog-mid">
+          <view class="rlog-word">{{item.word_text}}<text wx:if="{{item.translation}}" class="wt-trans"> {{item.translation}}</text></view>
+          <view wx:if="{{item.typed}}" class="rlog-typed">拼成「{{item.typed}}」<text wx:if="{{item.spot}}"> · {{item.spot}}</text></view>
+        </view>
+        <text class="muted" style="font-size:20rpx">{{item.timeText}}</text>
+      </view>
+    </view>
+    <view wx:else class="card center">
+      <view class="muted">还没有学习记录，等孩子练一轮后再来看。</view>
+    </view>
+
+    <!-- 外发：生成长图（可打印）/ 转发卡片 / 复制简报 -->
+    <view class="card acts">
+      <text class="card-title">发给家长 / 打印</text>
+      <view class="muted mt-s" style="font-size:22rpx">
+        生成的是 A4 竖版长图：直接存在相册里发给家长，也可以连打印机打出来。
+      </view>
+      <button class="btn mt-s" bindtap="onMakeImage" disabled="{{making}}">
+        {{making ? '生成中…' : '🖼 生成报告长图（可打印）'}}
+      </button>
+      <button class="btn ghost mt-s" open-type="share">转发这个报告</button>
+      <button class="btn ghost mt-s" bindtap="copySummary">复制简报文案</button>
+    </view>
+  </block>
+
+  <!-- 长图画布：画在屏幕外，只用于导出 -->
+  <canvas type="2d" id="shareCanvas" class="off-canvas" />
+</view>

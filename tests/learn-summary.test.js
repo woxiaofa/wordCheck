@@ -100,9 +100,10 @@ ok('① 有学有抽查且有错：说清"掌握 X 个、不会 Y 个、需要�
       assert.strictEqual(s.need_loop, true);
       assert.ok(!s.honor, '有错的词不发荣誉');
       var t = s.text;
-      assert.ok(/经过 20 分钟学了 10 个单词/.test(t), '时长与词数，实际：' + t);
-      assert.ok(/经过抽查，8 个掌握、2 个不会/.test(t), '掌握/不会，实际：' + t);
-      assert.ok(/需要继续循环学习/.test(t), '循环学习结论，实际：' + t);
+      // 2026-10-09 文案口径：学与抽查已是同一流程，说"练"，不再把抽查当独立待办
+      assert.ok(/练了 20 分钟、10 个单词/.test(t), '时长与词数，实际：' + t);
+      assert.ok(/抽查 \d+ 题：8 个掌握、2 个没记住/.test(t), '掌握/不会，实际：' + t);
+      assert.ok(/明天继续循环/.test(t), '循环学习结论，实际：' + t);
     });
 });
 
@@ -139,7 +140,7 @@ ok('③ 抽查全对但今天评过"忘了" → 不发满分奖，如实说', fu
     });
 });
 
-ok('④ 没学习也没抽查 / 学了没抽查：分别说清楚，不编数字', function () {
+ok('④ 没学习也没抽查 / 只认没拼：分别说清楚，不编数字', function () {
   base();
   return as(S_A, function () { return classFn.main({ action: 'summary' }); })
     .then(function (r) {
@@ -148,7 +149,9 @@ ok('④ 没学习也没抽查 / 学了没抽查：分别说清楚，不编数字
       return as(S_A, function () { return classFn.main({ action: 'summary' }); });
     })
     .then(function (r) {
-      assert.ok(/还没抽查/.test(r.data.text), '未抽查分支，实际：' + r.data.text);
+      // 口径（2026-10-09）：不再说"去抽查一下"（抽查不是另一项作业），说"还没走到拼写"
+      assert.ok(/还没走到拼写/.test(r.data.text), '未拼写分支，实际：' + r.data.text);
+      assert.ok(!/去抽查/.test(r.data.text), '不得再出现"去抽查"这种独立待办口吻，实际：' + r.data.text);
       assert.ok(!r.data.honor, '没抽查就没有荣誉');
     });
 });
@@ -160,7 +163,7 @@ ok('⑤ 学员报告（studentDetail）也带同一份简报', function () {
   return as(COACH, function () { return classFn.main({ action: 'studentDetail', studentId: 'A' }); })
     .then(function (r) {
       assert.ok(r.data.summary, '报告应带 summary');
-      assert.ok(/4 个掌握、1 个不会/.test(r.data.summary.text),
+      assert.ok(/4 个掌握、1 个没记住/.test(r.data.summary.text),
         '报告简报应同口径，实际：' + r.data.summary.text);
     });
 });

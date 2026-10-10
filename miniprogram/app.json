@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/stats/stats",
     "pages/class/class",
+    "pages/report/report",
     "pages/test-card/test-card"
   ],
   "subpackages": [

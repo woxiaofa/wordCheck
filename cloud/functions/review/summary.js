@@ -81,19 +81,23 @@ async function learnSummary(db, userId, name, today) {
     text: ''
   };
 
+  /* 文案口径（2026-10-09 用户反馈）：学习和抽查已是同一个流程（认→拼→巩固），
+   * 简报里不得再把"抽查"说成学完之后要去做的另一件事（"还没抽查，去抽查一下"
+   * 听着像还有第二项作业）。统一叫"练"，抽查只是练习里的拼写环节。 */
+
   if (!learned && !quizTotal) {
     out.text = who + '今天还没有学习记录。';
     return out;
   }
 
   if (!quizTotal) {
-    out.text = who + '经过 ' + minutes + ' 分钟学了 ' + learned + ' 个单词，还没抽查 —— 去抽查一下，看看是真记住了还是看着眼熟。';
+    out.text = who + '今天练了 ' + learned + ' 个单词（认了一遍），还没走到拼写 —— 明天完整走一遍（认 + 拼），看看能不能真的写出来。';
     return out;
   }
 
   if (failed > 0) {
-    out.text = who + '经过 ' + minutes + ' 分钟学了 ' + learned + ' 个单词，经过抽查，' +
-      mastered + ' 个掌握、' + failed + ' 个不会，需要继续循环学习。';
+    out.text = who + '今天练了 ' + minutes + ' 分钟、' + learned + ' 个单词，抽查 ' + quizTotal +
+      ' 题：' + mastered + ' 个掌握、' + failed + ' 个没记住，明天继续循环。';
     return out;
   }
 
@@ -104,11 +108,11 @@ async function learnSummary(db, userId, name, today) {
       title: '今日全掌握',
       detail: '抽查 ' + quizTotal + ' 题全对，' + learned + ' 个词一个都没忘。'
     };
-    out.text = who + '经过 ' + minutes + ' 分钟学了 ' + learned + ' 个单词，抽查全对 —— 全部掌握 🎉 明天再循环巩固一次就稳了。';
+    out.text = who + '今天练了 ' + minutes + ' 分钟、' + learned + ' 个单词，抽查全对 —— 全部掌握 🎉 明天再循环巩固一次就稳了。';
   } else {
     // 抽查全对，但学习页今天还评价过"忘了"：不许发满分奖，如实说
-    out.text = who + '经过 ' + minutes + ' 分钟学了 ' + learned + ' 个单词，抽查 ' + quizTotal +
-      ' 题全对，但今天还有 ' + forgotToday + ' 次"忘了"，这几个词需要继续循环学习。';
+    out.text = who + '今天练了 ' + minutes + ' 分钟、' + learned + ' 个单词，抽查 ' + quizTotal +
+      ' 题全对，但今天还有 ' + forgotToday + ' 次"忘了"，这几个词明天要重点过。';
   }
   return out;
 }

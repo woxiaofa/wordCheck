@@ -478,6 +478,33 @@ ok('⑬ 催学归因：今天只练了任务词 → 文案归因"每日任务"�
   });
 });
 
+// ---- ⑭ 外发文案必带 #小程序:// 直达链接（2026-10-10 用户拍板）----
+ok('⑭ 催一催/简报/邀请码文案：末尾带 #小程序://功课抽查/ 链接，粘贴到聊天即可点', function () {
+  seed({ learned: WORD_TEXTS.slice(0, 3) });
+  return as(COACH_OPENID, function () {
+    return classFn.main({ action: 'nudge', studentId: 'S' });
+  }).then(function (r) {
+    assert.strictEqual(r.ok, true, JSON.stringify(r));
+    var t = r.data.text;
+    assert.ok(t.indexOf('#小程序://功课抽查/') >= 0,
+      '催学文案必须带小程序直达链接，实际：\n' + t);
+    // 链接必须在最后一行：它是收尾的行动指引，插中间会打断故事线
+    var lines = t.split('\n');
+    assert.ok(lines[lines.length - 1].indexOf('#小程序://') >= 0,
+      '链接要放在最后一行，实际末行：' + lines[lines.length - 1]);
+
+    // 静态钉死：三处"复制出去给别人看"的文案都要带链接
+    var fs = require('fs');
+    var path = require('path');
+    var root = path.join(__dirname, '..');
+    ['miniprogram/pages/class/class.js', 'miniprogram/pages/index/index.js'].forEach(function (f) {
+      var src = fs.readFileSync(path.join(root, f), 'utf8');
+      assert.ok(src.indexOf('#小程序://功课抽查/') >= 0,
+        f + ' 的外发文案（简报/邀请码）必须带小程序直达链接');
+    });
+  });
+});
+
 steps.reduce(function (p, fn) { return p.then(fn); }, Promise.resolve())
   .then(function () {
     console.log(process.exitCode ? '\n有问题，见上方 ✗\n' : '\n全部通过\n');

@@ -1,3 +1,4 @@
+<view wx:if="{{landscape}}" class="rotate-tip">横屏下内容放得太大，建议竖屏使用更舒服</view>
 <!-- 今日任务：一眼回答三个问题——做多少、都是什么词、现在点哪里 -->
 <view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
 
@@ -37,12 +38,24 @@
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->
   <view class="card hero cls-hero" wx:if="{{clsAssign && !clsAssign.finished}}">
     <view class="hero-label">📌 {{clsAssign.name}}</view>
+    <view wx:if="{{clsAssign.offline}}" class="offline-tip">
+      离线练习 · 用的是本机留存的词单{{clsAssign.stale ? '（可能不是最新一次布置）' : ''}}
+    </view>
     <view class="hero-num">{{clsAssign.done}}<text class="hero-unit"> / {{clsAssign.count}} 个词</text></view>
     <view class="progress mt-s">
       <view class="progress-inner" style="width:{{clsAssign.count ? clsAssign.done * 100 / clsAssign.count : 0}}%"></view>
     </view>
     <button class="btn ok mt" bindtap="goClassAssign">继续学</button>
     <button class="btn ghost mt-s" bindtap="goQuiz">去抽查</button>
+    <button wx:if="{{clsAssign.offline}}" class="btn ghost mt-s" bindtap="retryCloud">重新联网同步</button>
+  </view>
+
+  <!-- 同步状态：把"为什么家长那边的数字没变"提前说清，而不是等家长来问 -->
+  <view wx:if="{{syncState}}" class="card sync-card">
+    <view class="row-between">
+      <text class="muted" style="font-size:24rpx">{{syncState}}</text>
+      <text class="link" bindtap="retryCloud">重试</text>
+    </view>
   </view>
 
   <!-- 任务卡：量 + 构成 + 每一项"为什么是它"。作业没完成时让位（见上） -->
@@ -189,6 +202,8 @@
     <view wx:elif="{{mySummary.need_loop}}" class="loop-tip">
       还有 {{mySummary.failed + mySummary.forgot_today}} 个没过关 —— 点「继续学」再走一轮就稳了。
     </view>
+    <!-- 转发卡片：简报本来就是给家长看的，与其让他来翻小程序，不如这一句直接发过去 -->
+    <button class="btn ghost sm mt-s" open-type="share">转发今日简报给家长</button>
   </view>
 
   <!-- 学习流水：把"我做了什么 → 进度有没有往前走"逐条摆出来，不靠猜 -->
@@ -210,7 +225,7 @@
     <view wx:for="{{learnLog}}" wx:key="id" class="log-row">
       <text class="log-time">{{item.time}}</text>
       <text class="log-word">{{item.word}}</text>
-      <text class="log-mode">{{item.mode}}<text wx:if="{{item.assign}}">·{{item.assign}}</text></text>
+      <view class="log-mode"><text>{{item.mode}}</text><text wx:if="{{item.assign}}">·{{item.assign}}</text></view>
       <text class="log-fb">{{item.feedback}}</text>
       <text class="log-cloud {{item.cloud}}">{{item.cloudTxt}}</text>
     </view>

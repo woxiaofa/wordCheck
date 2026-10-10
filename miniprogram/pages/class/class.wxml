@@ -51,6 +51,14 @@
     <view class="card">
       <view class="card-title">布置任务</view>
       <view class="form-row">
+        <text class="form-label">范围</text>
+        <view class="chips">
+          <view class="chip {{form.scope === 'tag' ? 'on' : ''}}" data-scope="tag" bindtap="pickScope">按词库</view>
+          <view class="chip {{form.scope === 'unit' ? 'on' : ''}}" data-scope="unit" bindtap="pickScope">按教材单元</view>
+        </view>
+      </view>
+      <!-- 按词库：老方式，行为保持不变 -->
+      <view class="form-row" wx:if="{{form.scope === 'tag'}}">
         <text class="form-label">词库</text>
         <view class="chips">
           <view
@@ -62,6 +70,18 @@
           >{{item}}</view>
         </view>
       </view>
+      <!-- 按教材单元：跟着课本进度布置（"今天讲完 Unit 3，就布置 Unit 3"） -->
+      <view class="form-row" wx:else>
+        <text class="form-label">单元</text>
+        <picker wx:if="{{unitNames.length}}" mode="selector" range="{{unitNames}}"
+                value="{{form.unitIndex}}" bindchange="pickUnit">
+          <view class="picker-val">{{unitNames[form.unitIndex]}}</view>
+        </picker>
+        <text wx:else class="muted" style="font-size:24rpx">暂无可用教材</text>
+      </view>
+      <view wx:if="{{form.scope === 'unit'}}" class="muted" style="font-size:22rpx;margin:-8rpx 0 8rpx">
+        按课本顺序出题，学完这一单元刚好跟上课堂进度
+      </view>
       <view class="form-row">
         <text class="form-label">词数</text>
         <slider min="3" max="30" step="1" value="{{form.count}}" activeColor="#3ea6ff"
@@ -72,6 +92,26 @@
         {{form.count > 10
           ? '⚠️ 小学生一次建议不超过 10 个词 —— 词太多容易为了赶进度乱点，看着做完了其实没记住'
           : '小学生一次 5~10 个词效果最好：做完有成就感，也记得住'}}
+      </view>
+
+      <!-- 预览词单：布置前就能看到"到底是哪些词"，可删可加（所见即所得） -->
+      <view class="preview-box">
+        <view class="preview-head">
+          <text>本次布置的词（{{preview.length}} 个）</text>
+          <text wx:if="{{previewEdited}}" class="preview-edited">已编辑 · 作业名会带"自定义"</text>
+        </view>
+        <view class="preview-chips">
+          <view wx:for="{{preview}}" wx:key="*this" class="preview-chip"
+                data-idx="{{index}}" bindtap="removeWord">{{item}} <text class="chip-x">×</text></view>
+          <view wx:if="{{!preview.length}}" class="preview-empty">词单空了 —— 在下面搜索单词加回来，至少 3 个</view>
+        </view>
+        <input class="preview-search" value="{{searchKw}}" placeholder="搜索单词添加，如 apple"
+               bindinput="onSearchInput" />
+        <view wx:if="{{searchHits.length}}" class="search-hits">
+          <view wx:for="{{searchHits}}" wx:key="*this" class="search-hit"
+                data-word="{{item}}" bindtap="addWord">+ {{item}}</view>
+        </view>
+        <view class="preview-note">改动范围或词数会重新生成词单；点词可删、搜索可加。拍照拍单词表自动加词，下个版本再上</view>
       </view>
       <view class="form-row">
         <text class="form-label">截止</text>
@@ -93,7 +133,9 @@
         <switch checked="{{form.personalized}}" bindchange="togglePersonal" color="#7c5cff" />
       </view>
       <button class="btn ok mt" loading="{{assigning}}" disabled="{{assigning}}" bindtap="submitAssign">
-        布置 {{form.count}} 个词{{form.tag === '全部' ? '' : '（' + form.tag + '）'}}{{form.personalized ? ' · 个性化' : ''}}
+        {{form.scope === 'unit'
+          ? '布置 ' + unitNames[form.unitIndex]
+          : '布置 ' + form.count + ' 个词' + (form.tag === '全部' ? '' : '（' + form.tag + '）')}}{{form.personalized ? ' · 个性化' : ''}}
       </button>
     </view>
 
@@ -110,13 +152,66 @@
           <text class="muted" style="font-size:24rpx">{{item.finished}}/{{item.total_students}} 人完成</text>
         </view>
         <view class="muted" style="font-size:24rpx">
-          {{item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}{{item.personalized ? ' · 个性化' : ''}}
+          {{item.unit_label || item.tag}} · {{item.count}} 词{{item.deadline ? ' · ' + item.deadline + ' 截止' : ''}}{{item.personalized ? ' · 个性化' : ''}}
         </view>
         <view class="bar"><view class="bar-in" style="width:{{item.total_students ? item.finished * 100 / item.total_students : 0}}%"></view></view>
+
+        <!-- 老师布置完想亲自看看词对不对：试做走学生同一条 drill?ids= 路径 -->
+        <button class="btn sm ghost mt-s" data-idx="{{index}}" bindtap="goTryAssignment">试做这份作业</button>
+
+        <!-- 老师打开这一页真正要的三件事，按顺序给：谁没交 → 错哪几个词 → 错在哪。
+             点名分两级（2026-10-10）：真没动的红标"还没完成"；词全学过但有忘词的
+             黄标"忘词待巩固" —— 9/10·忘1 的孩子不该和 0/10 的混在同一句里挨催。 -->
+        <view wx:if="{{item.pending}}" class="pending-line">
+          <text class="pending-tag">还没完成</text>
+          <text class="pending-names">{{item.pendingText}}</text>
+        </view>
+        <view wx:if="{{item.review}}" class="pending-line warn">
+          <text class="pending-tag warn-tag">忘词待巩固</text>
+          <text class="pending-names">{{item.reviewText}}</text>
+        </view>
+        <view wx:if="{{!item.pending && !item.review && !item.students}}" class="pending-line done">
+          <text class="pending-tag ok">还没有学员加入</text>
+        </view>
+        <view wx:if="{{!item.pending && item.students}}" class="pending-line done">
+          <text class="pending-tag ok">全班完成</text>
+        </view>
+
+      <view wx:if="{{item.hasWrongStat}}" class="wrong-box">
+        <view class="wrong-line">
+          <text class="muted">错得最多</text>
+          <!-- chip 用 view+flex 而不是 text 套 text：外层 text 混排不同字号的子 text
+               时行盒会被撑到两倍高（错词 chip 变大气泡的真正根因，2026-10-10 实锤） -->
+          <view wx:for="{{item.wrongTop}}" wx:for-item="wt" wx:key="word" class="wt-chip">
+            <text class="wt-word">{{wt.word}}</text>
+            <text wx:if="{{wt.trans}}" class="wt-trans">{{wt.trans}}</text>
+            <text class="wt-cnt">×{{wt.cnt}}</text>
+          </view>
+        </view>
+        <view wx:if="{{item.mistakeTop.length}}" class="wrong-line">
+          <text class="muted">错法</text>
+          <view wx:for="{{item.mistakeTop}}" wx:for-item="mk" wx:key="key" class="wt-chip alt">
+            <text class="wt-word">{{mk.key}}</text><text class="wt-cnt">×{{mk.cnt}}</text>
+          </view>
+        </view>
+        <view wx:if="{{item.letterTop.length}}" class="wrong-line">
+          <text class="muted">字母混淆</text>
+          <view wx:for="{{item.letterTop}}" wx:for-item="lt" wx:key="key" class="wt-chip danger">
+            <text class="wt-word">{{lt.key}}</text><text class="wt-cnt">×{{lt.cnt}}</text>
+          </view>
+        </view>
+        <view class="muted why">依据 {{item.wrongCounted}} 条错拼记录（孩子下次联网后继续累积）</view>
+      </view>
+
         <!-- 个性化透明化：每个孩子分到什么词、各自进度，一页看全（否则家长无从确认词单真的不同） -->
         <view wx:if="{{item.per_student.length}}" class="per-stu">
+          <view class="per-stu-row head">
+            <text class="per-stu-name muted">学员</text>
+            <text class="per-stu-mid muted">完成 / 忘了</text>
+            <text class="per-stu-words muted">词单与备注</text>
+          </view>
           <view class="per-stu-row" wx:for="{{item.per_student}}" wx:for-item="ps" wx:key="user_id">
-            <text class="per-stu-name">{{ps.nickname}}</text>
+            <text class="per-stu-name {{ps.state === 'pending' ? 'bad-text' : (ps.state === 'review' ? 'warn-text' : 'ok-text')}}">{{ps.nickname}}</text>
             <text class="muted per-stu-mid">{{ps.done}}/{{ps.count}}{{ps.forgot ? ' · 忘 ' + ps.forgot : ''}}</text>
             <view class="per-stu-words">
               <text class="muted" style="font-size:22rpx">{{ps.wrong_top ? '错词 ' + ps.wrong_top + ' · ' : ''}}{{ps.skipped_mastered ? '跳过已掌握 ' + ps.skipped_mastered + ' · ' : ''}}{{ps.preview}}</text>
@@ -133,76 +228,41 @@
         加载失败：{{stuError}}
         <text class="link" bindtap="reload"> 重试</text>
       </view>
+      <!-- 每日简报：一句话讲清"今天学得怎样"，不用每天记得开小程序来看 -->
+      <view class="muted mt-s" style="font-size:22rpx;line-height:1.6">
+        点「订简报」并勾选「总是保持以上选择」，之后每天 20:30 会收到这个孩子的学习简报。{{briefNote}}
+      </view>
+      <view wx:if="{{briefCount}}" class="mt-s">
+        <button class="btn ghost sm" bindtap="pushBriefNow">立刻发一次今天的简报</button>
+      </view>
       <view wx:if="{{!students.length && !stuError}}" class="muted mt-s">
         还没有学员加入。把上面的邀请码发给孩子，等孩子输入后就出现在这里。
       </view>
       <view class="stu" wx:for="{{students}}" wx:key="id">
-        <view class="stu-main" data-id="{{item.id}}" bindtap="toggleReport">
+        <view class="stu-main" data-id="{{item.id}}" bindtap="openReport">
           <view class="stu-ava">{{item.nickname[0] || '学'}}</view>
           <view class="stu-mid">
-            <view>{{item.nickname}}<text class="muted" style="font-size:20rpx">（点看报告）</text></view>
-            <!-- 家长真正想看的是"今天学没学、学得怎么样"，累计词数只是补充 -->
-            <view wx:if="{{item.synced}}" class="muted" style="font-size:22rpx">
-              今天 {{item.today.count}} 个<text wx:if="{{item.today.count}}"> · 掌握 {{item.todayRate}}%</text>
-              <text wx:if="{{item.wrong}}"> · 易错 {{item.wrong}} 词</text>
+            <!-- 名字 + 展开箭头（代替"（点看报告）"——箭头跟着开合转向，一眼知道能点） -->
+            <view class="stu-name-row">
+              <text class="stu-name">{{item.nickname}}</text>
+              <text class="stu-arrow">▸</text>
             </view>
-            <view wx:else class="muted" style="font-size:22rpx">
-              还没同步数据（孩子打开小程序学过之后才会出现）
+            <!-- 状态一行：状态图标 + 简短数据（长文案挪进展开的报告里，卡片只留一眼能扫完的） -->
+            <view class="stu-status t-{{item.status.tone}}">
+              {{item.status.icon}} {{item.status.label}}
             </view>
             <view class="muted" style="font-size:22rpx;opacity:.75">
-              累计 {{item.stats.learned_words || 0}} 词 · {{item.lastSeenText}}
+              累计 {{item.stats.learned_words || 0}} 词<text wx:if="{{item.lastSeenText !== '还没来过'}}"> · {{item.lastSeenText}}活跃</text>
             </view>
           </view>
         </view>
         <button class="btn sm ghost" data-id="{{item.id}}" catchtap="makeNudge">催一催</button>
+        <button class="btn sm {{briefSubs[item.id] ? 'ok' : 'ghost'}}"
+                data-id="{{item.id}}" catchtap="toggleBrief">{{briefSubs[item.id] ? '✓ 已订简报' : '订简报'}}</button>
       </view>
 
-      <!-- 学员进度报告（点学员卡展开） -->
-      <block wx:for="{{students}}" wx:for-item="stu" wx:key="id">
-        <view wx:if="{{reports[stu.id] && reports[stu.id].open}}" class="report">
-          <view class="report-title">{{stu.nickname}} 的进度报告</view>
-          <view wx:if="{{reports[stu.id].loading}}" class="muted mt-s">加载中…</view>
-          <view wx:elif="{{reports[stu.id].error}}" class="muted mt-s">
-            加载失败：{{reports[stu.id].error}}
-            <text class="link" data-id="{{stu.id}}" bindtap="toggleReport"> 重试</text>
-          </view>
-          <block wx:else>
-            <!-- 学习简报：与学员端同一句文案、同一份荣誉词（家长可直接复制发给对方） -->
-            <view wx:if="{{reports[stu.id].summary}}" class="summary">
-              <view class="row-between">
-                <text class="card-title">今日学习简报</text>
-                <text class="link" data-id="{{stu.id}}" bindtap="copyStuSummary">复制</text>
-              </view>
-              <view class="summary-text mt-s">{{reports[stu.id].summary.text}}</view>
-              <view wx:if="{{reports[stu.id].summary.honor}}" class="honor">
-                <text class="honor-badge">{{reports[stu.id].summary.honor.badge}}</text>
-                <view class="honor-detail">{{reports[stu.id].summary.honor.detail}}</view>
-              </view>
-              <view wx:elif="{{reports[stu.id].summary.need_loop}}" class="loop-tip">
-                还有 {{reports[stu.id].summary.failed + reports[stu.id].summary.forgot_today}} 个没过关，继续循环学习。
-              </view>
-            </view>
-            <view wx:if="{{!reports[stu.id].assignments.length && !reports[stu.id].logs.length}}"
-                  class="muted mt-s">还没有学习记录，等孩子学一轮后再来看。</view>
-            <view wx:for="{{reports[stu.id].assignments}}" wx:key="id" class="report-assign">
-              <view class="row-between">
-                <text class="assign-name">{{item.name || item.note || item.tag + '作业'}}</text>
-                <text class="muted" style="font-size:22rpx">{{item.done}}/{{item.count}}</text>
-              </view>
-              <view class="bar"><view class="bar-in" style="width:{{item.count ? item.done * 100 / item.count : 0}}%"></view></view>
-            </view>
-            <view wx:if="{{reports[stu.id].logs.length}}" class="report-logs">
-              <view class="muted" style="font-size:22rpx;margin-bottom:8rpx">最近评分</view>
-              <view class="report-log" wx:for="{{reports[stu.id].logs}}" wx:key="index">
-                <text class="log-mark {{item.ok ? 'ok' : 'bad'}}">{{item.ok ? '✓' : '✗'}}</text>
-                <text class="log-word">{{item.word_text}}</text>
-                <text class="muted log-trans">{{item.translation}}</text>
-                <text class="muted log-time">{{item.timeText}}</text>
-              </view>
-            </view>
-          </block>
-        </view>
-      </block>
+      <!-- 学员报告：2026-10-10 起改成独立页（pages/report/report）。
+           内联展开的版本越加越长，学员一多整页就乱，也没法打印/导出成图。 -->
     </view>
 
     <!-- 数据对不上时的自证入口：平时低调，需要时一页看全云端事实 -->

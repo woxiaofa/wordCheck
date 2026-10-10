@@ -115,6 +115,9 @@
   transition: width .3s;
 }
 .bad-text { color: #ff5c72; font-size: 24rpx; }
+/* 逐学员名单的名字配色：done 绿 / review 黄（词学过但有忘词）/ pending 红 */
+.ok-text { color: #7fd6a0; font-size: 24rpx; }
+.warn-text { color: #ffd88a; font-size: 24rpx; }
 
 /* 学员行 */
 .stu {
@@ -140,6 +143,25 @@
   flex-shrink: 0;
 }
 .stu-mid { flex: 1; font-size: 28rpx; }
+
+/* 名字行 + 展开箭头（2026-10-10：代替"（点看报告）"——那条小字会折行成"点看报/告"） */
+.stu-name-row { display: flex; align-items: center; gap: 8rpx; }
+.stu-name { font-weight: 600; }
+.stu-arrow {
+  color: #8fa8c0;
+  font-size: 24rpx;
+  transition: transform .2s ease;
+  transform-origin: center;
+  display: inline-block;
+}
+.stu-arrow.open { transform: rotate(90deg); }
+
+/* 状态一行：图标 + 简短数据，五档配色（灰待同步/红失联/黄有忘词/绿不错） */
+.stu-status { font-size: 22rpx; margin-top: 4rpx; }
+.stu-status.t-gray { color: #8fa8c0; }
+.stu-status.t-red { color: #ff8a8a; }
+.stu-status.t-amber { color: #ffd88a; }
+.stu-status.t-green { color: #7fd6a0; }
 
 /* 学员进度报告（展开区） */
 .report {
@@ -218,3 +240,119 @@
   color: #ffb020;
   border: 1rpx solid #5a4520;
 }
+
+/* 老师端"一张表"：谁没交 / 错哪几个词 / 错在哪
+   设计取舍：这里不用图表。老师要的是 5 秒内点出三个名字和三五个词，
+   图表要读图例、坐标，反而更慢。 */
+.pending-line {
+  margin-top: 14rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: #16202c;
+  display: flex;
+  align-items: flex-start;
+}
+.pending-line.done { background: #14261c; }
+/* 忘词待巩固：词学过了但有抽查答忘的 —— 黄色调，提醒而不是催 */
+.pending-line.warn { background: #241f14; }
+.pending-tag.warn-tag { color: #ffd88a; background: #3a3117; }
+.pending-tag {
+  flex-shrink: 0;
+  margin-right: 12rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #ffb0b0;
+  background: #3a1f24;
+}
+.pending-tag.ok { color: #7fd6a0; background: #173626; }
+.pending-names { flex: 1; font-size: 24rpx; color: #cfe0f0; line-height: 1.6; }
+
+.wrong-box {
+  margin-top: 12rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: #141d28;
+  border: 1rpx solid #223044;
+}
+.wrong-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8rpx;
+}
+.wrong-line .muted { flex-shrink: 0; margin-right: 12rpx; font-size: 22rpx; color: #6b8095; }
+.wt-chip {
+  /* view + flex 定高：不再依赖 text 行盒（text 套 text 曾把行盒撑到两倍高） */
+  display: flex;
+  align-items: center;
+  height: 44rpx;
+  margin: 4rpx 8rpx 4rpx 0;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  font-size: 23rpx;
+  color: #cfe0f0;
+  background: #22303f;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+}
+.wt-chip .wt-word { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+.wt-trans { margin-left: 8rpx; font-size: 20rpx; color: #7f93a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+.wt-cnt { margin-left: 8rpx; font-size: 20rpx; color: #ffb020; flex-shrink: 0; }
+.wt-chip.alt { background: #2b2438; color: #cdbcff; }
+.wt-chip.danger { background: #3a2028; color: #ffb0b0; }
+.wrong-box .why { margin-top: 10rpx; font-size: 20rpx; opacity: .7; }
+.per-stu-row.head { border-bottom: 1rpx solid #223044; padding-bottom: 8rpx; }
+.per-stu-row.head .muted { font-size: 20rpx; }
+
+/* ===== 布置预览 + 编辑（2026-10-09）===== */
+.preview-box {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  background: #16222f;
+  border: 1rpx solid #24374a;
+  border-radius: 12rpx;
+}
+.preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.preview-edited { font-size: 22rpx; color: #e8a33d; font-weight: 400; }
+.preview-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.preview-chip {
+  background: #1e2a38;
+  border: 1rpx solid #2c4157;
+  color: #dce8f4;
+  border-radius: 24rpx;
+  padding: 6rpx 20rpx;
+  font-size: 24rpx;
+}
+.chip-x { color: #c0392b; margin-left: 6rpx; }
+.preview-empty { font-size: 24rpx; color: #c0392b; }
+.preview-search {
+  margin-top: 14rpx;
+  background: #1e2a38;
+  border: 1rpx solid #2c4157;
+  color: #dce8f4;
+  border-radius: 10rpx;
+  padding: 10rpx 20rpx;
+  font-size: 26rpx;
+}
+.search-hits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+.search-hit {
+  background: rgba(62, 166, 255, .18);
+  color: #7cc4ff;
+  border-radius: 20rpx;
+  padding: 6rpx 18rpx;
+  font-size: 24rpx;
+}
+.preview-note { margin-top: 12rpx; font-size: 20rpx; color: #8a97a5; }

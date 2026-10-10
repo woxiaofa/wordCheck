@@ -81,8 +81,9 @@
   font-size: 22rpx;
   color: #8fa3b7;
 }
+.legend-item { display: flex; align-items: center; }
 .dot {
-  display: inline-block;
+  /* 作为 legend-item 的直接子节点，宽高才确定生效（原先放在 text 里尺寸不稳） */
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;

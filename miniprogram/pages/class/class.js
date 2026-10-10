@@ -13,8 +13,12 @@ var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var layout = require('../../utils/layout');
+var books = require('../../utils/books');
+var WORDS = require('../../data/words');
 
-var TAGS = ['全部', '中考', '高考', '四级', '外研四上'];
+// 布置词库选项：外研四上排第一并作为默认（2026-10-10 用户拍板 ——
+// 主场景就是教材同步，老师一进布置表单看到的就是课本词库）
+var TAGS = ['外研四上', '全部', '中考', '高考', '四级'];
 var CREATE_KEY = 'class_create_reqid';   // 建班幂等 ID 持久化：重进页面不产生第二个班
 var CREATE_ID_PREFIX = 'class-create:';
 
@@ -29,15 +33,31 @@ Page({
 
     // 教练端
     tags: TAGS,
-    form: { tag: '全部', count: 10, deadline: '', note: '', personalized: false },
+    /** 每日简报订阅：{ [studentId]: true } —— 家长不必开小程序就能收到一句"今天学得怎样" */
+    briefSubs: {},
+    briefReady: false,
+    briefNote: '',
+    form: { scope: 'tag', tag: '外研四上', count: 10, deadline: '', note: '', personalized: false,
+            volume: '', unit: 0, unitIndex: 0 },
     assigning: false,
+    // 布置预览（2026-10-09 反馈：布置前必须能看到"到底是哪些词"，还能删/加）
+    preview: [],           // 本次将布置的词（词文本），所见即所得
+    previewEdited: false,  // 删/加过 → 提交时整份传给服务端，作业名带"自定义"
+    searchKw: '',
+    searchHits: [],        // 搜索添加候选（≤20 条）
+    /**
+     * 取词范围：'tag' 按词库（老方式）/ 'unit' 按教材单元。
+     * 为什么加这条：K12 场景里老师的第一个动作是"布置 Unit 3"，不是"布置 10 个中考词"。
+     * 老方式必须原样保留 —— 已经布置过的老作业不能因为加了新入口就变了样。
+     */
+    volumes: [],          // [{ key, name, bookName, units: [{no,name,count}] }]
+    unitNames: [],        // picker 显示文案
+    unitVals: [],         // picker 对应的单元号（0 = 整册）
     assignments: [],
     students: [],
     /** 数据加载失败时显示在对应卡片里的错误（绝不静默吞错：吞了就无法排查） */
     assignError: '',
     stuError: '',
-    /** 学员进度报告：{ [studentId]: {loading, error, assignments, recent_logs} } */
-    reports: {},
 
     /** 云自检结果文本（排查"云到底通不通"时展示，平时为空不占地方） */
     diagnoseText: '',
@@ -53,6 +73,8 @@ Page({
 
   onShow: function () {
     this.setData({ today: time.getLocalDate(Date.now()) });
+    this.ensureUnits();
+    this.rebuildPreview();
     // 先补传本地积压的学习记录，再拉云端数据——教练看到的进度才包含
     // 孩子刚学的内容。补传最多等 1.5 秒（网络慢时不再多等，页面照常加载）
     var self = this;
@@ -99,7 +121,30 @@ Page({
   loadCoachData: function () {
     var self = this;
     cloud.api.coachAssignments().then(function (r) {
-      self.setData({ assignments: r.assignments || [], assignError: '' });
+      // 老师要的从来不是图表，是三件事：谁没交、错得最多的是哪几个词、错在哪。
+      // 所以这里把云端算好的班级错因摊平成"能直接读的字符串"，
+      // 界面只负责显示 —— 拼接逻辑放 wxml 里会把"没有错词"和"有错词但统计失败"混成同一种空白。
+      var list = (r.assignments || []).map(function (a) {
+        var cw = a.class_wrong || {};
+        var pend = a.pending_names || [];
+        var rev = a.review_names || [];
+        return Object.assign({}, a, {
+          pending: pend.length,
+          pendingText: pend.join('、'),
+          // 忘词待巩固：词全学过但有抽查答忘的 —— 不进红标点名，单独黄标温和提醒
+          review: rev.length,
+          reviewText: rev.join('、'),
+          // 学员数为 0（新班级还没人加入）时页面上要说"还没有学员加入"，
+          // 不能显示"全班完成"——0 个人全完成是数学上对、体验上错的文案（2026-10-09 实锤）
+          students: a.total_students || 0,
+          wrongTop: cw.wrong_top || [],
+          mistakeTop: cw.mistake_top || [],
+          letterTop: cw.letter_top || [],
+          wrongCounted: cw.counted || 0,
+          hasWrongStat: (cw.wrong_top || []).length > 0 || (cw.mistake_top || []).length > 0
+        });
+      });
+      self.setData({ assignments: list, assignError: '' });
     }).catch(function (err) {
       // 不静默：加载失败必须让教练看到原因，否则"布置了却看不到"无从排查
       self.setData({ assignError: cloud.humanError(err) });
@@ -109,14 +154,119 @@ Page({
     cloud.api.coachStudents().then(function (r) {
       var now = Date.now();
       var students = (r.students || []).map(function (s) {
-        return Object.assign({}, s, {
+        var stu = Object.assign({}, s, {
           lastSeenText: s.last_seen_at ? fmtAgo(now - s.last_seen_at) : '还没来过'
         });
+        // 状态图标（2026-10-10 用户反馈：两行长文案太乱，改"一个状态图标 + 简短数据"）：
+        //   💤 还没同步  ⏳ 今天还没学  🔴 好几天没来  ⚠️ 今天有忘词  🟢 学得不错
+        var t = s.today || { count: 0, known: 0, forgot: 0 };
+        var staleDays = s.last_seen_at ? (now - s.last_seen_at) / 86400000 : Infinity;
+        if (!s.synced) {
+          stu.status = { icon: '💤', label: '还没同步数据', tone: 'gray' };
+        } else if (!t.count && staleDays >= 3) {
+          stu.status = { icon: '🔴', label: (stu.lastSeenText || '很久') + '活跃', tone: 'red' };
+        } else if (!t.count) {
+          stu.status = { icon: '⏳', label: '今天还没学', tone: 'gray' };
+        } else if (t.forgot) {
+          stu.status = { icon: '⚠️', label: '今天 ' + t.count + ' 个 · 忘 ' + t.forgot + ' 个', tone: 'amber' };
+        } else {
+          stu.status = { icon: '🟢', label: '今天 ' + t.count + ' 个 · 掌握 ' + stu.todayRate + '%', tone: 'green' };
+        }
+        return stu;
       });
       self.setData({ students: students, stuError: '' });
     }).catch(function (err) {
       self.setData({ stuError: cloud.humanError(err) });
       console.warn('[class] students 加载失败', err);
+    });
+
+    self.loadBriefSubs();
+  },
+
+  /** 每日简报订阅状态：决定每个学员卡上的开关长什么样 */
+  loadBriefSubs: function () {
+    var self = this;
+    cloud.api.briefSubs().then(function (r) {
+      var map = {};
+      (r.subs || []).forEach(function (s) { map[s.student_id] = true; });
+      var ids = Object.keys(map);
+      // 单独给一个数字：wxml 里跑 Object.keys 不一定可靠，别让界面表达式决定能不能看见按钮
+      var note = r.template_ready
+        ? ''
+        : '（服务端还没配置订阅模板，暂时只能在这里看简报）';
+      if (r.collections_ready === false) {
+        // 集合没建时服务端会给 collections_ready:false —— 这时候按钮点了也是白点，
+        // 与其让人反复试，不如把"要去控制台建 brief_subs 集合"直接写在页面上
+        note = '（云端还没建 brief_subs 集合，订阅暂时不会生效）';
+      }
+      self.setData({
+        briefSubs: map,
+        briefCount: ids.length,
+        briefReady: !!(r.template_ready && r.collections_ready !== false),
+        briefNote: note
+      });
+    }).catch(function (err) {
+      console.warn('[class] 简报订阅状态加载失败：', (err && (err.errMsg || err.message)) || err);
+    });
+  },
+
+  /**
+   * 订阅 / 退订某个孩子的每日简报。
+   * 顺序不能反：必须先让用户勾授权，再记账 —— 微信只认"用户主动同意"的那一次。
+   */
+  toggleBrief: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var subscribed = !!this.data.briefSubs[id];
+    var self = this;
+
+    // toast 一屏最多十来个字，服务端那句"要去控制台新建集合"会被截成半句话 ——
+    // 与其让人读半句，不如在前端把常见原因压成短文案说清楚。
+    var failToast = function (err) {
+      var short = {
+        NO_TEMPLATE: '还没开通推送（缺模板 ID）',
+        NO_COLLECTION: '云端缺 brief_subs 集合',
+        FORBIDDEN: '只能订阅本班学员',
+        NOT_COACH: '只有创建者能订阅'
+      }[(err && err.code) || ''];
+      wx.showToast({ title: short || cloud.humanError(err), icon: 'none' });
+    };
+
+    var done = function (subscribedNow) {
+      var upd = {};
+      upd['briefSubs.' + id] = subscribedNow;
+      upd.briefCount = countSubs(self.data.briefSubs, id, subscribedNow);
+      self.setData(upd);
+      wx.showToast({
+        title: subscribedNow ? '已订阅，每天 20:30 发' : '已退订',
+        icon: 'none'
+      });
+    };
+
+    if (subscribed) {
+      cloud.api.subscribeBrief(id, true).then(function () { done(false); })
+        .catch(failToast);
+      return;
+    }
+    cloud.requestSubscribe().then(function () {
+      return cloud.api.subscribeBrief(id, false);
+    }).then(function () { done(true); })
+      .catch(failToast);
+  },
+
+  /** 立刻发一次今天的简报（不用等到晚上） */
+  pushBriefNow: function () {
+    var self = this;
+    wx.showLoading({ title: '发送中…' });
+    cloud.api.sendBriefs().then(function (r) {
+      wx.hideLoading();
+      wx.showToast({
+        title: r && r.skipped ? '还没开通推送（缺模板 ID）'
+          : ('已发出 ' + ((r && r.sent) || 0) + ' 条'),
+        icon: 'none'
+      });
+    }).catch(function (err) {
+      wx.hideLoading();
+      wx.showToast({ title: cloud.humanError(err), icon: 'none' });
     });
   },
 
@@ -153,12 +303,139 @@ Page({
     });
   },
 
+  /**
+   * 教材单元选择器（只在教练端用得到，进页面时构建一次）。
+   * 词数与单元名都来自本地目录树（data/booktree.js），不需要联网 ——
+   * 老师在教室里网络很差时也得能布置。
+   */
+  ensureUnits: function () {
+    if (this.data.volumes.length) return;
+    var vs = books.volumes();
+    if (!vs.length) return;
+    var names = [];
+    var vals = [];
+    vs.forEach(function (v) {
+      var total = v.units.reduce(function (s, u) { return s + u.count; }, 0);
+      // 只有一个版本 + 一册时不必显示冗长前缀，直接给"整册 / Unit N"
+      names.push(v.name + ' 整册（' + total + ' 词）');
+      vals.push({ volume: v.key, unit: 0, count: total });
+      v.units.forEach(function (u) {
+        names.push('Unit ' + u.no + (u.name ? ' ' + u.name : '') + '（' + u.count + ' 词）');
+        vals.push({ volume: v.key, unit: u.no, count: u.count });
+      });
+    });
+    this.setData({
+      volumes: vs,
+      unitNames: names,
+      unitVals: vals,
+      'form.volume': vs[0].key
+    });
+  },
+
+  pickScope: function (e) {
+    var scope = e.currentTarget.dataset.scope;
+    this.setData({ 'form.scope': scope });
+    if (scope === 'unit') {
+      this.ensureUnits();
+      this.clampCountToUnit();
+    }
+    this.rebuildPreview();
+  },
+
+  pickUnit: function (e) {
+    var idx = Number(e.detail.value) || 0;
+    var opt = this.data.unitVals[idx];
+    if (!opt) return;
+    var upd = {
+      'form.unitIndex': idx,
+      'form.unit': opt.unit,
+      'form.volume': opt.volume
+    };
+    // 词数不能超过该单元的词数：否则布置界面说 10 个、实际只给 8 个，
+    // 又是"两个数字互相打架"（这类问题的修复成本远高于提前夹住）
+    var max = opt.count || 0;
+    if (max && this.data.form.count > max) upd['form.count'] = max;
+    this.setData(upd);
+    this.rebuildPreview();
+  },
+
+  clampCountToUnit: function () {
+    var f = this.data.form;
+    var opt = this.data.unitVals[f.unitIndex];
+    if (!opt) return;
+    if (opt.count && f.count > opt.count) this.setData({ 'form.count': opt.count });
+  },
+
   pickTag: function (e) {
     this.setData({ 'form.tag': e.currentTarget.dataset.tag });
+    this.rebuildPreview();
   },
 
   pickCount: function (e) {
     this.setData({ 'form.count': e.detail.value });
+    this.rebuildPreview();   // 改数量 = 重新取词，编辑过的词单会被重建（预览区有小字说明）
+  },
+
+  /* ---------------------------------------------------------------- */
+  /* 布置预览 + 编辑：删词 / 搜索加词（2026-10-09 反馈）                     */
+  /* ---------------------------------------------------------------- */
+
+  /** 按当前范围生成预览词单 —— 取词口径必须与服务端 chooseWords 完全一致：
+   *  unit 模式按 unit_order（课本序），tag 模式按 freq 升序。本地词库与云端同源。 */
+  rebuildPreview: function () {
+    var f = this.data.form;
+    var list;
+    if (f.scope === 'unit') {
+      list = (books.getWordsByUnit(f.volume, f.unit) || [])
+        .slice(0, f.count).map(function (w) { return w.word; });
+    } else {
+      var pool = f.tag === '全部' ? WORDS : WORDS.filter(function (w) {
+        return (w.tags || []).indexOf(f.tag) >= 0;
+      });
+      list = pool.slice().sort(function (a, b) { return a.freq - b.freq; })
+        .slice(0, f.count).map(function (w) { return w.word; });
+    }
+    this.setData({ preview: list, previewEdited: false, searchKw: '', searchHits: [] });
+  },
+
+  removeWord: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var list = this.data.preview.slice();
+    list.splice(idx, 1);
+    this.setData({ preview: list, previewEdited: true });
+  },
+
+  onSearchInput: function (e) {
+    var kw = (e.detail.value || '').trim().toLowerCase();
+    if (!kw) {
+      this.setData({ searchKw: e.detail.value, searchHits: [] });
+      return;
+    }
+    var inPreview = {};
+    this.data.preview.forEach(function (w) { inPreview[w.toLowerCase()] = true; });
+    var hits = [];
+    for (var i = 0; i < WORDS.length && hits.length < 20; i++) {
+      var w = WORDS[i];
+      if (w.word.toLowerCase().indexOf(kw) >= 0 && !inPreview[w.word.toLowerCase()]) {
+        hits.push(w.word);
+      }
+    }
+    this.setData({ searchKw: e.detail.value, searchHits: hits });
+  },
+
+  addWord: function (e) {
+    var word = e.currentTarget.dataset.word;
+    if (!word) return;
+    if (this.data.preview.indexOf(word) >= 0) {
+      wx.showToast({ title: '已在词单里', icon: 'none' });
+      return;
+    }
+    if (this.data.preview.length >= 30) {
+      wx.showToast({ title: '最多 30 个词', icon: 'none' });
+      return;
+    }
+    var list = this.data.preview.concat([word]);
+    this.setData({ preview: list, previewEdited: true, searchKw: '', searchHits: [] });
   },
 
   pickDeadline: function (e) {
@@ -184,20 +461,46 @@ Page({
     if (this.data.assigning) return;
     this.setData({ assigning: true });
 
-    cloud.api.assignTask({
-      tag: f.tag,
+    // 按词库 / 按教材单元，两条路的参数集不同：别把 unit 塞给只认 tag 的老链路，
+    // 也别让按单元布置时多带一个会被无视的 tag（服务端会忽略，但看着像 bug）
+    var payload = {
       count: f.count,
       deadline: f.deadline,
       note: f.note,
       personalized: !!f.personalized,
       clientReqId: 'assign:' + srs.newReqId()
-    }).then(function (r) {
+    };
+    if (f.scope === 'unit') {
+      payload.volume = f.volume;
+      payload.unit = f.unit;
+    } else {
+      payload.tag = f.tag;
+    }
+    // 预览词单整份上交：所见即所得。本地词库与云端同源，预览里看到的
+    // 就是孩子练到的；服务端对配不上的词会如实回报 missing，不静默丢。
+    var preview = this.data.preview || [];
+    if (preview.length) {
+      payload.words = preview;
+      payload.count = preview.length;   // 编辑过删/加后，数量以词单为准
+    }
+
+    cloud.api.assignTask(payload).then(function (r) {
       self.setData({ assigning: false, 'form.note': '' });
       var n = (r && r.data && r.data.personalized) ? (r.data.student_count || 0) : 0;
-      wx.showToast({
-        title: n ? ('已布置 · ' + n + ' 人各自词单') : '已布置',
-        icon: 'success'
-      });
+      var asg = (r && r.data && r.data.assignment) || {};
+      var real = asg.count && asg.count !== payload.count
+        ? ' · 实际 ' + asg.count + ' 词' : '';
+      // 预览里有词配不上云端词库：如实提示（正常情况不会发生，发生了说明两边词库不同步）
+      var missing = (r && r.data && r.data.missing) || [];
+      if (missing.length) {
+        wx.showToast({ title: '已布置，' + missing.length + ' 个词不在词库：' + missing[0], icon: 'none', duration: 3000 });
+      } else {
+        wx.showToast({
+          title: n ? ('已布置 · ' + n + ' 人各自词单')
+            : ('已布置' + (asg.unit ? ' · Unit ' + asg.unit : '') + real),
+          icon: 'success'
+        });
+      }
       self.loadCoachData();
     }).catch(function (err) {
       self.setData({ assigning: false });
@@ -235,78 +538,45 @@ Page({
    * 学员进度报告：点学员卡展开/收起。首次展开（或数据超过 5 分钟）时
    * 拉取该学员的作业完成度 + 最近学习记录（单词文本已在服务端翻译好）。
    */
-  toggleReport: function (e) {
+  /**
+   * 打开学员报告（独立页，2026-10-10）。
+   * 之前是点卡片在这里内联展开：内容越加越长，学员一多整页就乱，
+   * 而且内联区没法打印、也没法导出成能分享的图 —— 独立页才谈得上这些。
+   */
+  openReport: function (e) {
     var id = e.currentTarget.dataset.id;
-    var cur = this.data.reports[id];
-    var self = this;
-
-    if (cur && !cur.loading) {
-      if (cur.open) {
-        var closeUpd = {};
-        closeUpd['reports.' + id + '.open'] = false;
-        this.setData(closeUpd);
-        return;
-      }
-      var fresh = cur.at && (Date.now() - cur.at < 5 * 60000);
-      var openUpd = {};
-      openUpd['reports.' + id + '.open'] = true;
-      this.setData(openUpd);
-      if (fresh && !cur.error) return;   // 数据还新鲜，直接展示
-    }
-
-    var loadUpd = {};
-    loadUpd['reports.' + id + '.loading'] = true;
-    loadUpd['reports.' + id + '.open'] = true;
-    loadUpd['reports.' + id + '.error'] = '';
-    this.setData(loadUpd);
-    cloud.api.studentDetail(id).then(function (r) {
-      var logs = (r.recent_logs || []).slice(0, 10).map(function (l) {
-        return Object.assign({}, l, {
-          timeText: l.created_at ? fmtTime(l.created_at) : '',
-          ok: l.feedback === 'known'
-        });
-      });
-      var upd = {};
-      upd['reports.' + id] = {
-        open: true, loading: false, error: '', at: Date.now(),
-        nickname: (r.student && r.student.nickname) || '',
-        // 简报来自 studentDetail（与学员端同一句文案、同一份荣誉词）
-        summary: r.summary || null,
-        assignments: r.assignments || [],
-        logs: logs
-      };
-      self.setData(upd);
-    }).catch(function (err) {
-      var upd = {};
-      upd['reports.' + id] = {
-        open: true, loading: false, error: cloud.humanError(err), at: Date.now(),
-        assignments: [], logs: []
-      };
-      self.setData(upd);
-      console.warn('[class] 学员报告加载失败', err);
-    });
-  },
-
-  /** 复制学员简报：家长要的就是"能直接发给对方的一句话" */
-  copyStuSummary: function (e) {
-    var id = e.currentTarget.dataset.id;
-    var r = this.data.reports[id];
-    var s = r && r.summary;
-    if (!s || !s.text) return;
-    var text = s.honor ? s.text + '\n' + s.honor.badge + ' · ' + s.honor.detail : s.text;
-    wx.setClipboardData({
-      data: text,
-      success: function () { wx.showToast({ title: '简报已复制', icon: 'none' }); }
-    });
+    if (!id) return;
+    wx.navigateTo({ url: '/pages/report/report?sid=' + id });
   },
 
   copyCode: function () {
     var code = this.data.cls && this.data.cls.code;
     if (!code) return;
+    // 不只复制光秃秃的码：带上打开链接和用法，对方收到就知道怎么用。
+    // #小程序:// 文本粘贴到微信聊天会自动变成可点链接（但带不了参数，
+    // 所以邀请码还是要手输 —— 文案里把这一步说清楚）
+    var name = (this.data.cls && this.data.cls.name) || '我的班级';
+    var text = '【' + name + '】邀请码：' + code +
+      '\n点这里打开小程序 👉 #小程序://功课抽查/ ，在「班级」页输入邀请码就能加入';
     wx.setClipboardData({
-      data: code,
-      success: function () { wx.showToast({ title: '邀请码已复制', icon: 'success' }); }
+      data: text,
+      success: function () { wx.showToast({ title: '邀请文案已复制', icon: 'success' }); }
     });
+  },
+
+  /**
+   * 分享班级卡：把邀请码放进转发卡片。
+   * 为什么标题要带码：家长/老师本来就要把这张卡发给另一个微信号（自己的微信或孩子），
+   * 对方点开就得能直接加班，不然还要再回来复制一次。
+   */
+  onShareAppMessage: function () {
+    var cls = this.data.cls || {};
+    var code = cls.code || '';
+    return {
+      title: code ? ('【' + (cls.name || '我的班级') + '】邀请码 ' + code) : '单词抽查 · 班级',
+      path: '/pages/class/class',
+      imageUrl: ''
+    };
   },
 
   /* ---------------- 学生端 ---------------- */
@@ -361,6 +631,26 @@ Page({
     var name = a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业');
     wx.redirectTo({
       url: '/pkg-media/pages/drill/drill?ids=' + assignParam.buildIdsParam(a.word_ids || []) +
+        '&name=' + encodeURIComponent(name)
+    });
+  },
+
+  /** 试做这份作业（教练端）：2026-10-09 实锤 —— 老师布置完 Unit 2 想亲自点开
+   * 看看词对不对，却没有入口；从首页"开始学习"进去走的是个人今日任务，
+   * 练到的还是旧词库的词，让人以为作业错了。试做走的就是学生同一条
+   * drill?ids= 路径，练的正是这份作业的词单（学习记录照常上报，不污染
+   * 班级进度：进度统计只算班级学员）。 */
+  goTryAssignment: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var a = (this.data.assignments || [])[idx] || {};
+    var ids = a.word_ids || [];
+    if (!ids.length) {
+      wx.showToast({ title: '这份作业没有词单', icon: 'none' });
+      return;
+    }
+    var name = (a.name || a.note || (a.tag ? a.tag + '作业' : '班级作业')) + ' · 试做';
+    wx.navigateTo({
+      url: '/pkg-media/pages/drill/drill?ids=' + assignParam.buildIdsParam(ids) +
         '&name=' + encodeURIComponent(name)
     });
   },
@@ -448,19 +738,20 @@ Page({
   }
 });
 
+/** 订阅数：把改动后的地图算一遍，避免界面表达式里再依赖 Object.keys */
+function countSubs(map, id, subscribed) {
+  var n = 0;
+  Object.keys(map || {}).forEach(function (k) {
+    if (k === id) { if (subscribed) n++; return; }
+    if (map[k]) n++;
+  });
+  if (!map || !(id in map)) return subscribed ? n + 1 : n;
+  return n;
+}
+
 function fmtAgo(ms) {
-  if (ms < 60000) return '1 分钟内活跃';
-  if (ms < 3600000) return Math.floor(ms / 60000) + ' 分钟前活跃';
+  if (ms < 60000) return '1 分钟内活跃';  if (ms < 3600000) return Math.floor(ms / 60000) + ' 分钟前活跃';
   if (ms < 86400000) return Math.floor(ms / 3600000) + ' 小时前活跃';
   return Math.floor(ms / 86400000) + ' 天前活跃';
 }
 
-/** 报告里的记录时间：今天显示时分，更早显示月-日 时分 */
-function fmtTime(ts) {
-  var d = new Date(ts);
-  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  var hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  var today = time.getLocalDate(Date.now());
-  if (time.getLocalDate(ts) === today) return hm;
-  return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + hm;
-}

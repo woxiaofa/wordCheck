@@ -75,6 +75,9 @@ function createFakeDb(opts) {
     return {
       count: function () { return Promise.resolve({ total: rows.length }); },
       limit: function (n) { return chain(rows.slice(0, n)); },
+      // 分页：一次拉全量的必经手段（单云开发 get 上限 100 条），
+      // 没它就只能测"数据量小到取不满一页"的理想情况，真实数据与本地自证会错位
+      skip: function (n) { return chain(rows.slice(n)); },
       orderBy: function (f, dir) {
         var out = rows.slice();
         out.sort(function (a, b) {
@@ -107,6 +110,14 @@ function createFakeDb(opts) {
   }
 
   function collection(name) {
+    // strictCollections：复刻云端"集合必须显式建过"（读/写不存在的集合都是 -502005）。
+    // 默认关闭（seed() 视为已建），因为绝大多数用例不该被这条规则打扰；
+    // 但凡是"记一笔就算订阅成功"这类写操作，必须用它来抓假成功。
+    if (opts.strictCollections && !colls[name]) {
+      var e = new Error('-502005 database collection not exists: ' + name);
+      e.errCode = -502005;
+      throw e;
+    }
     var self = {
       where: function (q) {
         return chain(ensure(name).filter(function (d) { return match(d, q); }), name);
@@ -114,8 +125,10 @@ function createFakeDb(opts) {
       // 不带 where 的全表链式入口（task.today 取词库 / class.onAssign 选词走这条）
       orderBy: function (f, dir) { return chain(ensure(name).slice()).orderBy(f, dir); },
       limit: function (n) { return chain(ensure(name).slice()).limit(n); },
+      skip: function (n) { return chain(ensure(name).slice()).skip(n); },
       field: function (f) { return chain(ensure(name).slice()).field(f); },
       get: function () { return chain(ensure(name).slice()).get(); },
+      count: function () { return chain(ensure(name).slice()).count(); },
       doc: function (id) {
         var list = ensure(name);
         function idx() {
@@ -173,6 +186,9 @@ function createFakeDb(opts) {
       return Promise.resolve({});
     },
     raw: colls,
+    // 运行时开关：云函数在模块加载时就绑定了 database() 返回的对象，
+    // 中途换实例是换不动的，所以严格模式要能随时开关。
+    setStrict: function (v) { opts.strictCollections = !!v; },
     reset: function () { Object.keys(colls).forEach(function (k) { delete colls[k]; }); },
     seed: function (name, docs) { colls[name] = clone(docs); }
   };
