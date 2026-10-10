@@ -18,9 +18,13 @@
 
 产物：miniprogram/pkg-media/assets/audio/<word>.mp3（16kHz 单声道 48kbps，去首尾静音）
   已存在的文件跳过（增量生成），删掉某个 mp3 重跑即可单独重生成。
+  文件名净化：词里的空格统一转成连字符（"ice cream" → ice-cream.mp3）——
+  2026-10-10 新版词库收录了短语，包内文件名带空格容易在真机/工具上出幺蛾子；
+  合成文本仍用原样（Piper 读短语没问题）。tts.js 查表时做同样的净化。
 """
 import json
 import math
+import re
 import struct
 import sys
 import wave
@@ -120,7 +124,9 @@ def main() -> int:
     total = 0
     since_reload = 0
     for i, word in enumerate(words, 1):
-        out = out_dir / ("%s.mp3" % word)
+        # 文件名净化：空格→连字符（短语词条）；合成文本用原样
+        fname = re.sub(r"\s+", "-", word)
+        out = out_dir / ("%s.mp3" % fname)
         if out.exists() and out.stat().st_size > 0:
             skipped += 1
             continue

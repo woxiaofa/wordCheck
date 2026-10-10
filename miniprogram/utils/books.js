@@ -16,16 +16,23 @@
  */
 
 var WORDS = require('../data/words');
+var TREE = require('../data/booktree');
 
 var STORAGE_KEY = 'word_book';
 
-/** 词书定义：tag 是 words.js 里存的显示名（切词时已由 TAG_CN 转成中文） */
+/**
+ * 词书定义：tag 是 words.js 里存的显示名（切词时已由 TAG_CN 转成中文）
+ *
+ * 顺序即界面顺序：外研四上排第一（2026-10-10 用户拍板 —— 产品主场景就是教材同步，
+ * 老师家长打开词书列表第一眼就该看到它）；默认词书也是它（见 DEFAULT_KEY）。
+ */
+var DEFAULT_KEY = 'wy4a';
 var BOOKS = [
+  { key: 'wy4a', name: '外研四上', desc: '外研版（三起）·四年级上册·2024新版', tag: '外研四上' },
   { key: 'all', name: '全部', desc: '中考 + 高考 + 四级混合', tag: null },
   { key: 'zk', name: '中考', desc: '初中核心词', tag: '中考' },
   { key: 'gk', name: '高考', desc: '高中核心词', tag: '高考' },
-  { key: 'cet4', name: '四级', desc: '大学四级词', tag: '四级' },
-  { key: 'wy4a', name: '外研四上', desc: '外研版四年级上册（三起）', tag: '外研四上' }
+  { key: 'cet4', name: '四级', desc: '大学四级词', tag: '四级' }
 ];
 
 /**
@@ -46,13 +53,13 @@ function getWords(key) {
   });
 }
 
-/** 当前词书 key（持久化） */
+/** 当前词书 key（持久化）。没存过 / 存的是已下线的词书 → 默认外研四上（教材同步是主场景） */
 function getKey() {
   try {
     var k = wx.getStorageSync(STORAGE_KEY);
-    return k && isValidKey(k) ? k : 'all';
+    return k && isValidKey(k) ? k : DEFAULT_KEY;
   } catch (e) {
-    return 'all';          // 非小程序环境（跑测试时）也能用
+    return DEFAULT_KEY;      // 非小程序环境（跑测试时）也能用
   }
 }
 
@@ -86,13 +93,94 @@ function currentName() {
   return '全部';
 }
 
+/* ------------------------------------------------------------------ */
+/* 教材三级结构：版本 → 册 → 单元                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 为什么这一层必须存在：K12 场景里家长判断"这个能不能用"只看一条——教材同步不。
+ * 老师的第一个动作是"布置 Unit 3"，不是"布置 10 个中考词"。
+ * 所以除了原有的按标签切词库，还得能按 (册, 单元) 精确取词，且**词序必须与课本一致**。
+ */
+
+/** 全部册（扁平化，给选择器用）：[{ key, name, tag, bookName, count }] */
+function volumes() {
+  var out = [];
+  (TREE.books || []).forEach(function (b) {
+    (b.volumes || []).forEach(function (v) {
+      var n = WORDS.filter(function (w) { return w.volume === v.key; }).length;
+      out.push({
+        key: v.key,
+        name: v.name,
+        tag: v.tag || '',
+        bookKey: b.key,
+        bookName: b.name,
+        count: n,
+        // 端上一次给全：选择器不需要二次请求，离线也能用
+        units: (v.units || []).map(function (u) {
+          return { no: u.no, name: u.name, count: u.count };
+        })
+      });
+    });
+  });
+  return out;
+}
+
+function findVolume(volumeKey) {
+  var vs = volumes();
+  for (var i = 0; i < vs.length; i++) if (vs[i].key === volumeKey) return vs[i];
+  return null;
+}
+
+/** 某册的单元列表：[{ no, name, count }]；册不存在时返回空数组（不抛，方便界面兜底） */
+function unitsOf(volumeKey) {
+  var v = findVolume(volumeKey);
+  return v ? v.units : [];
+}
+
+/**
+ * 取某册某单元的词，按课本顺序（unit_order）排。
+ * @param {string} volumeKey 册 key，如 'wy4a'
+ * @param {number|string} unitNo 单元号（1 起）；传 0 / 空表示整册（按 unit → unit_order 排）
+ */
+function getWordsByUnit(volumeKey, unitNo) {
+  var no = Number(unitNo) || 0;
+  var list = WORDS.filter(function (w) {
+    if (w.volume !== volumeKey) return false;
+    return no ? (Number(w.unit) === no) : !!w.unit;
+  });
+  list.sort(function (a, b) {
+    var ua = Number(a.unit) || 0, ub = Number(b.unit) || 0;
+    if (ua !== ub) return ua - ub;
+    return (Number(a.unit_order) || 0) - (Number(b.unit_order) || 0);
+  });
+  return list;
+}
+
+/** 单元的可读标签："四年级上册 · Unit 3 公园里"（作业名与页面标题都用它） */
+function unitLabel(volumeKey, unitNo) {
+  var v = findVolume(volumeKey);
+  if (!v) return '';
+  var no = Number(unitNo) || 0;
+  if (!no) return v.bookName + ' · ' + v.name;
+  var name = '';
+  v.units.forEach(function (u) { if (u.no === no) name = u.name; });
+  return v.bookName + ' · ' + v.name + ' · Unit ' + no + (name ? ' ' + name : '');
+}
+
 module.exports = {
   BOOKS: BOOKS,
   STORAGE_KEY: STORAGE_KEY,
+  DEFAULT_KEY: DEFAULT_KEY,
   getWords: getWords,
   getKey: getKey,
   setKey: setKey,
   isValidKey: isValidKey,
   list: list,
-  currentName: currentName
+  currentName: currentName,
+  volumes: volumes,
+  unitsOf: unitsOf,
+  findVolume: findVolume,
+  getWordsByUnit: getWordsByUnit,
+  unitLabel: unitLabel
 };

@@ -58,9 +58,9 @@ ok('空 key / 未知 key 一律回退全部（不能返回空数组）', functio
   assert.strictEqual(books.getWords(undefined).length, WORDS.length);
 });
 
-ok('默认 key 是 all', function () {
+ok('默认 key 是 wy4a（新装用户直接进教材词库，2026-10-10 拍板）', function () {
   storage = {};
-  assert.strictEqual(books.getKey(), 'all');
+  assert.strictEqual(books.getKey(), 'wy4a');
 });
 
 ok('setKey 只接受已定义的词书，其它一律拒绝', function () {
@@ -70,9 +70,9 @@ ok('setKey 只接受已定义的词书，其它一律拒绝', function () {
   assert.strictEqual(books.getKey(), 'zk', '非法 key 不该改掉当前值');
 });
 
-ok('storage 里是已下线的词书时回退 all（用户不留空白页）', function () {
+ok('storage 里是已下线的词书时回退默认（用户不留空白页）', function () {
   storage[books.STORAGE_KEY] = 'gre';
-  assert.strictEqual(books.getKey(), 'all');
+  assert.strictEqual(books.getKey(), 'wy4a');
 });
 
 ok('list() 给出每本的词数，且加起来 >= 全库（词可同属多本）', function () {
@@ -91,6 +91,11 @@ ok('currentName() 与当前 key 对应', function () {
   assert.strictEqual(books.currentName(), '四级');
   books.setKey('all');
   assert.strictEqual(books.currentName(), '全部');
+});
+
+ok('外研四上排第一位（界面顺序 = BOOKS 顺序，主场景是教材同步）', function () {
+  assert.strictEqual(books.BOOKS[0].key, 'wy4a');
+  assert.strictEqual(books.list()[0].key, 'wy4a');
 });
 
 ok('外研四上：词书可选、词条字段完整、与已有词不重复出词', function () {

@@ -33,6 +33,15 @@ var byLower = {};
 var plugin = null;
 try { plugin = requirePlugin('WechatSI'); } catch (e) { plugin = null; }
 
+/**
+ * 词文本 → 清单键：空格转连字符（"ice cream" → ice-cream）。
+ * 2026-10-10 新版词库收录短语后，mp3 文件名不带空格（gen_audio_piper.py 同规则净化），
+ * 这里查表必须做同一转换，否则短语永远查不到本地音频、听写题被判"无音频"。
+ */
+function fileKey(word) {
+  return String(word || '').toLowerCase().replace(/\s+/g, '-');
+}
+
 var audio = null;       // 复用的播放器
 var cache = {};         // word -> 临时音频路径（仅插件路径需要）
 var pending = {};       // word -> [callback]，合并并发请求（仅插件路径需要）
@@ -43,14 +52,14 @@ function hasLocalAudio() {
   return false;
 }
 
-/** 这个词有没有本地发音（大小写不敏感；没有的词不能出听写题 —— 一道哑巴题只能错） */
+/** 这个词有没有本地发音（大小写不敏感、短语按净化键；没有的词不能出听写题 —— 一道哑巴题只能错） */
 function hasAudio(word) {
-  return !!(word && byLower[String(word).toLowerCase()]);
+  return !!(word && byLower[fileKey(word)]);
 }
 
 /** 本地音频路径（用清单里的原样文件名）；不在清单里返回 '' */
 function localSrc(word) {
-  var orig = word ? byLower[String(word).toLowerCase()] : '';
+  var orig = word ? byLower[fileKey(word)] : '';
   return orig ? '/pkg-media/assets/audio/' + orig + '.mp3' : '';
 }
 

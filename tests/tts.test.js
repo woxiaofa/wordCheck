@@ -72,6 +72,21 @@ ok('大写词（China/Halloween）也能命中发音：查清单大小写不敏�
     'src 应保留原样大小写，实际: ' + calls[0]);
 });
 
+ok('短语命中：词文本带空格，按净化键（空格→连字符）查到本地音频', function () {
+  // 2026-10-10 新版词库收录 8 个短语（give up / ice cream / to-do list…），
+  // mp3 文件名净化为 ice-cream.mp3 —— tts 查表必须做同一转换，否则短语听写永远"无音频"
+  var key = 'ice-cream';
+  if (!manifest[key]) return; // 音频未生成时跳过（构建顺序：gen → manifest → 测试）
+  assert.strictEqual(tts.hasAudio('ice cream'), true, '短语应能查到音频');
+  assert.strictEqual(tts.hasAudio('ICE CREAM'), true, '大小写不敏感');
+  calls.length = 0;
+  var result = null;
+  tts.speak('ice cream', function (okFlag) { result = okFlag; });
+  assert.strictEqual(result, true);
+  assert.strictEqual(calls[0], 'play:/pkg-media/assets/audio/' + key + '.mp3',
+    'src 应指向净化后的文件名，实际: ' + calls[0]);
+});
+
 ok('清单外 + 无插件：同步回调 false，不抛异常', function () {
   var result = null;
   tts.speak(missingWord, function (okFlag) { result = okFlag; });

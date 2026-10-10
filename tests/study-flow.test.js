@@ -467,7 +467,14 @@ test('★ 全部学完后"提前巩固"能取出未到期的词，而不是留�
 
   var forced = page.localQueue(true);
   assert.strictEqual(forced.length, 10, '提前巩固模式：应取出一批未到期的词');
-  assert.strictEqual(forced[0].word, WORDS[0].word, '取的是最快到期的那批');
+  // 期望值按"默认词书"推导（2026-10-10 起默认 wy4a，不再是大全）：全员同时到期时，
+  // 取的是默认词书池里排最前的词 —— 写死词文本会在换词书/换版时撒谎
+  var poolFirst = '';
+  for (var j = 0; j < WORDS.length; j++) {
+    if ((WORDS[j].tags || []).indexOf('外研四上') >= 0) { poolFirst = WORDS[j].word; break; }
+  }
+  assert.ok(poolFirst, '默认词书外研四上不该是空池');
+  assert.strictEqual(forced[0].word, poolFirst, '取的是最快到期的那批（默认词书池首词）');
 });
 
 /* ============================================================ */

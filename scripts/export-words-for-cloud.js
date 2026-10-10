@@ -40,7 +40,14 @@ function main() {
       example_en: w.example_en || '',
       example_cn: w.example_cn || '',
       tags: Array.isArray(w.tags) ? w.tags : [],
-      freq: Number(w.freq) || 0
+      freq: Number(w.freq) || 0,
+      // 三级结构字段：必须进 words 集合，否则老师端"布置 Unit 3"在云端取不到词
+      // （云端 chooseWords 按 volume + unit 过滤、按 unit_order 排序，见 cloud/functions/class）。
+      // 非教材词写空串/0，过滤条件 volume == 'wy4a' 自然不命中。
+      book: w.book || '',
+      volume: w.volume || '',
+      unit: Number(w.unit) || 0,
+      unit_order: Number(w.unit_order) || 0
     });
   });
 
