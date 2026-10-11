@@ -23,6 +23,18 @@ var QWERTY_ROWS = [
   'zxcvbnm'.split('')
 ];
 
+/**
+ * 大写版键位（与 QWERTY_ROWS 一一对应）。
+ * 为什么要在 JS 里预先算好、而不是在 WXML 里转：
+ *   WXML 表达式调不了 toUpperCase，只能借 wxs；而 wxs 运行时**没有 String 构造函数**，
+ *   写 String(s).toUpperCase() 会直接失败并静默渲染成空 —— 2026-10-11 实锤：
+ *   单词 Mr（词表里少数首字母大写的词）触发自动大写，整排键全变成没字的方块，
+ *   孩子点不了只能等超时判错。大小写这类纯展示数据一律在 JS 侧备好。
+ */
+var QWERTY_ROWS_UPPER = QWERTY_ROWS.map(function (row) {
+  return row.map(function (ch) { return ch.toUpperCase(); });
+});
+
 /** 归一化：只留 a-z（旧接口保留，wrong.js 之外的少量调用仍在用） */
 function normalize(word) {
   var w = String(word || '').toLowerCase();
@@ -140,6 +152,7 @@ function levelLabel(level) {
 module.exports = {
   ALPHABET: ALPHABET,
   QWERTY_ROWS: QWERTY_ROWS,
+  QWERTY_ROWS_UPPER: QWERTY_ROWS_UPPER,
   EXTRA_ROW: EXTRA_ROW,
   normalize: normalize,
   uniqueLetters: uniqueLetters,

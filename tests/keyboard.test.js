@@ -86,5 +86,45 @@ eq('shiftFor：非字母位（空格/连字符）false',
 eq('normalize 只留 a-z 并转小写', keysLib.normalize('Ab-cd!'), 'abcd');
 eq('uniqueLetters 去重保序', keysLib.uniqueLetters('banana'), ['b', 'a', 'n']);
 
+/* ---------------- 大写态：键上的字由 JS 备好（2026-10-11 实锤） ---------------- */
+
+var fs = require('fs');
+var path = require('path');
+var ROOT = path.join(__dirname, '..');
+var kwxml = fs.readFileSync(path.join(ROOT, 'miniprogram/components/letter-keyboard/index.wxml'), 'utf8');
+var kjs = fs.readFileSync(path.join(ROOT, 'miniprogram/components/letter-keyboard/index.js'), 'utf8');
+
+var up = keysLib.QWERTY_ROWS_UPPER;
+ok('QWERTY_ROWS_UPPER 与小写行一一对应且全大写', !!up &&
+  up.length === keysLib.QWERTY_ROWS.length &&
+  up.every(function (row, i) {
+    return row.length === keysLib.QWERTY_ROWS[i].length &&
+      row.every(function (ch, j) { return ch === keysLib.QWERTY_ROWS[i][j].toUpperCase(); });
+  }));
+eq('大写态第一行就是 QWERTYUIOP', up[0].join(''), 'QWERTYUIOP');
+
+ok('WXML 不再用 wxs 转大小写（cs.up / case.wxs 已下线）',
+  kwxml.indexOf('cs.up') < 0 && kwxml.indexOf('case.wxs') < 0);
+ok('大写态整块换 rowsUpper 数据源', kwxml.indexOf('wx:for="{{shift ? rowsUpper : rows}}"') >= 0);
+ok('字母键直接渲染字符，不做表达式转换', kwxml.indexOf('>{{k}}</view>') >= 0);
+ok('组件 data 里备好 rowsUpper', /rowsUpper:\s*\[\]/.test(kjs) &&
+  kjs.indexOf('keysLib.QWERTY_ROWS_UPPER') >= 0);
+
+/* wxs 里没有 String/Number 构造函数：写了就是静默渲染空白，扫全工程防再犯 */
+var bad = [];
+(function scan(dir) {
+  fs.readdirSync(dir).forEach(function (f) {
+    var p = path.join(dir, f);
+    if (fs.statSync(p).isDirectory()) { scan(p); return; }
+    if (p.slice(-4) !== '.wxs') return;
+    var src = fs.readFileSync(p, 'utf8');
+    if (/\b(String|Number|Boolean|Array|Object)\s*\(/.test(src)) {
+      bad.push(path.relative(ROOT, p));
+    }
+  });
+})(path.join(ROOT, 'miniprogram'));
+ok('wxs 里不出现 String()/Number() 等构造调用（WXS 没这些全局对象）',
+  bad.length === 0, bad.join('、'));
+
 console.log('\n' + (fail ? '有失败：' + fail + ' 项' : '全部通过：' + pass + ' 项 ✓'));
 process.exit(fail ? 1 : 0);

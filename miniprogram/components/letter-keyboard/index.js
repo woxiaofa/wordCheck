@@ -43,6 +43,7 @@ Component({
 
   data: {
     rows: [],        // QWERTY 三行（keys.planRows）
+    rowsUpper: [],   // 同结构的大写版：⇧ 亮起时整块换掉（WXML 侧不做大小写转换）
     extraRow: [],    // 第四行：连字符 + 空格（keys.planExtraRow，短语收录后必须有）
     shift: false,    // ⇧ 大写态：字母键显示并插入大写
     shiftManual: false // 刚手动点过 ⇧：下一次插入/删除前不被自动 ⇧ 覆盖
@@ -50,7 +51,11 @@ Component({
 
   lifetimes: {
     attached: function () {
-      this.setData({ rows: keysLib.planRows(), extraRow: keysLib.planExtraRow() });
+      this.setData({
+        rows: keysLib.planRows(),
+        rowsUpper: keysLib.QWERTY_ROWS_UPPER,
+        extraRow: keysLib.planExtraRow()
+      });
       this.syncShift();
     }
   },
