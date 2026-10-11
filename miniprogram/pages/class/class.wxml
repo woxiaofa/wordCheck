@@ -82,10 +82,27 @@
       <view wx:if="{{form.scope === 'unit'}}" class="muted" style="font-size:22rpx;margin:-8rpx 0 8rpx">
         按课本顺序出题，学完这一单元刚好跟上课堂进度
       </view>
+
+      <!-- 续接上次（2026-10-11 反馈：布置过前 10 个，想再布置 11~20 个，
+           以前只能删了重选 —— 这里一键把起点挪到已布置的下一个词） -->
+      <view wx:if="{{form.scope === 'unit' && continueFrom > 1}}" class="form-row continue-row">
+        <text class="muted" style="font-size:22rpx">这个单元已布置过 {{continueFrom - 1}} 个词</text>
+        <view class="continue-btn" bindtap="continueFromLast">接着上次：从第 {{continueFrom}} 个开始</view>
+      </view>
+
+      <!-- 起点（仅按单元）：42 词的单元分几次布置，从第 N 个开始取 -->
+      <view class="form-row" wx:if="{{form.scope === 'unit'}}">
+        <text class="form-label">起点</text>
+        <slider min="1" max="{{unitTotal}}" step="1" value="{{form.start}}" activeColor="#3ea6ff"
+                block-size="20" show-value bindchange="pickStart" class="grow" />
+      </view>
       <view class="form-row">
         <text class="form-label">词数</text>
-        <slider min="3" max="30" step="1" value="{{form.count}}" activeColor="#3ea6ff"
+        <slider min="3" max="{{countMax}}" step="1" value="{{form.count}}" activeColor="#3ea6ff"
                 block-size="20" show-value bindchange="pickCount" class="grow" />
+      </view>
+      <view wx:if="{{form.scope === 'unit'}}" class="muted" style="font-size:22rpx;margin:-4rpx 0 8rpx">
+        本次布置课本第 {{form.start}} ~ {{form.start + form.count - 1}} 个词（该单元共 {{unitTotal}} 个）
       </view>
       <!-- 小学阶段的量：一次超过 10 个，孩子多半会为了赶完乱点，等于没学 -->
       <view class="count-tip {{form.count > 10 ? 'warn' : ''}}">
@@ -111,7 +128,7 @@
           <view wx:for="{{searchHits}}" wx:key="*this" class="search-hit"
                 data-word="{{item}}" bindtap="addWord">+ {{item}}</view>
         </view>
-        <view class="preview-note">改动范围或词数会重新生成词单；点词可删、搜索可加。拍照拍单词表自动加词，下个版本再上</view>
+        <view class="preview-note">改动范围、起点或词数会重新生成词单；点词可删、搜索可加。拍照拍单词表自动加词，下个版本再上</view>
       </view>
       <view class="form-row">
         <text class="form-label">截止</text>

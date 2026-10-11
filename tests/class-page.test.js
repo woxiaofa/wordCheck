@@ -170,4 +170,30 @@ rule('⑫ 全工程零「text 里套 text」（混排字号会把行盒撑到两
   assert.deepStrictEqual(bad, [], '以下位置 text 里还套着 text，改成 view 再排：' + bad.join('、'));
 });
 
+rule('⑬ 布置作业：起点滑杆 + 续接上次 + 词数上限跟着单元走（2026-10-11）', function () {
+  // 为什么：42 词的单元被写死的 max=30 卡住，后 12 个只能搜索；布置过前 10 个，
+  // 想再布置 11~20 个只能删词重选 —— 都是把老师往"手动编辑词单"上逼
+  assert.ok(wxml.indexOf('max="{{countMax}}"') >= 0,
+    '词数滑杆上限要动态绑定 countMax（42 词的单元不该被 30 卡住）');
+  assert.ok(wxml.indexOf('bindchange="pickStart"') >= 0, '要有一条起点滑杆');
+  assert.ok(wxml.indexOf('bindtap="continueFromLast"') >= 0, '要有一键续接按钮');
+  assert.ok(wxml.indexOf('已布置过 {{continueFrom - 1}} 个词') >= 0,
+    '续接按钮要说明"已布置过几个"，老师才知道接着的是什么');
+  assert.ok(wxml.indexOf('第 {{form.start}} ~ {{form.start + form.count - 1}} 个词') >= 0,
+    '要显示本次取的是课本第几到第几个词');
+
+  assert.ok(js.indexOf('pickStart:') >= 0, 'js 缺 pickStart');
+  assert.ok(js.indexOf('continueFromLast:') >= 0, 'js 缺 continueFromLast');
+  assert.ok(js.indexOf('computeContinueFrom:') >= 0, 'js 缺已布置覆盖数计算');
+  assert.ok(js.indexOf("slice(start - 1, start - 1 + f.count)") >= 0,
+    '预览取词必须从 start-1 开始切（口径与课本序一致）');
+  assert.ok(js.indexOf("String(w || '').trim().toLowerCase()") >= 0,
+    'word_id 比对必须 trim+lower（老数据 word_id 带前后空格，比错就是"布置过却说没布置"）');
+  assert.ok(js.indexOf(">= 60") >= 0, '加词上限要放宽到 60（原 30 是拍脑袋值）');
+
+  // 云端要下发 volume：前端按 volume+unit 找同单元旧作业
+  var cjs = fs.readFileSync(path.join(ROOT, 'cloud/functions/class/index.js'), 'utf8');
+  assert.ok(/volume:\s*vol,/.test(cjs), 'publicAssignment 必须下发 volume');
+});
+
 console.log('\n全部通过：' + pass + ' 项 ✓');

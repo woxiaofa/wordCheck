@@ -38,7 +38,7 @@ Page({
     briefReady: false,
     briefNote: '',
     form: { scope: 'tag', tag: '外研四上', count: 10, deadline: '', note: '', personalized: false,
-            volume: '', unit: 0, unitIndex: 0 },
+            volume: '', unit: 0, unitIndex: 0, start: 1 },
     assigning: false,
     // 布置预览（2026-10-09 反馈：布置前必须能看到"到底是哪些词"，还能删/加）
     preview: [],           // 本次将布置的词（词文本），所见即所得
@@ -53,6 +53,9 @@ Page({
     volumes: [],          // [{ key, name, bookName, units: [{no,name,count}] }]
     unitNames: [],        // picker 显示文案
     unitVals: [],         // picker 对应的单元号（0 = 整册）
+    unitTotal: 0,         // 当前单元总词数（起点/词数两个滑杆的上限都由它算）
+    countMax: 30,         // 词数滑杆上限：unit 模式 = 单元剩余词数（42 词的单元不再被 30 卡住）
+    continueFrom: 0,      // 该单元已布置覆盖到第几个词；>1 时显示"接着上次"按钮（0 = 不适用）
     assignments: [],
     students: [],
     /** 数据加载失败时显示在对应卡片里的错误（绝不静默吞错：吞了就无法排查） */
@@ -145,6 +148,9 @@ Page({
         });
       });
       self.setData({ assignments: list, assignError: '' });
+      // 作业列表到手后重算"接着上次"：打开页面时表单先渲染、数据后到，
+      // 不重算的话续接按钮会晚一拍（甚至这个会话里一直不出现）
+      if (this.data.form.scope === 'unit') this.syncUnitMeta();
     }).catch(function (err) {
       // 不静默：加载失败必须让教练看到原因，否则"布置了却看不到"无从排查
       self.setData({ assignError: cloud.humanError(err) });
@@ -338,6 +344,11 @@ Page({
     if (scope === 'unit') {
       this.ensureUnits();
       this.clampCountToUnit();
+      this.syncUnitMeta();
+    } else {
+      // 回到按词库：上限回到老规则（30），起点无意义重置 ——
+      // 两个模式各记各的状态，切回来时别带着上一次的残留
+      this.setData({ 'form.start': 1, countMax: 30, continueFrom: 0 });
     }
     this.rebuildPreview();
   },
@@ -349,12 +360,78 @@ Page({
     var upd = {
       'form.unitIndex': idx,
       'form.unit': opt.unit,
-      'form.volume': opt.volume
+      'form.volume': opt.volume,
+      // 换单元 = 换了一_pool 词，起点回到开头（续接按钮会提示可以从哪继续）
+      'form.start': 1
     };
     // 词数不能超过该单元的词数：否则布置界面说 10 个、实际只给 8 个，
     // 又是"两个数字互相打架"（这类问题的修复成本远高于提前夹住）
     var max = opt.count || 0;
     if (max && this.data.form.count > max) upd['form.count'] = max;
+    this.setData(upd);
+    this.syncUnitMeta();
+    this.rebuildPreview();
+  },
+
+  /** 重算当前单元的两个滑杆上限与"接着上次"提示（unit 模式专用，切范围/换单元/作业列表刷新后都要跑） */
+  syncUnitMeta: function () {
+    var f = this.data.form;
+    var opt = this.data.unitVals[f.unitIndex];
+    var total = (opt && opt.count) || 0;
+    var upd = { unitTotal: total };
+    // 词数上限 = 从起点到单元末尾还剩多少个 —— 42 个词的单元不再被写死的 30 卡住
+    upd.countMax = f.scope === 'unit' && total ? Math.max(3, total - f.start + 1) : 30;
+    upd.continueFrom = this.computeContinueFrom();
+    this.setData(upd);
+  },
+
+  /**
+   * 这个单元已经布置到第几个词了？（unit 模式的"接着上次布置"数据源）
+   * 拿该班所有同单元作业的词单，跟课本词序对齐，取最靠后的一个的位置。
+   * word_id 可能有前后空格（老数据），两边都 trim+lower 再比 —— 比错一个字母就是"明明布置过却说没布置"。
+   */
+  computeContinueFrom: function () {
+    var f = this.data.form;
+    if (f.scope !== 'unit' || !f.volume || !f.unit) return 0;
+    var unitWords = (books.getWordsByUnit(f.volume, f.unit) || [])
+      .map(function (w) { return String(w.word || '').trim().toLowerCase(); });
+    if (!unitWords.length) return 0;
+    var assigned = {};
+    (this.data.assignments || []).forEach(function (a) {
+      if (Number(a.unit) !== f.unit || a.volume !== f.volume) return;
+      (a.word_ids || []).forEach(function (w) {
+        assigned[String(w || '').trim().toLowerCase()] = true;
+      });
+    });
+    var last = 0;
+    unitWords.forEach(function (w, i) {
+      if (assigned[w]) last = Math.max(last, i + 1);
+    });
+    return last ? last + 1 : 0;   // 下一个该布置的词的序号（1-based）；一个都没布置过返回 0
+  },
+
+  /** 一键续接：起点挪到"上次布置的下一个词"，词数沿用当前设置（默认还是 10 个） */
+  continueFromLast: function () {
+    var n = this.data.continueFrom;
+    if (!n) return;
+    var upd = { 'form.start': n };
+    var total = this.data.unitTotal;
+    var left = total ? total - n + 1 : 0;
+    if (left && this.data.form.count > left) upd['form.count'] = left;
+    upd.countMax = total ? Math.max(3, total - n + 1) : 30;
+    this.setData(upd);
+    this.rebuildPreview();
+    wx.showToast({ title: '从第 ' + n + ' 个词接着布置', icon: 'none' });
+  },
+
+  pickStart: function (e) {
+    var start = Number(e.detail.value) || 1;
+    var upd = { 'form.start': start };
+    var total = this.data.unitTotal;
+    var left = total ? total - start + 1 : 0;
+    // 起点往后挪，剩余词数变少：词数必须跟着夹住，否则预览只有 5 个词、滑杆却显示 10
+    if (left && this.data.form.count > left) upd['form.count'] = left;
+    upd.countMax = total ? Math.max(3, left) : 30;
     this.setData(upd);
     this.rebuildPreview();
   },
@@ -381,13 +458,15 @@ Page({
   /* ---------------------------------------------------------------- */
 
   /** 按当前范围生成预览词单 —— 取词口径必须与服务端 chooseWords 完全一致：
-   *  unit 模式按 unit_order（课本序），tag 模式按 freq 升序。本地词库与云端同源。 */
+   *  unit 模式按 unit_order（课本序），从第 start 个起取 count 个（起点滑杆，2026-10-11 反馈）；
+   *  tag 模式按 freq 升序。本地词库与云端同源。 */
   rebuildPreview: function () {
     var f = this.data.form;
     var list;
     if (f.scope === 'unit') {
+      var start = Math.max(1, Number(f.start) || 1);
       list = (books.getWordsByUnit(f.volume, f.unit) || [])
-        .slice(0, f.count).map(function (w) { return w.word; });
+        .slice(start - 1, start - 1 + f.count).map(function (w) { return w.word; });
     } else {
       var pool = f.tag === '全部' ? WORDS : WORDS.filter(function (w) {
         return (w.tags || []).indexOf(f.tag) >= 0;
@@ -430,8 +509,10 @@ Page({
       wx.showToast({ title: '已在词单里', icon: 'none' });
       return;
     }
-    if (this.data.preview.length >= 30) {
-      wx.showToast({ title: '最多 30 个词', icon: 'none' });
+    // 60 的来源：最大的单元 42 词 + 搜索补词的空间。旧的 30 是拍脑袋写的，
+    // 结果 42 个词的单元后 12 个只能靠搜索一个个加（2026-10-11 反馈）
+    if (this.data.preview.length >= 60) {
+      wx.showToast({ title: '最多 60 个词', icon: 'none' });
       return;
     }
     var list = this.data.preview.concat([word]);

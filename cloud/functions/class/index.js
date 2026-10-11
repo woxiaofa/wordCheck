@@ -1320,6 +1320,8 @@ function publicAssignment(a) {
     // 个性化作业：前端要标注"每人词单不同"，别让家长以为两份进度对不上是 bug
     personalized: !!a.personalized,
     unit: vol && no ? no : 0,
+    // 教练端"接着上次布置"要按 volume+unit 找同单元的旧作业（2026-10-11）
+    volume: vol,
     unit_label: vol && no ? scopeLabel({ mode: 'unit', tag: a.tag, volume: vol, unit: no }) : ''
   };
 }
