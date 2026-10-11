@@ -9,6 +9,11 @@
       "name": "dailyBrief",
       "type": "timer",
       "config": "0 30 20 * * * *"
+    },
+    {
+      "name": "dailyAssign",
+      "type": "timer",
+      "config": "0 0 8 * * * *"
     }
   ]
 }

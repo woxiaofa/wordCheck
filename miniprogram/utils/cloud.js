@@ -321,6 +321,23 @@ var api = {
     return call('class', 'assign', params);
   },
 
+  /* ------------- 自动布置计划（2026-10-11） ------------- */
+
+  /** 一次设定：这个单元从 start 起，分 days 天自动布置完（第一天当场发出） */
+  createPlan: function (params) {
+    return call('class', 'planCreate', params);
+  },
+
+  /** 本班的自动布置计划（含进度：已发几天 / 还剩几天） */
+  planList: function () {
+    return call('class', 'planList', {});
+  },
+
+  /** 停掉计划：已发出的作业保留，只是不再往后发 */
+  stopPlan: function (planId) {
+    return call('class', 'planStop', { planId: planId });
+  },
+
   /** 教练：作业列表（带全班进度） */
   coachAssignments: function () {
     return call('class', 'assignments', {});

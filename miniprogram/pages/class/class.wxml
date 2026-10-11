@@ -104,6 +104,28 @@
       <view wx:if="{{form.scope === 'unit'}}" class="muted" style="font-size:22rpx;margin:-4rpx 0 8rpx">
         本次布置课本第 {{form.start}} ~ {{form.start + form.count - 1}} 个词（该单元共 {{unitTotal}} 个）
       </view>
+
+      <!-- 自动布置（2026-10-11）：一次设定分几天发完，之后每天早上 8 点自动接着发 -->
+      <view wx:if="{{form.scope === 'unit'}}" class="plan-box">
+        <view class="form-row plan-toggle">
+          <text class="form-label" style="width:auto">分几天自动布置</text>
+          <switch checked="{{form.planOn}}" color="#3ea6ff" bindchange="togglePlan" />
+        </view>
+        <!-- ⚠ 这里不能用 block 标签：class-page.test.js 按第一个闭合标签切教练/学生区块，
+             内层再套一个会把区块截断，三条老断言会一起挂（2026-10-11 实锤） -->
+        <view wx:if="{{form.planOn}}">
+          <view class="form-row">
+            <text class="form-label">天数</text>
+            <picker mode="selector" range="{{planDaysNames}}" value="{{form.planDays - 2}}"
+                    bindchange="pickPlanDays">
+              <view class="picker-val">{{form.planDays}} 天</view>
+            </picker>
+          </view>
+          <view class="muted" style="font-size:22rpx">
+            每天约 {{planPerDay}} 个词，第一天当场发出，剩下 {{form.planDays - 1}} 天每天早上 8 点自动布置
+          </view>
+        </view>
+      </view>
       <!-- 小学阶段的量：一次超过 10 个，孩子多半会为了赶完乱点，等于没学 -->
       <view class="count-tip {{form.count > 10 ? 'warn' : ''}}">
         {{form.count > 10
@@ -150,10 +172,31 @@
         <switch checked="{{form.personalized}}" bindchange="togglePersonal" color="#7c5cff" />
       </view>
       <button class="btn ok mt" loading="{{assigning}}" disabled="{{assigning}}" bindtap="submitAssign">
-        {{form.scope === 'unit'
-          ? '布置 ' + unitNames[form.unitIndex]
-          : '布置 ' + form.count + ' 个词' + (form.tag === '全部' ? '' : '（' + form.tag + '）')}}{{form.personalized ? ' · 个性化' : ''}}
+        {{form.scope === 'unit' && form.planOn
+          ? '开始自动布置（' + form.planDays + ' 天）'
+          : (form.scope === 'unit'
+            ? '布置 ' + unitNames[form.unitIndex]
+            : '布置 ' + form.count + ' 个词' + (form.tag === '全部' ? '' : '（' + form.tag + '）'))}}{{form.personalized ? ' · 个性化' : ''}}
       </button>
+    </view>
+
+    <!-- 进行中的自动布置计划：老师每天打开只需要看这里 + 催一催 -->
+    <view class="card" wx:if="{{plans.length}}">
+      <view class="card-title">自动布置中</view>
+      <view class="plan-item" wx:for="{{plans}}" wx:key="id">
+        <view class="plan-head">
+          <text wx:if="{{item.active}}" class="plan-dot live"></text>
+          <text wx:else class="plan-dot"></text>
+          <text class="plan-name">{{item.unit_label}} 第 {{item.start}} 个词起</text>
+          <text class="plan-progress">{{item.done}}/{{item.days}} 天</text>
+        </view>
+        <view class="muted" style="font-size:22rpx">
+          {{item.active
+            ? '每天约 ' + item.per_day + ' 个词，还剩 ' + item.left + ' 天 · 每天早上 8 点自动布置（下一个从第 ' + item.next_start + ' 个词开始）'
+            : '已结束：共发了 ' + item.done + ' 天'}}
+        </view>
+        <view wx:if="{{item.active}}" class="plan-stop" data-id="{{item.id}}" bindtap="stopPlan">停止自动布置</view>
+      </view>
     </view>
 
     <!-- 已布置的作业 -->

@@ -66,6 +66,34 @@
   color: #8fa3b7;
   flex-shrink: 0;
 }
+/* 自动布置（分几天发完） */
+.plan-box {
+  margin-top: 12rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: #141d28;
+  border: 1rpx solid #223044;
+}
+.plan-toggle { margin-top: 0; justify-content: space-between; }
+.plan-item { margin-top: 16rpx; padding-bottom: 14rpx; border-bottom: 1rpx dashed #26313f; }
+.plan-head { display: flex; align-items: center; gap: 10rpx; }
+.plan-dot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: #4a5a6b; flex-shrink: 0;
+}
+.plan-dot.live { background: #2fd07a; }
+.plan-name { flex: 1; font-size: 26rpx; color: #e8eef5; }
+.plan-progress { font-size: 22rpx; color: #8fa3b7; flex-shrink: 0; }
+.plan-stop {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #ff9a9a;
+  border: 1rpx solid rgba(255, 92, 114, .4);
+}
+
 /* 续接上次布置（起点一键顺延） */
 .continue-row { justify-content: space-between; gap: 12rpx; margin-top: 14rpx; }
 .continue-btn {

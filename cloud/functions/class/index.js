@@ -32,7 +32,14 @@ const COLL = {
   requests: 'request_dedup',
   logs: 'review_logs',
   /** 每日简报订阅：{user_id, openid, student_id, template_id, last_sent_at} */
-  briefSubs: 'brief_subs'
+  briefSubs: 'brief_subs',
+  /**
+   * 自动布置计划（2026-10-11）：{class_id, teacher_id, volume, unit, start,
+   * per_day, days, done, personalized, active, last_date, created_at}
+   * 老师一次设定"这个单元分几天发完"，之后每天早上由定时器接着发 ——
+   * 不用每天来点布置，只管看报告和催一催。
+   */
+  plans: 'assign_plans'
 };
 
 const LIMITS = {
@@ -85,7 +92,7 @@ exports.main = async (event) => {
   // 定时触发（config.json 里的 timer）：没有用户身份，只做"给所有订阅者发当天简报"。
   // 必须放在取 OPENID 之前 —— 定时器调用方不是人，拿不到也不该要求 OPENID。
   if (event && (event.Type === 'Timer' || event.triggerName)) {
-    return onTimerTick();
+    return onTimerTick(event);
   }
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
@@ -105,6 +112,9 @@ exports.main = async (event) => {
     case 'subscribeBrief': return onSubscribeBrief(OPENID, event);
     case 'briefSubs':     return onBriefSubs(OPENID);
     case 'sendBriefs':    return onSendBriefs(OPENID, event);
+    case 'planCreate':    return onPlanCreate(OPENID, event);
+    case 'planList':      return onPlanList(OPENID);
+    case 'planStop':      return onPlanStop(OPENID, event);
     default:              return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
@@ -369,6 +379,216 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     // 自定义词单里有词配不上库时如实带回，前端提示 —— 不静默、不假成功
     missing: missingWords.length ? missingWords : undefined
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* 自动布置计划（2026-10-11 用户反馈：42 个词的单元分 4 天发完，别每天来点）  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 为什么要它：老师的真实节奏是"这周把 Unit 2 过完"，不是"每天下午四点来布置 10 个词"。
+ * 一次设定，定时器每天早 8 点接着发 —— 老师只剩两件事：看报告、催一催。
+ *
+ * 刻意不做的事：
+ *   1) 不猜每天该布置多少 —— 由老师定天数，我们按 ceil(剩余/天数) 均分；
+ *   2) 不自动跳过"孩子已经会的词"（那是个性化开关的事，计划只管按课本序往前推）；
+ *   3) 定时器无身份，所以计划文档里自带 class_id 与 teacher_id，写库不依赖 openid。
+ */
+async function onPlanCreate(openid, { volume, unit, start, days, personalized, clientReqId }) {
+  if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+
+  const scope = resolveScope(null, volume, unit);
+  if (scope.err) return scope.err;
+  if (scope.mode !== 'unit') return fail('BAD_PARAM', '自动布置只支持按教材单元');
+
+  const startNo = Math.max(1, parseInt(start, 10) || 1);
+  const daysNo = Math.min(14, Math.max(2, parseInt(days, 10) || 2));
+
+  // 单元总词数：按 volume+unit 计数（不拉全文，只要个数量）
+  const totalRes = await db.collection('words')
+    .where({ volume: scope.volume, unit: scope.unit }).count().catch(() => ({ total: 0 }));
+  const unitTotal = totalRes.total || 0;
+  const remaining = unitTotal - startNo + 1;
+  if (remaining < 2) return fail('BAD_PARAM', '这个单元从这个起点往后没有词可布置了');
+
+  // 每天词数 = 均分向上取整（42 词 4 天 → 11/11/10/10），最后一天可能少一个
+  const perDay = Math.max(1, Math.ceil(remaining / daysNo));
+  const realDays = Math.min(daysNo, Math.ceil(remaining / perDay));
+
+  // 集合可能还没建（新功能第一次用）：先自愈一次，省得老师点完布置只看到一句报错。
+  // 建不成也要给得出人话 —— "点了没反应"比"报错"更让人怀疑数据坏了。
+  await ensureCollection(db, COLL.plans);
+
+  const now = Date.now();
+  const doc = {
+    class_id: ctx.cls._id,
+    teacher_id: ctx.user._id,
+    volume: scope.volume,
+    unit: scope.unit,
+    start: startNo,
+    per_day: perDay,
+    days: realDays,
+    done: 0,
+    personalized: personalized === true,
+    active: true,
+    last_date: '',
+    created_at: now
+  };
+  const addRes = await db.collection(COLL.plans).add({ data: doc }).catch((e) => ({
+    __err: String((e && (e.errMsg || e.message)) || e)
+  }));
+  if (addRes && addRes.__err) {
+    return fail('NO_COLLECTION',
+      '云端还没建 assign_plans 集合（自动布置要用）：去云开发控制台建一个，或重试一次');
+  }
+
+  // 第一天当场发出：老师设定完立刻能在"已布置"里看到，孩子今天就有得练。
+  // 剩下的交给定时器 —— "设完什么都没发生"是最让人不安的体验。
+  const first = await planEmitAssignment(Object.assign({ _id: addRes._id }, doc));
+  if (first.err) {
+    // 第一份都没发出来就别留个假计划在班里转：立刻停掉并如实报错
+    await db.collection(COLL.plans).doc(addRes._id).update({ data: { active: false } }).catch(() => {});
+    return first.err;
+  }
+
+  const saved = await db.collection(COLL.plans).doc(addRes._id).get();
+  return ok({ plan: publicPlan(saved.data), assignment: first.assignment });
+}
+
+/** 教练端：本班的自动布置计划（含进度） */
+async function onPlanList(openid) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+  const r = await db.collection(COLL.plans)
+    .where({ class_id: ctx.cls._id })
+    .orderBy('created_at', 'desc')
+    .limit(10)
+    .get().catch(() => ({ data: [] }));
+  return ok({ plans: (r.data || []).map(publicPlan) });
+}
+
+/** 停掉计划：已经发出去的作业保留（那是孩子已经领到的活），只是不再往后发 */
+async function onPlanStop(openid, { planId }) {
+  const ctx = await requireCoach(openid);
+  if (ctx.err) return ctx.err;
+  if (!planId) return fail('BAD_PARAM', '缺少 planId');
+  const r = await db.collection(COLL.plans).doc(planId).get().catch(() => null);
+  if (!r || !r.data) return fail('NOT_FOUND', '计划不存在');
+  // 只能停自己班的（定时器侧不需要 openid，权限必须在数据上卡住）
+  if (r.data.class_id !== ctx.cls._id) return fail('FORBIDDEN', '这不是本班的计划');
+  await db.collection(COLL.plans).doc(planId).update({ data: { active: false } });
+  return ok({ stopped: true });
+}
+
+/** 给前端看的计划：把"还剩几天、下一个词是第几个"摊平，前端不拼字符串 */
+function publicPlan(p) {
+  const nextStart = (p.start || 1) + ((p.done || 0) * (p.per_day || 0));
+  return {
+    id: p._id,
+    volume: p.volume,
+    unit: p.unit,
+    unit_label: p.volume && p.unit ? scopeLabel({ mode: 'unit', tag: '', volume: p.volume, unit: p.unit }) : '',
+    start: p.start || 1,
+    per_day: p.per_day || 0,
+    days: p.days || 0,
+    done: p.done || 0,
+    left: Math.max(0, (p.days || 0) - (p.done || 0)),
+    next_start: nextStart,
+    personalized: !!p.personalized,
+    active: p.active !== false,
+    last_date: p.last_date || ''
+  };
+}
+
+/**
+ * 按计划发一天的作业（第 done+1 天）。
+ * 取词 = 课本序跳过 start-1+done*per_day，取 per_day 个 —— 与老师手动布置同一口径。
+ * 幂等：靠 last_date 挡住（同一天被定时器重复触发也不会发两份）。
+ */
+async function planEmitAssignment(plan) {
+  const offset = (plan.start - 1) + plan.done * plan.per_day;
+  const r = await db.collection('words')
+    .where({ volume: plan.volume, unit: plan.unit })
+    .orderBy('unit_order', 'asc')
+    .skip(offset)
+    .limit(plan.per_day)
+    .get().catch(() => ({ data: [] }));
+  const wordIds = (r.data || []).map(w => w.word);
+  if (wordIds.length < 1) {
+    return { err: fail('WORDS_EMPTY', '这个单元从这个起点往后没有词可布置了') };
+  }
+
+  const now = Date.now();
+  const scope = resolveScope(null, plan.volume, plan.unit);
+  const dayNo = plan.done + 1;
+  const name = scope.label + ' 第 ' + dayNo + '/' + plan.days + ' 天（' +
+    (plan.start + plan.done * plan.per_day) + '~' +
+    (plan.start + plan.done * plan.per_day + wordIds.length - 1) + ' 词）';
+
+  const addRes = await db.collection(COLL.assignments).add({
+    data: {
+      class_id: plan.class_id,
+      tag: scope.tag,
+      volume: plan.volume,
+      unit: plan.unit,
+      name,
+      word_ids: wordIds,
+      count: wordIds.length,
+      deadline: '',
+      note: '',
+      personalized: !!plan.personalized,
+      pool_ids: [],
+      // 溯源：这份作业是自动计划发的第几天（排查"孩子说没作业"时能立刻查到）
+      plan_id: plan._id,
+      plan_day: dayNo,
+      created_by: plan.teacher_id,
+      created_at: now
+    }
+  });
+
+  await db.collection(COLL.plans).doc(plan._id).update({
+    data: {
+      done: dayNo,
+      last_date: getLocalDate(now),
+      active: dayNo < plan.days
+    }
+  }).catch((e) => {
+    console.error('[class] 计划进度回写失败（可能重复发同一天）:',
+      String((e && (e.errMsg || e.message)) || e).slice(0, 120));
+  });
+
+  if (plan.personalized) {
+    const cls = await db.collection(COLL.classes).doc(plan.class_id).get().catch(() => null);
+    const sids = (cls && cls.data && cls.data.student_ids) || [];
+    for (const sid of sids) {
+      await wordsForStudent({ _id: addRes._id, word_ids: wordIds, personalized: true }, sid)
+        .catch(() => {});
+    }
+  }
+
+  const created = await db.collection(COLL.assignments).doc(addRes._id).get();
+  return { assignment: publicAssignment(created.data) };
+}
+
+/** 定时器：每天早 8 点把所有进行中的计划往前推一天 */
+async function runDailyPlans() {
+  const today = getLocalDate(Date.now());
+  const r = await db.collection(COLL.plans)
+    .where({ active: true })
+    .limit(50)
+    .get().catch(() => ({ data: [] }));
+  const plans = r.data || [];
+  let sent = 0;
+  for (const p of plans) {
+    // 幂等：同一天只发一次（定时器偶发重触发、或多个触发器撞一起）
+    if (p.last_date === today) continue;
+    if (!p._id) continue;
+    const res = await planEmitAssignment(p).catch((e) => ({ err: String((e && e.message) || e) }));
+    if (res && !res.err) sent++;
+  }
+  return { plans: plans.length, sent: sent };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1033,8 +1253,20 @@ async function onSendBriefs(openid, event) {
 }
 
 /** 定时触发入口（config.json 的 timer 每天调一次） */
-function onTimerTick() {
-  return onSendBriefs(null, {});
+/**
+ * 定时器分发（config.json 里两条 timer）：
+ *   dailyBrief  20:30 —— 给订阅者发当天简报
+ *   dailyAssign 08:00 —— 把进行中的自动布置计划往前推一天
+ * 两条必须分开：8 点那个要是顺手发了简报，家长早上就收到"今天练了 0 个词"。
+ */
+async function onTimerTick(event) {
+  const name = (event && (event.triggerName || event.TriggerName)) || '';
+  if (name === 'dailyAssign') return runDailyPlans();
+  if (name === 'dailyBrief') return onSendBriefs(null, {});
+  // 拿不到触发器名（手工触发/老环境）：两件都做，行为与加自动布置之前一致
+  const briefs = await onSendBriefs(null, {});
+  const plans = await runDailyPlans().catch(() => ({ sent: 0 }));
+  return Object.assign({}, briefs, { daily_plans: plans });
 }
 
 /**

@@ -23,13 +23,18 @@ function ok(name, fn) {
   catch (e) { console.log('  ✗ ' + name + '\n    ' + e.message); process.exitCode = 1; }
 }
 
-/** 取出某个 block 的内容（从标记行到 </block>） */
+/**
+ * 取出某个 block 的内容（从标记到闭合标签）。
+ * ⚠ 先剥注释再找：注释里出现闭合标签的字面量会把区块切短 ——
+ *   2026-10-11 实锤（写注释提醒"别用 block 标签"时把标签名写进了注释，三条断言全挂）。
+ */
 function block(marker) {
-  var i = wxml.indexOf(marker);
+  var src = wxml.replace(/<!--[\s\S]*?-->/g, '');
+  var i = src.indexOf(marker);
   assert.ok(i >= 0, '找不到区块标记: ' + marker);
-  var end = wxml.indexOf('</block>', i);
+  var end = src.indexOf('</block>', i);
   assert.ok(end > i, '区块未闭合: ' + marker);
-  return wxml.slice(i, end);
+  return src.slice(i, end);
 }
 
 var STUDENT = block("my.role === 'student'");
@@ -194,6 +199,47 @@ rule('⑬ 布置作业：起点滑杆 + 续接上次 + 词数上限跟着单元�
   // 云端要下发 volume：前端按 volume+unit 找同单元旧作业
   var cjs = fs.readFileSync(path.join(ROOT, 'cloud/functions/class/index.js'), 'utf8');
   assert.ok(/volume:\s*vol,/.test(cjs), 'publicAssignment 必须下发 volume');
+});
+
+rule('⑭ 自动布置计划：一次设定分几天发完（2026-10-11）', function () {
+  // 为什么（用户原话）：42 个词就 4 天每天自动布置 10~12 个，
+  // 不用每天都来布置，只管看报告和催一催
+  var cjs = fs.readFileSync(path.join(ROOT, 'cloud/functions/class/index.js'), 'utf8');
+  var cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'cloud/functions/class/config.json'), 'utf8'));
+  var ujs = fs.readFileSync(path.join(ROOT, 'miniprogram/utils/cloud.js'), 'utf8');
+
+  // 云端：三个 action + 计划集合 + 定时器
+  ['planCreate', 'planList', 'planStop'].forEach(function (a) {
+    assert.ok(new RegExp("case '" + a + "':").test(cjs), '云函数缺少 action：' + a);
+  });
+  assert.ok(/plans:\s*'assign_plans'/.test(cjs), '缺少 assign_plans 集合常量');
+  var names = (cfg.triggers || []).map(function (t) { return t.name; });
+  assert.ok(names.indexOf('dailyAssign') >= 0, 'config.json 要有 dailyAssign 定时器');
+  var t8 = (cfg.triggers || []).filter(function (t) { return t.name === 'dailyAssign'; })[0];
+  assert.strictEqual(t8.config, '0 0 8 * * * *', '自动布置定时器必须是每天 08:00（用户拍板）');
+  // 两个定时器必须分开：8 点那个顺手发简报，家长早上就收到"今天练了 0 个词"
+  assert.ok(/name === 'dailyAssign'\s*\)\s*return runDailyPlans\(\)/.test(cjs),
+    'onTimerTick 必须按 triggerName 分发（dailyAssign 只跑计划）');
+  // 幂等：同一天不能被发两份
+  assert.ok(/if \(p\.last_date === today\) continue;/.test(cjs), '定时器要按 last_date 幂等');
+  // 均分算法与前端一致
+  assert.ok(/Math\.ceil\(remaining \/ daysNo\)/.test(cjs), '每天词数要向上均分');
+
+  ['createPlan', 'planList', 'stopPlan'].forEach(function (m) {
+    assert.ok(new RegExp('\\b' + m + ':').test(ujs), 'utils/cloud.js 缺少 ' + m);
+  });
+
+  // 前端：开关 + 天数 + 每天几个词 + 计划卡 + 停止
+  assert.ok(wxml.indexOf('bindchange="togglePlan"') >= 0, '要有自动布置开关');
+  assert.ok(wxml.indexOf('bindchange="pickPlanDays"') >= 0, '要有天数选择');
+  assert.ok(wxml.indexOf('每天约 {{planPerDay}} 个词') >= 0, '要说清每天几个词');
+  assert.ok(wxml.indexOf('bindtap="stopPlan"') >= 0, '要能停掉计划');
+  assert.ok(wxml.indexOf('{{item.done}}/{{item.days}} 天') >= 0, '计划卡要显示进度');
+  assert.ok(js.indexOf('cloud.api.createPlan') >= 0 && js.indexOf("clientReqId: 'plan:'") >= 0,
+    '提交要走 createPlan 且带幂等 reqId');
+  assert.ok(js.indexOf("'form.planOn'") >= 0 && js.indexOf("'form.planDays'") >= 0,
+    'form 要带 planOn / planDays');
+  assert.ok(js.indexOf('refreshPlanPerDay') >= 0, '每天词数要算出来存进 data（WXML 调不了方法）');
 });
 
 console.log('\n全部通过：' + pass + ' 项 ✓');

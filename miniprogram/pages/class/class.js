@@ -38,7 +38,10 @@ Page({
     briefReady: false,
     briefNote: '',
     form: { scope: 'tag', tag: '外研四上', count: 10, deadline: '', note: '', personalized: false,
-            volume: '', unit: 0, unitIndex: 0, start: 1 },
+            volume: '', unit: 0, unitIndex: 0, start: 1,
+            // 自动布置：一次设定分几天发完（2026-10-11）—— 42 词的单元分 4 天，
+            // 之后每天早上 8 点自动接着发，老师只看报告和催一催
+            planOn: false, planDays: 4 },
     assigning: false,
     // 布置预览（2026-10-09 反馈：布置前必须能看到"到底是哪些词"，还能删/加）
     preview: [],           // 本次将布置的词（词文本），所见即所得
@@ -56,6 +59,9 @@ Page({
     unitTotal: 0,         // 当前单元总词数（起点/词数两个滑杆的上限都由它算）
     countMax: 30,         // 词数滑杆上限：unit 模式 = 单元剩余词数（42 词的单元不再被 30 卡住）
     continueFrom: 0,      // 该单元已布置覆盖到第几个词；>1 时显示"接着上次"按钮（0 = 不适用）
+    planDaysNames: ['2 天', '3 天', '4 天', '5 天', '6 天', '7 天'],
+    planPerDay: 0,        // 自动布置时每天几个词（WXML 读不了方法，只能存字段）
+    plans: [],            // 本班自动布置计划（含进度）
     assignments: [],
     students: [],
     /** 数据加载失败时显示在对应卡片里的错误（绝不静默吞错：吞了就无法排查） */
@@ -150,7 +156,14 @@ Page({
       self.setData({ assignments: list, assignError: '' });
       // 作业列表到手后重算"接着上次"：打开页面时表单先渲染、数据后到，
       // 不重算的话续接按钮会晚一拍（甚至这个会话里一直不出现）
-      if (this.data.form.scope === 'unit') this.syncUnitMeta();
+      // ⚠ 这里是 then 回调：只能用 self（写 this 会抛 undefined，后面整段都不执行）
+      if (self.data.form.scope === 'unit') self.syncUnitMeta();
+      // 自动布置计划单独拉：它失败不该连累作业列表（老师的正事是看谁没交）
+      cloud.api.planList().then(function (pr) {
+        self.setData({ plans: (pr && pr.data && pr.data.plans) || [] });
+      }).catch(function () {
+        self.setData({ plans: [] });
+      });
     }).catch(function (err) {
       // 不静默：加载失败必须让教练看到原因，否则"布置了却看不到"无从排查
       self.setData({ assignError: cloud.humanError(err) });
@@ -383,6 +396,7 @@ Page({
     upd.countMax = f.scope === 'unit' && total ? Math.max(3, total - f.start + 1) : 30;
     upd.continueFrom = this.computeContinueFrom();
     this.setData(upd);
+    this.refreshPlanPerDay();
   },
 
   /**
@@ -424,6 +438,46 @@ Page({
     wx.showToast({ title: '从第 ' + n + ' 个词接着布置', icon: 'none' });
   },
 
+  /** 自动布置开关：只按单元可用（tag 池没有"课本序"，谈不上下一天） */
+  togglePlan: function (e) {
+    this.setData({ 'form.planOn': !!e.detail.value });
+  },
+
+  pickPlanDays: function (e) {
+    this.setData({ 'form.planDays': Number(e.detail.value) + 2 });
+    this.refreshPlanPerDay();
+  },
+
+  /** 每天多少个词：向上均分（42 词 4 天 → 11/11/10/10），与云端同一算法。
+   *  放在 data 里而不是方法 —— WXML 调不了方法，只能读字段。 */
+  refreshPlanPerDay: function () {
+    var f = this.data.form;
+    var total = this.data.unitTotal || 0;
+    var left = total ? total - f.start + 1 : 0;
+    this.setData({
+      planPerDay: left ? Math.max(1, Math.ceil(left / (f.planDays || 2))) : 0
+    });
+  },
+
+  stopPlan: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var self = this;
+    wx.showModal({
+      title: '停止自动布置？',
+      content: '已经发出去的作业会保留，只是不再往后自动发。',
+      confirmText: '停止',
+      success: function (r) {
+        if (!r.confirm) return;
+        cloud.api.stopPlan(id).then(function () {
+          wx.showToast({ title: '已停止', icon: 'none' });
+          self.loadCoachData();
+        }).catch(function (err) {
+          wx.showToast({ title: cloud.humanError(err), icon: 'none' });
+        });
+      }
+    });
+  },
+
   pickStart: function (e) {
     var start = Number(e.detail.value) || 1;
     var upd = { 'form.start': start };
@@ -433,6 +487,7 @@ Page({
     if (left && this.data.form.count > left) upd['form.count'] = left;
     upd.countMax = total ? Math.max(3, left) : 30;
     this.setData(upd);
+    this.refreshPlanPerDay();
     this.rebuildPreview();
   },
 
@@ -541,6 +596,31 @@ Page({
     var f = this.data.form;
     if (this.data.assigning) return;
     this.setData({ assigning: true });
+
+    // 自动布置：一次设定，剩下的交给每天早上 8 点的定时器（第一天当场发出）
+    if (f.scope === 'unit' && f.planOn) {
+      cloud.api.createPlan({
+        volume: f.volume,
+        unit: f.unit,
+        start: f.start,
+        days: f.planDays,
+        personalized: !!f.personalized,
+        clientReqId: 'plan:' + srs.newReqId()
+      }).then(function (r) {
+        self.setData({ assigning: false, 'form.note': '' });
+        var p = (r && r.data && r.data.plan) || {};
+        wx.showToast({
+          title: '已布置第 1 天 · 剩下 ' + (p.left || 0) + ' 天每天早 8 点自动发',
+          icon: 'success',
+          duration: 3000
+        });
+        self.loadCoachData();
+      }).catch(function (err) {
+        self.setData({ assigning: false });
+        wx.showToast({ title: cloud.humanError(err), icon: 'none' });
+      });
+      return;
+    }
 
     // 按词库 / 按教材单元，两条路的参数集不同：别把 unit 塞给只认 tag 的老链路，
     // 也别让按单元布置时多带一个会被无视的 tag（服务端会忽略，但看着像 bug）
