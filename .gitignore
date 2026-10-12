@@ -36,3 +36,8 @@ scripts/words.json
 
 # WorkBuddy 会话/记忆/LS 索引（本机工程数据，不进仓库）
 .workbuddy/
+
+# 短视频素材（体积大且可由脚本重新生成，脚本与网页进仓库）
+assets/video/*.mp4
+assets/video/*.wav
+assets/video/audio/

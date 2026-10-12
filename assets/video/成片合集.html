@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>功课抽查 · 7 天短视频成片（可录制）</title>
+<style>
+  :root{
+    --bg:#0f1620; --card:#18222e; --card2:#1e2a38; --line:#2b3949;
+    --fg:#e8eef5; --dim:#8fa3b7; --accent:#3ea6ff; --accent2:#7c5cff;
+    --ok:#2fd07a; --bad:#ff5c72; --warn:#ffb020;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden;
+    font-family:-appleSystem,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{width:1080px;height:1920px;background:var(--bg);position:relative;overflow:hidden;
+    transform-origin:center center}
+  #view{position:absolute;inset:0}
+  video.clip{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+  .dim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.62))}
+
+  .hookcard{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:0 90px;text-align:center;background:#000}
+  .hookcard.over{background:rgba(0,0,0,.62)}
+  .hookcard .l1{font-size:104px;font-weight:800;color:#fff;letter-spacing:2px;line-height:1.25}
+  .hookcard .l2{font-size:104px;font-weight:800;color:var(--bad);letter-spacing:2px;line-height:1.25;margin-top:18px}
+  .hookcard .l2.white{color:#fff}
+  .hookcard .small{font-size:52px;color:#fff;margin-top:40px;opacity:.9}
+
+  #cap{position:absolute;left:0;right:0;bottom:420px;text-align:center;padding:0 80px;pointer-events:none;z-index:30}
+  #cap .t{display:inline-block;font-size:60px;font-weight:700;color:#fff;line-height:1.35;
+    background:rgba(0,0,0,.55);padding:14px 28px;border-radius:18px;text-shadow:0 3px 12px rgba(0,0,0,.6)}
+
+  .app{position:absolute;inset:0;background:var(--bg);padding:90px 56px}
+  .app .topbar{font-size:40px;color:var(--dim);margin-bottom:26px;display:flex;justify-content:space-between}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:32px;padding:52px 46px}
+  .stem{font-size:74px;font-weight:700;color:#fff;text-align:center}
+  .sub{font-size:34px;color:var(--dim);text-align:center;margin-top:14px}
+  .slots{display:flex;justify-content:center;gap:14px;margin-top:52px;flex-wrap:wrap}
+  .slot{width:70px;height:92px;border-bottom:8px solid var(--line);display:flex;align-items:center;
+    justify-content:center;font-size:58px;font-weight:700;color:#fff}
+  .slot.filled{border-bottom-color:var(--accent)}
+  .slot.bad{border-bottom-color:var(--bad);color:var(--bad)}
+  .verdict{margin-top:46px;text-align:center;font-size:82px;font-weight:800}
+  .verdict.bad{color:var(--bad)} .verdict.ok{color:var(--ok)}
+
+  .kb{position:absolute;left:0;right:0;bottom:0;padding:0 26px 56px}
+  .kbrow{display:flex;justify-content:center;gap:14px;margin-bottom:16px}
+  .key{width:92px;height:104px;border-radius:16px;background:var(--card2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:600;color:var(--fg)}
+  .key.hit{background:var(--accent);color:#fff;transform:scale(.94)}
+  .key.wide{width:150px;font-size:34px;background:#243244}
+
+  .rows{margin-top:26px}
+  .r{display:flex;justify-content:space-between;align-items:center;padding:20px 8px;
+    border-bottom:1px solid var(--line);font-size:38px;color:var(--fg);opacity:0;transform:translateY(14px);
+    transition:opacity .25s,transform .25s}
+  .r.in{opacity:1;transform:none}
+  .r .bad{color:var(--bad);font-weight:700} .r .ok{color:var(--ok);font-weight:700}
+  .kpis{display:flex;gap:20px}
+  .kpi{flex:1;background:var(--card2);border-radius:20px;padding:26px;text-align:center}
+  .kpi b{display:block;font-size:62px;color:#fff} .kpi span{font-size:28px;color:var(--dim)}
+  h3.t{font-size:44px;color:#fff;margin-bottom:22px}
+
+  /* 情景题 D4 */
+  .pic{height:420px;border-radius:28px;background:linear-gradient(160deg,#2a4a7a,#22406b);
+    display:flex;align-items:center;justify-content:center;font-size:180px;margin-bottom:34px}
+  .cn{font-size:52px;color:var(--dim);text-align:center;margin-bottom:16px}
+  .sentence{font-size:60px;color:#fff;text-align:center;line-height:1.6;font-weight:600}
+  .blank{display:inline-block;min-width:150px;border-bottom:8px solid var(--accent);color:var(--accent)}
+
+  /* 布置作业 D5 */
+  .opt{display:flex;justify-content:space-between;align-items:center;padding:24px 6px;
+    border-bottom:1px solid var(--line);font-size:38px;color:var(--fg)}
+  .opt .v{color:var(--accent);font-weight:700}
+  .switch{width:104px;height:56px;border-radius:999px;background:#2b3949;position:relative;transition:background .25s}
+  .switch .dot{position:absolute;top:6px;left:6px;width:44px;height:44px;border-radius:50%;background:#8fa3b7;transition:.25s}
+  .switch.on{background:var(--accent)} .switch.on .dot{left:54px;background:#fff}
+  .planbox{margin-top:26px;background:var(--card2);border-radius:22px;padding:26px;font-size:34px;color:var(--dim);
+    display:none}
+  .planbox.on{display:block}
+  .planbox b{color:var(--accent);font-size:40px}
+
+  .endcard{position:absolute;inset:0;background:linear-gradient(135deg,#1b2740,#101823);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .endcard .name{font-size:82px;font-weight:800;color:#fff}
+  .endcard .cta{margin-top:34px;font-size:56px;color:var(--accent);font-weight:700}
+  .endcard .tip{margin-top:26px;font-size:38px;color:var(--dim)}
+
+  #bar{position:absolute;top:0;left:0;height:8px;background:var(--accent);width:0;z-index:60}
+  #ui{position:fixed;left:0;right:0;top:0;z-index:99;display:flex;gap:8px;flex-wrap:wrap;
+    padding:10px;background:rgba(0,0,0,.72)}
+  #ui button{font-size:14px;padding:8px 12px;border-radius:8px;border:1px solid #444;
+    background:#1b2430;color:#dfe8f2;cursor:pointer}
+  #ui button.cur{background:#3ea6ff;color:#fff;border-color:#3ea6ff}
+  #hud{position:fixed;left:12px;bottom:12px;z-index:99;font-size:13px;color:#9fb0c2;
+    background:rgba(0,0,0,.65);padding:10px 14px;border-radius:8px;line-height:1.7}
+  #gate{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.9);display:flex;
+    align-items:center;justify-content:center;flex-direction:column;color:#fff}
+  #gate button{margin-top:22px;font-size:20px;padding:16px 34px;border:none;border-radius:12px;
+    background:linear-gradient(135deg,#3ea6ff,#7c5cff);color:#fff;cursor:pointer;font-weight:700}
+  #gate p{margin-top:14px;font-size:14px;color:#93a5b8}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <div id="view"></div>
+  <div id="cap"><span class="t" id="capt"></span></div>
+  <div id="bar"></div>
+</div></div>
+
+<div id="ui"></div>
+<div id="hud">
+  选 D1~D7 切换成片；空格播放/暂停；R 重播本条；H 隐藏所有 UI（录制前必按）<br>
+  录制：F11 全屏 → OBS/系统录屏锁窗口 → 剪映加封面即可发
+</div>
+<div id="gate">
+  <div style="font-size:26px;font-weight:700">7 天短视频成片 · 点击开始</div>
+  <button id="goBtn">开始播放（含口播配音与背景音乐）</button>
+  <p>浏览器需先有一次点击才允许出声；开始后按 H 隐藏界面再录屏</p>
+</div>
+
+<script>
+/* ================= 数据：7 条成片 ================= */
+var DATA = {
+ 1:{name:'会认 ≠ 会写', scenes:[
+   {kind:'hook', a:1, l1:'一背就会', l2:'一听写就废', small:'背单词最怕的不是记不住'},
+   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'认识，不代表写得出来。'},
+   {kind:'app', view:'spell', a:3, cap:'我只让他写 —— 只给中文，一个字母一个字母敲。',
+    data:{top:'第 3 / 10 题 · 拼写', stem:'星期三', sub:'听发音，拼出单词', word:'wednesday', typed:'wednesdai', correct:false}},
+   {kind:'app', view:'wrong', a:4, cap:'写错了不用我记，它自己进错词本，明天再考一遍。'},
+   {kind:'app', view:'report', a:5, cap:'一天 10 个词，2 分钟，我只看这张表。'},
+   {kind:'gold', src:'mom-phone.mp4', a:6, l1:'怕的不是记不住', l2:'是以为记住了', cap:'背单词最怕的不是记不住，是以为记住了。'},
+   {kind:'end', a:7, name:'功课抽查', cta:'评论区回「1」，我把词库发你', tip:'小学英语单词 · 跟课本同步'}
+ ]},
+ 2:{name:'38 分钟 → 30 秒', scenes:[
+   {kind:'hook', a:1, l1:'40 本听写', l2:'你改多久？', small:'老师/教练视角'},
+   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'我以前 38 分钟，一本一本改。'},
+   {kind:'app', view:'assign', a:3, cap:'现在我只做一件事：选单元，点布置。'},
+   {kind:'app', view:'report', a:4, cap:'孩子自己写完，这边实时出结果：谁对、谁错、错哪个词。'},
+   {kind:'app', view:'wrong', a:5, cap:'没交的直接催，家长点开就是作业，不用我解释第二遍。'},
+   {kind:'hook', a:6, l1:'38 分钟', l2:'30 秒', small:'布置 + 批改 + 催交'},
+   {kind:'end', a:7, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'一次布置 · 自动批改 · 一键催办'}
+ ]},
+ 3:{name:'别背，抽查', scenes:[
+   {kind:'hook', a:1, l1:'别让孩子背单词', l2:'让他被抽查', small:'', l2white:true},
+   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'背是主动回忆，孩子会自己骗自己。'},
+   {kind:'clip', src:'hands-keyboard.mp4', a:3, cap:'抽查是被动提取：会就是会，不会当场现形。'},
+   {kind:'app', view:'spell', a:4, cap:'选义、拼写、听写，三种题型轮着来，专治「看着眼熟」。',
+    data:{top:'第 5 / 10 题 · 拼写', stem:'图书馆', sub:'拼出单词', word:'library', typed:'library', correct:true}},
+   {kind:'app', view:'wrong', a:5, cap:'错一个字母就是错，别跟我说「差一点」。'},
+   {kind:'app', view:'report', a:6, cap:'错的词它替我记着，明天、后天继续考，考到会为止。'},
+   {kind:'end', a:7, name:'功课抽查', cta:'回「抽查」，我把词库发你', tip:'会认 ≠ 会写'}
+ ]},
+ 4:{name:'情景图填句子', scenes:[
+   {kind:'hook', a:1, l1:'给中文 · 给图', l2:'把句子补完整', small:'抖音同款，但能判对错'},
+   {kind:'app', view:'cloze', a:2, cap:'看着简单，孩子一写就露馅。',
+    data:{pic:'🚌', cn:'我坐公共汽车去学校', en:['I go to school by ', '.'], ans:['bus'], tail:''}},
+   {kind:'app', view:'cloze', a:3, cap:'我把它做进去了：图在下，句子在上，空出来的词自己敲。',
+    data:{pic:'📚', cn:'我在图书馆读书', en:['I read books in the ', '.'], ans:['library'], tail:''}},
+   {kind:'clip', src:'hands-keyboard.mp4', a:4, cap:'填完点确认，读一遍，对是绿勾，错就当场标红。'},
+   {kind:'hook', a:5, l1:'从背单词', l2:'变成会用单词', small:'句子级填空才对应真听写', l2white:true},
+   {kind:'end', a:6, name:'功课抽查', cta:'想要这种题型，回「句子」', tip:'短语 · 例句 · 自绘键盘'}
+ ]},
+ 5:{name:'一次设定，四天自动布置', scenes:[
+   {kind:'hook', a:1, l1:'42 个词', l2:'我不会一天全丢给孩子', small:'Unit 2 · 2024 外研四上'},
+   {kind:'app', view:'assign', a:2, cap:'选单元，打开「分几天自动布置」，选 4 天。'},
+   {kind:'app', view:'plan', a:3, cap:'今天这份当场发出，剩下 3 天，每天早上 8 点自动发。'},
+   {kind:'app', view:'report', a:4, cap:'我一周只需要点一次。'},
+   {kind:'app', view:'wrong', a:5, cap:'布置完只看报告，谁没交，点一下催办。'},
+   {kind:'end', a:6, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'自动布置 · 报告 · 催办'}
+ ]},
+ 6:{name:'家长视角看报告', scenes:[
+   {kind:'hook', a:1, l1:'早上送完孩子', l2:'我先看的不是群消息', small:'而是一张表', l2white:true},
+   {kind:'clip', src:'mom-phone.mp4', a:2, cap:'昨天 10 个词：写对 7 个，错 3 个。'},
+   {kind:'app', view:'report', a:3, cap:'Wednesday 错两次，library 错一次。'},
+   {kind:'app', view:'wrong', a:4, cap:'不用问「你背了吗」——他还没开口，我已经知道了。'},
+   {kind:'clip', src:'kid-desk.mp4', a:5, cap:'错的词它替我记着，明天继续考。'},
+   {kind:'end', a:6, name:'功课抽查', cta:'想看的回「报告」', tip:'家长看得见 · 孩子不用催'}
+ ]},
+ 7:{name:'一周数据汇报', scenes:[
+   {kind:'hook', a:1, l1:'这一周', l2:'我发了 6 条视频', small:'说点真实的', l2white:true},
+   {kind:'app', view:'stats', a:2, cap:'后台多了几十个家长、几个班在试用。'},
+   {kind:'hook', a:3, l1:'反馈最多的一句', l2:'能不能加上我们学校的教材', small:'', l2white:true},
+   {kind:'app', view:'cloze', a:4, cap:'所以下一步就做一件事：拍照上传课本词表，自动生成词库。',
+    data:{pic:'📷', cn:'拍照上传课本词表', en:['自动生成 ', ' 词库'], ans:['校本'], tail:''}},
+   {kind:'clip', src:'kid-desk.mp4', a:5, cap:'还没做好的我不吹，做完再发给你看。'},
+   {kind:'end', a:6, name:'功课抽查', cta:'想跟的评论区回「1」', tip:'每天一条 · 边发边做'}
+ ]}
+};
+
+/* ================= 舞台缩放 ================= */
+function fit(){var s=document.getElementById('stage');
+  s.style.transform='scale('+Math.min(window.innerWidth/1080,window.innerHeight/1920)+')';}
+window.addEventListener('resize',fit); fit();
+
+/* ================= 视图渲染 ================= */
+var ROWS=['qwertyuiop','asdfghjkl','zxcvbnm'];
+function kbHtml(){
+  var h='<div class="kb">';
+  ROWS.forEach(function(row){
+    h+='<div class="kbrow">';
+    if(row==='zxcvbnm') h+='<div class="key wide">⇧</div>';
+    row.split('').forEach(function(c){h+='<div class="key" data-k="'+c+'">'+c.toUpperCase()+'</div>';});
+    if(row==='zxcvbnm') h+='<div class="key wide">⌫</div>';
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+function viewSpell(d){
+  var s='<div class="app"><div class="topbar"><span>'+d.top+'</span><span>功课抽查</span></div>'+
+    '<div class="card"><div class="stem">'+d.stem+'</div><div class="sub">'+d.sub+'</div><div class="slots">';
+  d.word.split('').forEach(function(){s+='<div class="slot"></div>';});
+  s+='</div><div class="verdict"></div></div>'+kbHtml()+'</div>';
+  return s;
+}
+function animSpell(d){
+  var slots=document.querySelectorAll('#view .slot'), v=document.querySelector('#view .verdict');
+  var typed=d.typed, i=0, timer=null;
+  function step(){
+    if(i>=typed.length){
+      if(d.correct){v.className='verdict ok';v.textContent='✓  '+cap1(d.word);}
+      else{slots[slots.length-1].classList.add('bad');v.className='verdict bad';v.textContent='✗  '+cap1(d.word);}
+      return;
+    }
+    var ch=typed[i], k=document.querySelector('#view .key[data-k="'+ch+'"]');
+    if(k){k.classList.add('hit');setTimeout(function(){k.classList.remove('hit')},180);}
+    slots[i].textContent=ch.toUpperCase(); slots[i].classList.add('filled');
+    i++; timer=setTimeout(step,300);
+  }
+  setTimeout(step,500);
+  return function(){clearTimeout(timer);};
+}
+function cap1(w){return w.charAt(0).toUpperCase()+w.slice(1);}
+
+function viewReport(){
+  return '<div class="app"><div class="topbar"><span>今日报告 · Unit 2</span><span>功课抽查</span></div>'+
+   '<div class="card"><h3 class="t">今日 10 词</h3><div class="kpis">'+
+   '<div class="kpi"><b>7</b><span>写对</span></div><div class="kpi"><b>3</b><span>写错</span></div>'+
+   '<div class="kpi"><b>2′</b><span>用时</span></div></div><div class="rows">'+
+   '<div class="r"><span>Wednesday</span><span class="bad">错 2 次</span></div>'+
+   '<div class="r"><span>library</span><span class="bad">错 1 次</span></div>'+
+   '<div class="r"><span>because</span><span class="ok">✓</span></div>'+
+   '<div class="r"><span>homework</span><span class="ok">✓</span></div>'+
+   '</div></div>'+
+   '<div style="margin-top:38px;font-size:38px;color:var(--dim);text-align:center">错的词自动进错词本，明天继续考</div></div>';
+}
+function viewWrong(){
+  return '<div class="app"><div class="topbar"><span>错词本 · 自动积累</span><span>功课抽查</span></div>'+
+   '<div class="card"><h3 class="t">待复习 3 个</h3><div class="rows">'+
+   '<div class="r"><span>Wednesday 星期三</span><span class="bad">明天再考</span></div>'+
+   '<div class="r"><span>library 图书馆</span><span class="bad">后天再考</span></div>'+
+   '<div class="r"><span>umbrella 雨伞</span><span class="bad">已考 1 次</span></div>'+
+   '</div></div>'+
+   '<div style="margin-top:38px;font-size:38px;color:var(--dim);text-align:center">不用家长记，系统自己排复习</div></div>';
+}
+function viewCloze(d){
+  return '<div class="app"><div class="topbar"><span>情景填空 · Unit 2</span><span>功课抽查</span></div>'+
+   '<div class="card"><div class="pic">'+d.pic+'</div><div class="cn">'+d.cn+'</div>'+
+   '<div class="sentence">'+d.en[0]+'<span class="blank" data-blank="1"></span>'+d.en[1]+'</div>'+
+   '<div class="verdict"></div></div>'+kbHtml()+'</div>';
+}
+function animCloze(d){
+  var blank=document.querySelector('#view [data-blank]'), v=document.querySelector('#view .verdict');
+  var ans=d.ans[0], i=0, timer=null;
+  function step(){
+    if(i>=ans.length){
+      blank.textContent=cap1(ans);
+      v.className='verdict ok'; v.textContent='✓  '+cap1(ans)+'　读一遍：'+d.en[0]+ans+d.en[1];
+      return;
+    }
+    var ch=ans[i], k=document.querySelector('#view .key[data-k="'+ch+'"]');
+    if(k){k.classList.add('hit');setTimeout(function(){k.classList.remove('hit')},180);}
+    blank.textContent=cap1(ans.slice(0,i+1));
+    i++; timer=setTimeout(step,280);
+  }
+  setTimeout(step,600);
+  return function(){clearTimeout(timer);};
+}
+function viewAssign(){
+  return '<div class="app"><div class="topbar"><span>布置作业</span><span>功课抽查</span></div>'+
+   '<div class="card"><div class="opt"><span>范围</span><span class="v">Unit 2 · 课本同步</span></div>'+
+   '<div class="opt"><span>起点</span><span class="v">第 1 个词</span></div>'+
+   '<div class="opt"><span>词数</span><span class="v">11 / 42</span></div>'+
+   '<div class="opt"><span>分几天自动布置</span><span class="switch"><span class="dot"></span></span></div>'+
+   '<div class="planbox">分 <b>4</b> 天发完 · 每天约 <b>11</b> 个词<br>第一天当场发出，剩下 3 天每天早上 8 点自动布置</div>'+
+   '</div></div>';
+}
+function animAssign(){
+  var t1=setTimeout(function(){
+    var sw=document.querySelector('#view .switch'); if(sw) sw.classList.add('on');
+  },900);
+  var t2=setTimeout(function(){var p=document.querySelector('#view .planbox'); if(p) p.classList.add('on');},1500);
+  return function(){clearTimeout(t1);clearTimeout(t2);};
+}
+function viewPlan(){
+  return '<div class="app"><div class="topbar"><span>自动布置中</span><span>功课抽查</span></div>'+
+   '<div class="card"><h3 class="t">Unit 2 · 42 个词</h3>'+
+   '<div class="rows"><div class="r"><span>第 1 天 · 已发</span><span class="ok">1 ~ 11</span></div>'+
+   '<div class="r"><span>第 2 天 · 明早 8:00</span><span>12 ~ 22</span></div>'+
+   '<div class="r"><span>第 3 天</span><span>23 ~ 33</span></div>'+
+   '<div class="r"><span>第 4 天</span><span>34 ~ 42</span></div></div>'+
+   '<div style="margin-top:34px;font-size:38px;color:var(--dim);text-align:center">一周只点一次，其余它替你发</div>'+
+   '</div></div>';
+}
+function viewStats(){
+  return '<div class="app"><div class="topbar"><span>这一周 · 后台数据</span><span>功课抽查</span></div>'+
+   '<div class="card"><h3 class="t">7 天实测</h3><div class="kpis">'+
+   '<div class="kpi"><b>6</b><span>条视频</span></div><div class="kpi"><b>3</b><span>个班试用</span></div>'+
+   '<div class="kpi"><b>2′</b><span>日均用时</span></div></div><div class="rows">'+
+   '<div class="r"><span>播放 / 完播</span><span class="ok">持续看</span></div>'+
+   '<div class="r"><span>家长最关心</span><span>能写对吗</span></div>'+
+   '<div class="r"><span>老师最关心</span><span>能不能省事</span></div>'+
+   '</div></div></div>';
+}
+function animRows(){
+  var rs=document.querySelectorAll('#view .r'), i=0, timer=null;
+  function step(){ if(i>=rs.length) return; rs[i].classList.add('in'); i++; timer=setTimeout(step,320); }
+  setTimeout(step,300);
+  return function(){clearTimeout(timer);};
+}
+function viewHook(d){
+  return '<div class="hookcard"><div class="l1">'+d.l1+'</div>'+
+   '<div class="l2'+(d.l2white?' white':'')+'">'+d.l2+'</div>'+
+   (d.small?'<div class="small">'+d.small+'</div>':'')+'</div>';
+}
+function viewGold(d){
+  return '<video class="clip" src="'+d.src+'" muted playsinline autoplay loop></video><div class="dim"></div>'+
+   '<div class="hookcard over"><div class="l1" style="font-size:86px">'+d.l1+'</div>'+
+   '<div class="l2 white" style="font-size:86px">'+d.l2+'</div></div>';
+}
+function viewClip(d){
+  return '<video class="clip" src="'+d.src+'" muted playsinline autoplay loop></video><div class="dim"></div>';
+}
+function viewEnd(d){
+  return '<div class="endcard"><div class="name">'+d.name+'</div>'+
+   '<div class="cta">'+d.cta+'</div><div class="tip">'+d.tip+'</div></div>';
+}
+
+/* ================= 播放引擎 ================= */
+var view=document.getElementById('view'), capEl=document.getElementById('capt'),
+    barEl=document.getElementById('bar'), uiEl=document.getElementById('ui');
+var day=1, idx=0, playing=false, cancelAnim=null, timers=[], curAudio=null, bgm=null, bgmOn=true;
+
+function clearScene(){
+  if(cancelAnim) cancelAnim();
+  timers.forEach(clearTimeout); timers=[];
+  if(curAudio){ curAudio.pause(); curAudio=null; }
+}
+function enter(i){
+  clearScene();
+  var sc=DATA[day].scenes[i]; if(!sc) return;
+  var html='', anim=null;
+  if(sc.kind==='hook') html=viewHook(sc);
+  else if(sc.kind==='gold') html=viewGold(sc);
+  else if(sc.kind==='clip') html=viewClip(sc);
+  else if(sc.kind==='end') html=viewEnd(sc);
+  else if(sc.view==='spell'){ html=viewSpell(sc.data); }
+  else if(sc.view==='cloze'){ html=viewCloze(sc.data); }
+  else if(sc.view==='report') html=viewReport();
+  else if(sc.view==='wrong') html=viewWrong();
+  else if(sc.view==='assign') html=viewAssign();
+  else if(sc.view==='plan') html=viewPlan();
+  else if(sc.view==='stats') html=viewStats();
+  view.innerHTML=html;
+  capEl.textContent=sc.cap||'';
+  if(sc.kind==='app'){
+    if(sc.view==='spell') anim=animSpell(sc.data);
+    else if(sc.view==='cloze') anim=animCloze(sc.data);
+    else if(sc.view==='assign') anim=animAssign();
+    else anim=animRows();
+  }
+  cancelAnim=anim;
+  // 配音
+  if(sc.a){
+    var a=new Audio('audio/d'+day+'_'+sc.a+'.wav');
+    curAudio=a;
+    a.play().catch(function(){});
+    a.onended=function(){ if(playing) next(400); };
+    timers.push(setTimeout(function(){ if(playing) next(0); }, 12000)); // 兜底
+  }else{
+    timers.push(setTimeout(function(){ if(playing) next(0); }, 3000));
+  }
+  barEl.style.width=((i+1)/DATA[day].scenes.length*100)+'%';
+}
+function next(delay){
+  timers.push(setTimeout(function(){
+    if(idx+1<DATA[day].scenes.length){ idx++; enter(idx); }
+    else { playing=false; barEl.style.width='100%'; }
+  }, delay||250));
+}
+function playDay(d){
+  day=d; idx=0; playing=true; markUI();
+  if(bgmOn&&bgm){ bgm.currentTime=0; bgm.play().catch(function(){}); }
+  enter(0);
+}
+function stopAll(){ playing=false; clearScene(); if(bgm) bgm.pause(); }
+
+function markUI(){
+  Array.prototype.forEach.call(uiEl.children,function(b){
+    b.classList.toggle('cur', Number(b.dataset.d)===day);
+  });
+}
+Object.keys(DATA).forEach(function(d){
+  var b=document.createElement('button');
+  b.textContent='D'+d+' · '+DATA[d].name;
+  b.dataset.d=d;
+  b.onclick=function(){ playDay(Number(d)); };
+  uiEl.appendChild(b);
+});
+var sb=document.createElement('button'); sb.textContent='🔊 BGM'; sb.onclick=function(){
+  bgmOn=!bgmOn; if(bgm){ bgmOn?bgm.play().catch(function(){}):bgm.pause(); }
+  sb.style.opacity=bgmOn?1:.45;
+}; uiEl.appendChild(sb);
+
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){ e.preventDefault(); playing?stopAll():playDay(day); }
+  if(e.key==='r'||e.key==='R') playDay(day);
+  if(e.key==='h'||e.key==='H'){
+    ['ui','hud'].forEach(function(id){var el=document.getElementById(id);
+      el.style.display=el.style.display==='none'?'':'none';});
+  }
+});
+document.getElementById('goBtn').onclick=function(){
+  document.getElementById('gate').style.display='none';
+  bgm=new Audio('bgm.wav'); bgm.loop=true; bgm.volume=0.16;
+  if(bgmOn) bgm.play().catch(function(){});
+  playDay(1);
+};
+</script>
+</body>
+</html>
