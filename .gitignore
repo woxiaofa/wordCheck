@@ -41,3 +41,7 @@ scripts/words.json
 assets/video/*.mp4
 assets/video/*.wav
 assets/video/audio/
+
+# 待用户确认后再处理的旧测试与夹具（保持未纳管）
+tests/fixtures/
+tests/seed-then-assign.test.js
