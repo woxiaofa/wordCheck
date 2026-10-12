@@ -17,6 +17,7 @@ var books = require('../../utils/books');
 var cloud = require('../../utils/cloud');
 var asgcache = require('../../utils/asgcache');
 var learnlog = require('../../utils/learnlog');
+var privacy = require('../../utils/privacy');
 var layout = require('../../utils/layout');
 var fit = require('../../utils/fit');
 
@@ -214,12 +215,7 @@ Page({
   /** 一键复制学习流水：进度对不上时，家长把这段发出来就能当场判责 */
   copyLearnLog: function () {
     var text = learnlog.toText(30);
-    wx.setClipboardData({
-      data: text,
-      success: function () {
-        wx.showToast({ title: '流水已复制', icon: 'none' });
-      }
-    });
+    privacy.copy(text, function () { wx.showToast({ title: '流水已复制', icon: 'none' }); });
     console.log('[learnlog]\n' + text);
   },
 
@@ -232,12 +228,7 @@ Page({
       : s.text;
     // 末尾带上 #小程序:// 文本链接：粘贴到微信聊天会变成可点链接，对方一点就开
     text += '\n点这里打开小程序看详情 👉 #小程序://功课抽查/';
-    wx.setClipboardData({
-      data: text,
-      success: function () {
-        wx.showToast({ title: '简报已复制', icon: 'none' });
-      }
-    });
+    privacy.copy(text, function () { wx.showToast({ title: '简报已复制', icon: 'none' }); });
   },
 
   /** 首次打开（本地没有任何学习记录且从未关闭过）约 1 秒后浮出引导卡 */

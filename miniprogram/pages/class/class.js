@@ -13,6 +13,7 @@ var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var layout = require('../../utils/layout');
+var privacy = require('../../utils/privacy');
 var books = require('../../utils/books');
 var WORDS = require('../../data/words');
 
@@ -678,16 +679,13 @@ Page({
     this.loadCoachData();
     cloud.api.nudgeText(id).then(function (r) {
       wx.hideLoading();
-      wx.setClipboardData({
-        data: r.text,
-        success: function () {
-          wx.showModal({
-            title: '已复制，去微信发给孩子吧',
-            content: r.text,
-            showCancel: false,
-            confirmText: '知道了'
-          });
-        }
+      privacy.copy(r.text, function () {
+        wx.showModal({
+          title: '已复制，去微信发给孩子吧',
+          content: r.text,
+          showCancel: false,
+          confirmText: '知道了'
+        });
       });
     }).catch(function (err) {
       wx.hideLoading();
@@ -719,10 +717,7 @@ Page({
     var name = (this.data.cls && this.data.cls.name) || '我的班级';
     var text = '【' + name + '】邀请码：' + code +
       '\n点这里打开小程序 👉 #小程序://功课抽查/ ，在「班级」页输入邀请码就能加入';
-    wx.setClipboardData({
-      data: text,
-      success: function () { wx.showToast({ title: '邀请文案已复制', icon: 'success' }); }
-    });
+    privacy.copy(text, function () { wx.showToast({ title: '邀请文案已复制', icon: 'success' }); });
   },
 
   /**

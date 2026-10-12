@@ -231,5 +231,10 @@
     </view>
   </view>
 
+  <!-- 未成年人保护提示（K12 类目审核会看）：不收集手机号、不开放付费、建议家长陪同 -->
+  <view class="muted" style="text-align:center;font-size:22rpx;opacity:.6;padding:20rpx 0 8rpx">
+    面向小学生英语单词练习，建议在家长陪同下使用 · 不收集手机号、不开放付费
+  </view>
+
   <footer-nav active="index" />
 </view>

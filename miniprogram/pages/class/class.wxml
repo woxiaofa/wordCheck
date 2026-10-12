@@ -288,11 +288,13 @@
         加载失败：{{stuError}}
         <text class="link" bindtap="reload"> 重试</text>
       </view>
-      <!-- 每日简报：一句话讲清"今天学得怎样"，不用每天记得开小程序来看 -->
-      <view class="muted mt-s" style="font-size:22rpx;line-height:1.6">
+      <!-- 每日简报：一句话讲清"今天学得怎样"，不用每天记得开小程序来看。
+           模板没配好（briefReady=false）时整个入口隐藏 —— 上线前宁可不出现，
+           也不要让审核员点出一个"还没开通"的提示（会被判功能不完整） -->
+      <view wx:if="{{briefReady}}" class="muted mt-s" style="font-size:22rpx;line-height:1.6">
         点「订简报」并勾选「总是保持以上选择」，之后每天 20:30 会收到这个孩子的学习简报。{{briefNote}}
       </view>
-      <view wx:if="{{briefCount}}" class="mt-s">
+      <view wx:if="{{briefCount && briefReady}}" class="mt-s">
         <button class="btn ghost sm" bindtap="pushBriefNow">立刻发一次今天的简报</button>
       </view>
       <view wx:if="{{!students.length && !stuError}}" class="muted mt-s">
@@ -317,7 +319,7 @@
           </view>
         </view>
         <button class="btn sm ghost" data-id="{{item.id}}" catchtap="makeNudge">催一催</button>
-        <button class="btn sm {{briefSubs[item.id] ? 'ok' : 'ghost'}}"
+        <button wx:if="{{briefReady}}" class="btn sm {{briefSubs[item.id] ? 'ok' : 'ghost'}}"
                 data-id="{{item.id}}" catchtap="toggleBrief">{{briefSubs[item.id] ? '✓ 已订简报' : '订简报'}}</button>
       </view>
 

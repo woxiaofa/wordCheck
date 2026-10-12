@@ -15,6 +15,7 @@
 var cloud = require('../../utils/cloud');
 var time = require('../../utils/time');
 var wrongLib = require('../../utils/wrong');
+var privacy = require('../../utils/privacy');
 
 Page({
   data: {
@@ -171,10 +172,7 @@ Page({
     if (!s || !s.text) return;
     var text = s.text + (s.honor ? '\n' + s.honor.badge + ' · ' + s.honor.detail : '');
     text += '\n点这里打开小程序看详情 👉 #小程序://功课抽查/';
-    wx.setClipboardData({
-      data: text,
-      success: function () { wx.showToast({ title: '简报已复制', icon: 'none' }); }
-    });
+    privacy.copy(text, function () { wx.showToast({ title: '简报已复制', icon: 'none' }); });
   },
 
   onShareAppMessage: function () {
@@ -233,30 +231,34 @@ Page({
   /** 保存到相册：拒绝授权时引导去设置页，而不是静默失败 */
   saveImage: function (file) {
     var self = this;
-    wx.saveImageToPhotosAlbum({
-      filePath: file,
-      success: function () {
-        wx.showModal({
-          title: '已保存到相册',
-          content: '这张图可以直接分享给家长，也可以连打印机打出来（A4 竖版排版）。',
-          showCancel: false,
-          confirmText: '知道了'
-        });
-      },
-      fail: function (err) {
-        var msg = String((err && err.errMsg) || '');
-        if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+    if (!file) return;
+    // 写入相册同样属于隐私接口：先确认授权，再保存；拒绝时给一句人话，不静默失败
+    privacy.ensure().then(function () {
+      wx.saveImageToPhotosAlbum({
+        filePath: file,
+        success: function () {
           wx.showModal({
-            title: '需要相册权限',
-            content: '保存报告图片需要「保存到相册」权限，去设置里开一下就能用了。',
-            confirmText: '去设置',
-            success: function (r) { if (r.confirm) wx.openSetting(); }
+            title: '已保存到相册',
+            content: '这张图可以直接分享给家长，也可以连打印机打出来（A4 竖版排版）。',
+            showCancel: false,
+            confirmText: '知道了'
           });
-        } else {
-          wx.showToast({ title: '保存失败：' + msg.slice(0, 20), icon: 'none' });
+        },
+        fail: function (err) {
+          var msg = String((err && err.errMsg) || '');
+          if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+            wx.showModal({
+              title: '需要相册权限',
+              content: '保存报告图片需要「保存到相册」权限，去设置里开一下就能用了。',
+              confirmText: '去设置',
+              success: function (r) { if (r.confirm) wx.openSetting(); }
+            });
+          } else {
+            wx.showToast({ title: '保存失败：' + msg.slice(0, 20), icon: 'none' });
+          }
         }
-      }
-    });
+      });
+    }).catch(function (err) { privacy.onDenied(err); });
   },
 
   /** 手绘报告长图；返回画布实际高度 */
