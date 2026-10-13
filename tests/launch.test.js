@@ -91,5 +91,23 @@ ok('⑧ docs/上线检查清单.md 存在且写明备案/类目/隐私指引', f
   });
 });
 
+/* ⑨ 广告：提审版必须全关，且不许出现在孩子做题流程里 */
+ok('⑨ 广告默认全关（AD_UNITS 留空），且做题页不得引用 utils/ads.js', function () {
+  var s = read('miniprogram/utils/ads.js');
+  assert.ok(/reward:\s*''/.test(s), 'ads.js 里 reward 广告位不是空串 —— 提审版不能带广告');
+  assert.ok(/interstitial:\s*''/.test(s), 'ads.js 里 interstitial 广告位不是空串');
+  assert.ok(/banner:\s*''/.test(s), 'ads.js 里 banner 广告位不是空串');
+  // 广告失败必须放行：源码里 done(false) 的分支要足够多
+  var guard = (s.match(/done\(false\)/g) || []).length;
+  assert.ok(guard >= 4, 'ads.js 的失败放行分支只有 ' + guard + ' 处，广告不能阻断功能');
+  ['pages/test-card/test-card', 'pages/drill/drill', 'pages/quiz/quiz', 'pages/study/study']
+    .forEach(function (p) {
+      var f = 'miniprogram/' + p + '.js';
+      if (fs.existsSync(path.join(ROOT, f))) {
+        assert.ok(read(f).indexOf('utils/ads') < 0, '孩子做题流程不该有广告：' + f);
+      }
+    });
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
