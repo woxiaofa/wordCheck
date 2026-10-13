@@ -45,3 +45,8 @@ assets/video/audio/
 # 待用户确认后再处理的旧测试与夹具（保持未纳管）
 tests/fixtures/
 tests/seed-then-assign.test.js
+
+# 备案证件等个人材料绝不进仓库（脚本输出到 Documents/备案材料/）
+*身份证*
+*人像面*
+*国徽面*
