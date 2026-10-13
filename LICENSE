@@ -1,0 +1,32 @@
+MIT License
+
+Copyright (c) 2026 wordCheck contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+第三方内容说明：
+
+- 发音音频：由 Piper（MIT）本地批量生成，脚本见 scripts/gen_audio_piper.py。
+- 混合词库（中考/高考/四级）：来自 ECDICT（MIT 协议，https://github.com/skywind3000/ECDICT）。
+- 教材同步词表（如「外研四上」）：整理自公开发行教材附录，**仅用于个人学习与非商业用途**。
+  若你要商用或二次分发，请自行替换为已授权词表（替换方式见 README「词库」一节）。
+- 词表本身通常不构成受著作权保护的作品，但**释义与例句属于文字作品**，请勿从商业词典
+  或竞品抓取。本项目例句均为自撰。
