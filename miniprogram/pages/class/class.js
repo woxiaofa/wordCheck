@@ -15,6 +15,7 @@ var time = require('../../utils/time');
 var layout = require('../../utils/layout');
 var privacy = require('../../utils/privacy');
 var books = require('../../utils/books');
+var env = require('../../utils/env');
 var WORDS = require('../../data/words');
 
 // 布置词库选项：外研四上排第一并作为默认（2026-10-10 用户拍板 ——
@@ -78,7 +79,11 @@ Page({
     /** 空列表时的服务端诊断提示（如 TEACHER_HAS_OTHER_CLASS：老师布置过作业但不在这个班） */
     emptyHint: '',
 
-    today: ''
+    today: '',
+
+    /** 调试入口开关（云自检/修复历史数据/原始报错）：只在开发与体验版渲染，
+     *  正式版整块不出现 —— 审核员和用户都不该看到排查工具（2026-10-14）。 */
+    devTools: env.isDev()
   },
 
   onShow: function () {

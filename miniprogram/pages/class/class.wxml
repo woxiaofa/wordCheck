@@ -9,10 +9,13 @@
   <view wx:elif="{{cloudError}}" class="card">
     <view class="t1">班级功能需要联网</view>
     <view class="muted mt-s">{{cloudError}}</view>
-    <view wx:if="{{cloudRaw}}" class="raw-err">{{cloudRaw}}</view>
+    <!-- 原始报错与自检属于排查工具：只在开发/体验版出现，正式版只留人话 -->
+    <view wx:if="{{cloudRaw && devTools}}" class="raw-err">{{cloudRaw}}</view>
     <button class="btn mt" bindtap="reload">重试</button>
-    <button class="btn ghost mt-s" bindtap="runDiagnose">云自检</button>
-    <view wx:if="{{diagnoseText}}" class="raw-err">{{diagnoseText}}</view>
+    <view wx:if="{{devTools}}">
+      <button class="btn ghost mt-s" bindtap="runDiagnose">云自检</button>
+      <view wx:if="{{diagnoseText}}" class="raw-err">{{diagnoseText}}</view>
+    </view>
   </view>
 
   <!-- ===== 未加入任何班级 ===== -->
@@ -327,8 +330,8 @@
            内联展开的版本越加越长，学员一多整页就乱，也没法打印/导出成图。 -->
     </view>
 
-    <!-- 数据对不上时的自证入口：平时低调，需要时一页看全云端事实 -->
-    <view class="card">
+    <!-- 数据对不上时的自证入口：调试工具，只在开发/体验版出现（正式版整块不渲染） -->
+    <view class="card" wx:if="{{devTools}}">
       <button class="btn ghost sm" bindtap="runDiagnose">云自检 · 数据对不上时点我</button>
       <button class="btn ghost sm mt-s" bindtap="runRepair">修复历史数据 · 学习记录找回</button>
       <view wx:if="{{diagnoseText}}" class="raw-err mt-s">{{diagnoseText}}</view>
@@ -374,9 +377,12 @@
 
     <view class="card">
       <button class="btn ghost sm" bindtap="leaveConfirm">退出班级（换班用）</button>
-      <button class="btn ghost sm mt-s" bindtap="runDiagnose">云自检 · 作业进度对不上时点我</button>
-      <button class="btn ghost sm mt-s" bindtap="runRepair">修复历史数据 · 学习记录找回</button>
-      <view wx:if="{{diagnoseText}}" class="raw-err mt-s">{{diagnoseText}}</view>
+      <!-- 下面两个是排查工具：只在开发/体验版出现，正式版不渲染 -->
+      <view wx:if="{{devTools}}">
+        <button class="btn ghost sm mt-s" bindtap="runDiagnose">云自检 · 作业进度对不上时点我</button>
+        <button class="btn ghost sm mt-s" bindtap="runRepair">修复历史数据 · 学习记录找回</button>
+        <view wx:if="{{diagnoseText}}" class="raw-err mt-s">{{diagnoseText}}</view>
+      </view>
     </view>
   </block>
 

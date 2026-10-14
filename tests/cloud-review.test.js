@@ -271,6 +271,9 @@ function seedUser() {
     role: 'student',
     stats_cache: { total_words: 0, learned_words: 0, streak_days: 0 }
   }];
+  // 权限门（2026-10-14 上线加固）：repair / diagnose-all 只放行教练，
+  // 测试调用方（test-openid）需要是某个班的 owner 才能触发修复
+  db.raw.classes = [{ _id: 'c1', owner_id: 'test-openid', name: '测试班' }];
 }
 
 function submit(word, feedback, reqId) {

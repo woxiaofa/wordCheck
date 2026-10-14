@@ -209,7 +209,24 @@ async function onDueList(openid, { limit }) {
  * 返回：记录总数、word_id 为空的脏记录数、review_logs 是否有数据、
  *       stats_cache 当前值 —— "进度恒 0"一眼定位到是哪一环断了。
  */
+/**
+ * 教练判定：与 class 云函数同口径 —— coach 身份只认 classes.owner_id。
+ * 调试类全库动作（diagnose all / repair）发布后不再对普通用户开放：
+ * 全库快照会摊出所有学员的学习明细，属于隐私面，端上藏了按钮还不够，
+ * 直接 callFunction 也得挡住。云控制台调用（无登录态 openid）不受限。
+ */
+async function isCoachOrConsole(openid) {
+  if (!openid) return true; // 控制台「云端测试」没有登录态，本来就需要控制台权限
+  const r = await db.collection(COLL.classes)
+    .where({ owner_id: openid }).limit(1).get()
+    .catch(() => ({ data: [] }));
+  return !!(r.data && r.data.length);
+}
+
 async function onDiagnose(openid, { clean, all }) {
+  if ((all || !openid) && !(await isCoachOrConsole(openid))) {
+    return fail('FORBIDDEN', '全库诊断仅限教练角色；普通用户请去掉 all 参数只查自己');
+  }
   if (all || !openid) return diagnoseAll(clean);
   const user = await getUser(openid);
   if (!user) return diagnoseAll(clean);
@@ -262,6 +279,10 @@ async function onDiagnose(openid, { clean, all }) {
  * 幂等：已存在的记录只更新不新建，跑多少次结果一致。
  */
 async function onRepair(openid, { dryRun }) {
+  // 修复是全局写动作（回填所有人的状态表）：同样只放行教练与控制台
+  if (!(await isCoachOrConsole(openid))) {
+    return fail('FORBIDDEN', '历史数据修复仅限教练角色');
+  }
   // v2 新集合可能还没建（-502005 Db or Table not exist）—— 回填前先确保存在
   const built = await ensureCollection(db, COLL.state);
   if (!built && !dryRun) {

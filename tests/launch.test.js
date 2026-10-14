@@ -109,5 +109,40 @@ ok('⑨ 广告默认全关（AD_UNITS 留空），且做题页不得引用 utils
     });
 });
 
+/* ⑩ 调试入口：云自检/修复历史数据/原始报错，正式版必须一个都看不见 */
+ok('⑩ 调试入口被 envVersion 开关卡住（正式版不渲染，云端还有教练权限门）', function () {
+  var env = read('miniprogram/utils/env.js');
+  assert.ok(env.indexOf('getAccountInfoSync') >= 0, 'env.js 必须用 getAccountInfoSync 判环境');
+  assert.ok(env.indexOf("=== 'release'") >= 0 && env.indexOf("!== 'release'") >= 0, 'env.js 缺 release 判断');
+  assert.ok(/return 'release'/.test(env), 'env.js 拿不到环境时必须按 release 处理（宁可少不能多）');
+
+  var w = read('miniprogram/pages/class/class.wxml');
+  assert.ok(w.indexOf('devTools: env.isDev()') >= 0 || read('miniprogram/pages/class/class.js').indexOf('devTools: env.isDev()') >= 0,
+    'class.js 必须用 env.isDev() 生成 devTools 开关');
+  // 每个 runDiagnose / runRepair 按钮上方 8 行内必须出现 devTools 的 wx:if
+  var lines = w.split('\n');
+  var bare = 0;
+  lines.forEach(function (line, i) {
+    if (line.indexOf('bindtap="runDiagnose"') < 0 && line.indexOf('bindtap="runRepair"') < 0) return;
+    var gated = false;
+    for (var j = Math.max(0, i - 8); j <= i; j++) {
+      if (lines[j].indexOf('devTools') >= 0 && lines[j].indexOf('wx:if') >= 0) gated = true;
+    }
+    if (!gated) bare++;
+  });
+  assert.ok(bare === 0, '有 ' + bare + ' 个调试按钮没有被 devTools 开关包住（正式版会露出来）');
+  // 原始报错文本同理：cloudRaw 只能在 devTools 下显示
+  var rawLines = lines.filter(function (l) { return l.indexOf('{{cloudRaw') >= 0; });
+  rawLines.forEach(function (l) {
+    assert.ok(l.indexOf('devTools') >= 0, '原始报错 cloudRaw 必须加 devTools 条件：' + l.trim().slice(0, 60));
+  });
+
+  // 云端兜底：review 云函数的 diagnose(all)/repair 必须有教练/控制台权限门
+  var rev = read('cloud/functions/review/index.js');
+  assert.ok(rev.indexOf('isCoachOrConsole') >= 0, 'review 云函数缺 isCoachOrConsole 权限门');
+  assert.ok(rev.indexOf("owner_id: openid") >= 0, '教练判定必须查 classes.owner_id（与 class 云函数同口径）');
+  assert.ok(rev.indexOf("fail('FORBIDDEN'") >= 0, 'review 云函数缺 FORBIDDEN 拒绝分支');
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
