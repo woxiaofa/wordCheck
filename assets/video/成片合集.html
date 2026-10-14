@@ -100,6 +100,18 @@
   #gate button{margin-top:22px;font-size:20px;padding:16px 34px;border:none;border-radius:12px;
     background:linear-gradient(135deg,#3ea6ff,#7c5cff);color:#fff;cursor:pointer;font-weight:700}
   #gate p{margin-top:14px;font-size:14px;color:#93a5b8}
+  /* 配音时长表：剪映里按这个表一句一句配，画面就能对上 */
+  #shot{position:fixed;right:12px;top:12px;z-index:99;display:none;max-height:86vh;overflow:auto;
+    background:rgba(0,0,0,.78);color:#d8e2ec;border-radius:10px;padding:14px 16px;
+    font-size:13px;line-height:1.85;max-width:420px}
+  #shot.on{display:block}
+  #shot h4{margin:0 0 8px;font-size:15px;color:#7fd7ff}
+  #shot table{border-collapse:collapse;width:100%}
+  #shot td{padding:3px 6px;vertical-align:top;border-top:1px solid rgba(255,255,255,.08)}
+  #shot td.n{color:#8fa3b7;white-space:nowrap}
+  #shot td.s{color:#ffd479;white-space:nowrap;font-variant-numeric:tabular-nums}
+  #shot tr.cur td{background:rgba(126,215,255,.16)}
+  #shot .foot{margin-top:8px;color:#8fa3b7;font-size:12px}
 </style>
 </head>
 <body>
@@ -110,82 +122,84 @@
 </div></div>
 
 <div id="ui"></div>
+<div id="shot"></div>
 <div id="hud">
-  选 D1~D7 切换成片；空格播放/暂停；R 重播本条；H 隐藏所有 UI（录制前必按）<br>
-  录制：F11 全屏 → OBS/系统录屏锁窗口 → 剪映加封面即可发
+  <b style="color:#7fd7ff">静音版</b>：画面按台词字数自动走完毕场，你在剪映里配自己的音<br>
+  选 D1~D7 切换；空格播放/暂停；R 重播；<b>T 配音时长表</b>；H 隐藏所有 UI（录制前必按）<br>
+  录制：F11 全屏 → OBS/系统录屏锁窗口 → 剪映配音 + 封面即可发
 </div>
 <div id="gate">
   <div style="font-size:26px;font-weight:700">7 天短视频成片 · 点击开始</div>
-  <button id="goBtn">开始播放（含口播配音与背景音乐）</button>
-  <p>浏览器需先有一次点击才允许出声；开始后按 H 隐藏界面再录屏</p>
+  <button id="goBtn">开始播放（静音，字幕 + 画面）</button>
+  <p>配音请在这版录制后用剪映 AI 配音逐句添加（按 T 看每句话的对应时长）</p>
 </div>
 
 <script>
 /* ================= 数据：7 条成片 ================= */
 var DATA = {
  1:{name:'会认 ≠ 会写', scenes:[
-   {kind:'hook', a:1, l1:'一背就会', l2:'一听写就废', small:'背单词最怕的不是记不住'},
-   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'认识，不代表写得出来。'},
-   {kind:'app', view:'spell', a:3, cap:'我只让他写 —— 只给中文，一个字母一个字母敲。',
+   {kind:'hook', line:'你家孩子是不是也这样：单词背得滚瓜烂熟，一听写就废？', a:1, l1:'一背就会', l2:'一听写就废', small:'背单词最怕的不是记不住'},
+   {kind:'clip', line:'认识，不代表写得出来。', src:'kid-desk.mp4', a:2, cap:'认识，不代表写得出来。'},
+   {kind:'app', line:'所以我没让他背，我让他写。只给中文，一个字母一个字母敲。', view:'spell', a:3, cap:'我只让他写 —— 只给中文，一个字母一个字母敲。',
     data:{top:'第 3 / 10 题 · 拼写', stem:'星期三', sub:'听发音，拼出单词', word:'wednesday', typed:'wednesdai', correct:false}},
-   {kind:'app', view:'wrong', a:4, cap:'写错了不用我记，它自己进错词本，明天再考一遍。'},
-   {kind:'app', view:'report', a:5, cap:'一天 10 个词，2 分钟，我只看这张表。'},
-   {kind:'gold', src:'mom-phone.mp4', a:6, l1:'怕的不是记不住', l2:'是以为记住了', cap:'背单词最怕的不是记不住，是以为记住了。'},
-   {kind:'end', a:7, name:'功课抽查', cta:'评论区回「1」，我把词库发你', tip:'小学英语单词 · 跟课本同步'}
+   {kind:'app', line:'写错了不用我记，它自己进错词本，明天再考一遍。', view:'wrong', a:4, cap:'写错了不用我记，它自己进错词本，明天再考一遍。'},
+   {kind:'app', line:'一天十个词，两分钟，我只看这张表。', view:'report', a:5, cap:'一天 10 个词，2 分钟，我只看这张表。'},
+   {kind:'gold', line:'背单词最怕的不是记不住，是以为记住了。', src:'mom-phone.mp4', a:6, l1:'怕的不是记不住', l2:'是以为记住了', cap:'背单词最怕的不是记不住，是以为记住了。'},
+   {kind:'end', line:'想试的，评论区回一，我把词库发你。', a:7, name:'功课抽查', cta:'评论区回「1」，我把词库发你', tip:'小学英语单词 · 跟课本同步'}
  ]},
  2:{name:'38 分钟 → 30 秒', scenes:[
-   {kind:'hook', a:1, l1:'40 本听写', l2:'你改多久？', small:'老师/教练视角'},
-   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'我以前 38 分钟，一本一本改。'},
-   {kind:'app', view:'assign', a:3, cap:'现在我只做一件事：选单元，点布置。'},
-   {kind:'app', view:'report', a:4, cap:'孩子自己写完，这边实时出结果：谁对、谁错、错哪个词。'},
-   {kind:'app', view:'wrong', a:5, cap:'没交的直接催，家长点开就是作业，不用我解释第二遍。'},
-   {kind:'hook', a:6, l1:'38 分钟', l2:'30 秒', small:'布置 + 批改 + 催交'},
-   {kind:'end', a:7, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'一次布置 · 自动批改 · 一键催办'}
+   {kind:'hook', line:'四十个孩子的单词听写，你改多久？', a:1, l1:'40 本听写', l2:'你改多久？', small:'老师/教练视角'},
+   {kind:'clip', line:'我以前三十八分钟。', src:'kid-desk.mp4', a:2, cap:'我以前 38 分钟，一本一本改。'},
+   {kind:'app', line:'现在我只做一件事：选单元，点布置。', view:'assign', a:3, cap:'现在我只做一件事：选单元，点布置。'},
+   {kind:'app', line:'孩子自己写完，这边实时出结果：谁对、谁错、错哪个词。', view:'report', a:4, cap:'孩子自己写完，这边实时出结果：谁对、谁错、错哪个词。'},
+   {kind:'app', line:'没交的直接催，家长点开就是作业，不用我解释第二遍。', view:'wrong', a:5, cap:'没交的直接催，家长点开就是作业，不用我解释第二遍。'},
+   {kind:'hook', line:'三十八分钟，变三十秒。', a:6, l1:'38 分钟', l2:'30 秒', small:'布置 + 批改 + 催交'},
+   {kind:'end', line:'带班的评论区回作业，我拉你进体验群。', a:7, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'一次布置 · 自动批改 · 一键催办'}
  ]},
  3:{name:'别背，抽查', scenes:[
-   {kind:'hook', a:1, l1:'别让孩子背单词', l2:'让他被抽查', small:'', l2white:true},
-   {kind:'clip', src:'kid-desk.mp4', a:2, cap:'背是主动回忆，孩子会自己骗自己。'},
-   {kind:'clip', src:'hands-keyboard.mp4', a:3, cap:'抽查是被动提取：会就是会，不会当场现形。'},
-   {kind:'app', view:'spell', a:4, cap:'选义、拼写、听写，三种题型轮着来，专治「看着眼熟」。',
+   {kind:'hook', line:'别让孩子背单词。', a:1, l1:'别让孩子背单词', l2:'让他被抽查', small:'', l2white:true},
+   {kind:'clip', line:'让他被抽查。', src:'kid-desk.mp4', a:2, cap:'背是主动回忆，孩子会自己骗自己。'},
+   {kind:'clip', line:'背是主动回忆，孩子会自己骗自己。抽查是被动提取，会就是会，不会当场现形。', src:'hands-keyboard.mp4', a:3, cap:'抽查是被动提取：会就是会，不会当场现形。'},
+   {kind:'app', line:'选义、拼写、听写，三种题型轮着来，专治看着眼熟。', view:'spell', a:4, cap:'选义、拼写、听写，三种题型轮着来，专治「看着眼熟」。',
     data:{top:'第 5 / 10 题 · 拼写', stem:'图书馆', sub:'拼出单词', word:'library', typed:'library', correct:true}},
-   {kind:'app', view:'wrong', a:5, cap:'错一个字母就是错，别跟我说「差一点」。'},
-   {kind:'app', view:'report', a:6, cap:'错的词它替我记着，明天、后天继续考，考到会为止。'},
-   {kind:'end', a:7, name:'功课抽查', cta:'回「抽查」，我把词库发你', tip:'会认 ≠ 会写'}
+   {kind:'app', line:'错一个字母就是错，别跟我说差一点。', view:'wrong', a:5, cap:'错一个字母就是错，别跟我说「差一点」。'},
+   {kind:'app', line:'错的词它替我记着，明天、后天继续考，考到会为止。', view:'report', a:6, cap:'错的词它替我记着，明天、后天继续考，考到会为止。'},
+   {kind:'end', line:'同款在评论区，回抽查我发你。', a:7, name:'功课抽查', cta:'回「抽查」，我把词库发你', tip:'会认 ≠ 会写'}
  ]},
  4:{name:'情景图填句子', scenes:[
-   {kind:'hook', a:1, l1:'给中文 · 给图', l2:'把句子补完整', small:'抖音同款，但能判对错'},
-   {kind:'app', view:'cloze', a:2, cap:'看着简单，孩子一写就露馅。',
+   {kind:'hook', line:'这种题你刷到过吧？给中文、给图，把句子补完整。', a:1, l1:'给中文 · 给图', l2:'把句子补完整', small:'抖音同款，但能判对错'},
+   {kind:'app', line:'看着简单，孩子一写就露馅。', view:'cloze', a:2, cap:'看着简单，孩子一写就露馅。',
     data:{pic:'🚌', cn:'我坐公共汽车去学校', en:['I go to school by ', '.'], ans:['bus'], tail:''}},
-   {kind:'app', view:'cloze', a:3, cap:'我把它做进去了：图在下，句子在上，空出来的词自己敲。',
+   {kind:'app', line:'我把它做进去了：图在下，句子在上，空出来的词自己敲。', view:'cloze', a:3, cap:'我把它做进去了：图在下，句子在上，空出来的词自己敲。',
     data:{pic:'📚', cn:'我在图书馆读书', en:['I read books in the ', '.'], ans:['library'], tail:''}},
-   {kind:'clip', src:'hands-keyboard.mp4', a:4, cap:'填完点确认，读一遍，对是绿勾，错就当场标红。'},
-   {kind:'hook', a:5, l1:'从背单词', l2:'变成会用单词', small:'句子级填空才对应真听写', l2white:true},
-   {kind:'end', a:6, name:'功课抽查', cta:'想要这种题型，回「句子」', tip:'短语 · 例句 · 自绘键盘'}
+   {kind:'clip', line:'填完点确认，读一遍，对是绿勾，错就当场标红。', src:'hands-keyboard.mp4', a:4, cap:'填完点确认，读一遍，对是绿勾，错就当场标红。'},
+   {kind:'hook', line:'从背单词，变成会用单词。', a:5, l1:'从背单词', l2:'变成会用单词', small:'句子级填空才对应真听写', l2white:true},
+   {kind:'end', line:'想要这种题型的，评论区回句子。', a:6, name:'功课抽查', cta:'想要这种题型，回「句子」', tip:'短语 · 例句 · 自绘键盘'}
  ]},
  5:{name:'一次设定，四天自动布置', scenes:[
-   {kind:'hook', a:1, l1:'42 个词', l2:'我不会一天全丢给孩子', small:'Unit 2 · 2024 外研四上'},
-   {kind:'app', view:'assign', a:2, cap:'选单元，打开「分几天自动布置」，选 4 天。'},
-   {kind:'app', view:'plan', a:3, cap:'今天这份当场发出，剩下 3 天，每天早上 8 点自动发。'},
-   {kind:'app', view:'report', a:4, cap:'我一周只需要点一次。'},
-   {kind:'app', view:'wrong', a:5, cap:'布置完只看报告，谁没交，点一下催办。'},
-   {kind:'end', a:6, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'自动布置 · 报告 · 催办'}
+   {kind:'hook', line:'第二单元一共四十二个词，我不会一天全丢给孩子。', a:1, l1:'42 个词', l2:'我不会一天全丢给孩子', small:'Unit 2 · 2024 外研四上'},
+   {kind:'app', line:'选单元，打开分几天自动布置，选四天。', view:'assign', a:2, cap:'选单元，打开「分几天自动布置」，选 4 天。'},
+   {kind:'app', line:'今天这份当场发出，剩下三天，每天早上八点自动发。', view:'plan', a:3, cap:'今天这份当场发出，剩下 3 天，每天早上 8 点自动发。'},
+   {kind:'app', line:'我一周只需要点一次。', view:'report', a:4, cap:'我一周只需要点一次。'},
+   {kind:'app', line:'布置完我就只看报告，谁没交，点一下催办。', view:'wrong', a:5, cap:'布置完只看报告，谁没交，点一下催办。'},
+   {kind:'end', line:'带班的回作业，我拉你进体验群。', a:6, name:'功课抽查', cta:'带班的回「作业」，拉你进体验群', tip:'自动布置 · 报告 · 催办'}
  ]},
  6:{name:'家长视角看报告', scenes:[
-   {kind:'hook', a:1, l1:'早上送完孩子', l2:'我先看的不是群消息', small:'而是一张表', l2white:true},
-   {kind:'clip', src:'mom-phone.mp4', a:2, cap:'昨天 10 个词：写对 7 个，错 3 个。'},
-   {kind:'app', view:'report', a:3, cap:'Wednesday 错两次，library 错一次。'},
-   {kind:'app', view:'wrong', a:4, cap:'不用问「你背了吗」——他还没开口，我已经知道了。'},
-   {kind:'clip', src:'kid-desk.mp4', a:5, cap:'错的词它替我记着，明天继续考。'},
-   {kind:'end', a:6, name:'功课抽查', cta:'想看的回「报告」', tip:'家长看得见 · 孩子不用催'}
+   {kind:'hook', line:'早上送完孩子，我先看的不是群消息，是这张表。', a:1, l1:'早上送完孩子', l2:'我先看的不是群消息', small:'而是一张表', l2white:true},
+   {kind:'clip', line:'昨天十个词，写对七个，错三个。', src:'mom-phone.mp4', a:2, cap:'昨天 10 个词：写对 7 个，错 3 个。'},
+   {kind:'app', line:'Wednesday 错两次，library 错一次。', view:'report', a:3, cap:'Wednesday 错两次，library 错一次。'},
+   {kind:'app', line:'不用问孩子你背了吗。他还没开口，我已经知道了。', view:'wrong', a:4, cap:'不用问「你背了吗」——他还没开口，我已经知道了。'},
+   {kind:'clip', line:'错的词它替我记着，明天继续考。', src:'kid-desk.mp4', a:5, cap:'错的词它替我记着，明天继续考。'},
+   {kind:'end', line:'想看的回报告。', a:6, name:'功课抽查', cta:'想看的回「报告」', tip:'家长看得见 · 孩子不用催'}
  ]},
  7:{name:'一周数据汇报', scenes:[
-   {kind:'hook', a:1, l1:'这一周', l2:'我发了 6 条视频', small:'说点真实的', l2white:true},
-   {kind:'app', view:'stats', a:2, cap:'后台多了几十个家长、几个班在试用。'},
-   {kind:'hook', a:3, l1:'反馈最多的一句', l2:'能不能加上我们学校的教材', small:'', l2white:true},
-   {kind:'app', view:'cloze', a:4, cap:'所以下一步就做一件事：拍照上传课本词表，自动生成词库。',
+   {kind:'hook', line:'这一周，我发了六条视频。', a:1, l1:'这一周', l2:'我发了 6 条视频', small:'说点真实的', l2white:true},
+   {kind:'app', line:'后台多了几十个家长、几个班在试用。', view:'stats', a:2, cap:'后台多了几十个家长、几个班在试用。'},
+   {kind:'hook', line:'反馈最多的一句是：能不能加上我们学校的教材。', a:3, l1:'反馈最多的一句', l2:'能不能加上我们学校的教材', small:'', l2white:true},
+   {kind:'app', line:'所以下一步我就做一件事：拍照上传课本词表，自动生成词库。', view:'cloze', a:4, cap:'所以下一步就做一件事：拍照上传课本词表，自动生成词库。',
     data:{pic:'📷', cn:'拍照上传课本词表', en:['自动生成 ', ' 词库'], ans:['校本'], tail:''}},
-   {kind:'clip', src:'kid-desk.mp4', a:5, cap:'还没做好的我不吹，做完再发给你看。'},
-   {kind:'end', a:6, name:'功课抽查', cta:'想跟的评论区回「1」', tip:'每天一条 · 边发边做'}
+   {kind:'clip', line:'还没做好的我不吹，做完再发给你看。', src:'kid-desk.mp4', a:5, cap:'还没做好的我不吹，做完再发给你看。'},
+   {kind:'end', line:'想跟的评论区回一。', a:6, name:'功课抽查', cta:'想跟的评论区回「1」', tip:'每天一条 · 边发边做'}
  ]}
 };
 
@@ -339,8 +353,47 @@ function viewEnd(d){
 
 /* ================= 播放引擎 ================= */
 var view=document.getElementById('view'), capEl=document.getElementById('capt'),
-    barEl=document.getElementById('bar'), uiEl=document.getElementById('ui');
-var day=1, idx=0, playing=false, cancelAnim=null, timers=[], curAudio=null, bgm=null, bgmOn=true;
+    barEl=document.getElementById('bar'), uiEl=document.getElementById('ui'),
+    shotEl=document.getElementById('shot');
+var day=1, idx=0, playing=false, cancelAnim=null, timers=[], curAudio=null, bgm=null;
+var refAudio=false;   // 参考配音（本地合成的旧音）：默认关，给剪映自己配让位
+
+/* ---------- 时长模型：由台词字数推算（与 scripts/gen-video-shotlist.js 同一套公式） ----------
+   为什么要它：2026-10-14 起用户改用剪映配音，页面不再有音轨可依赖，切换时机必须自算。
+   语速取 4.6 字/秒（略快于正常朗读，短视频口播节奏）；英文/数字按 0.6 字折算；
+   标点给一点停顿；每场景留 0.55s 起手 + 0.5s 收尾，避免画面一到就切走。        */
+var RATE=4.6;
+function talkLen(t){
+  t=t||'';
+  var cn=(t.match(/[\u4e00-\u9fa5]/g)||[]).length;
+  var en=(t.replace(/[\u4e00-\u9fa5]/g,'').match(/[A-Za-z0-9]/g)||[]).length*0.6;
+  var pause=(t.match(/[，。、？！：；—…]/g)||[]).length*0.22;
+  return 0.55+(cn+en+pause)/RATE;
+}
+/** 画面自身需要的时间下限：动画没演完就切，等于白做 */
+function animNeed(sc){
+  if(sc.kind==='hook') return 2.4;
+  if(sc.kind==='gold') return 2.8;
+  if(sc.kind==='end')  return 3.2;
+  if(sc.view==='spell') return 1.9+((sc.data&&sc.data.typed||'').length)*0.34;
+  if(sc.view==='cloze') return 2.3+((sc.data&&sc.data.ans&&sc.data.ans[0])||'').length*0.34;
+  if(sc.view==='assign') return 3.4;
+  return 2.2;
+}
+function sceneDur(sc){
+  return Math.round((Math.max(talkLen(sc.line), animNeed(sc))+0.5)*10)/10;
+}
+/** 全片时间轴：给剪映配音用的开始/结束时间 */
+function timeline(d){
+  var t=0, out=[];
+  DATA[d].scenes.forEach(function(sc,i){
+    var dur=sceneDur(sc);
+    out.push({i:i, start:t, end:t+dur, dur:dur, line:sc.line||'', cap:sc.cap||''});
+    t=Math.round((t+dur)*10)/10;
+  });
+  out.total=t;
+  return out;
+}
 
 function clearScene(){
   if(cancelAnim) cancelAnim();
@@ -371,15 +424,17 @@ function enter(i){
     else anim=animRows();
   }
   cancelAnim=anim;
-  // 配音
-  if(sc.a){
+  renderShot(i);
+  // 推进：静音版按时长走；开参考音时跟着音频走（音频缺失或失败照样按时长兜底）
+  var dur=sceneDur(sc)*1000;
+  if(refAudio && sc.a){
     var a=new Audio('audio/d'+day+'_'+sc.a+'.wav');
     curAudio=a;
     a.play().catch(function(){});
-    a.onended=function(){ if(playing) next(400); };
-    timers.push(setTimeout(function(){ if(playing) next(0); }, 12000)); // 兜底
+    a.onended=function(){ if(playing) next(350); };
+    timers.push(setTimeout(function(){ if(playing) next(0); }, dur+2500)); // 音没了也别卡住
   }else{
-    timers.push(setTimeout(function(){ if(playing) next(0); }, 3000));
+    timers.push(setTimeout(function(){ if(playing) next(0); }, dur));
   }
   barEl.style.width=((i+1)/DATA[day].scenes.length*100)+'%';
 }
@@ -396,6 +451,21 @@ function playDay(d){
 }
 function stopAll(){ playing=false; clearScene(); if(bgm) bgm.pause(); }
 
+/* ---------- 配音时长表（T 键）：剪映里照高亮行配，画面正好踩点 ---------- */
+function renderShot(cur){
+  var tl=timeline(day);
+  var h='<h4>D'+day+' · '+DATA[day].name+'　总时长 '+tl.total.toFixed(1)+' 秒</h4><table>';
+  tl.forEach(function(r){
+    var line=r.line||r.cap||'（无台词）';
+    h+='<tr class="'+(r.i===cur?'cur':'')+'"><td class="n">'+(r.i+1)+'</td>'+
+       '<td class="s">'+r.start.toFixed(1)+'~'+r.end.toFixed(1)+'s</td>'+
+       '<td>'+line+'</td></tr>';
+  });
+  h+='</table><div class="foot">T 键开关此表；剪映里逐句配完让每句落在对应区间内即可。<br>'+
+     '整体偏快/偏慢：调剪映语速，或改本文件里的 RATE（越大越快）。</div>';
+  shotEl.innerHTML=h;
+}
+
 function markUI(){
   Array.prototype.forEach.call(uiEl.children,function(b){
     b.classList.toggle('cur', Number(b.dataset.d)===day);
@@ -408,23 +478,41 @@ Object.keys(DATA).forEach(function(d){
   b.onclick=function(){ playDay(Number(d)); };
   uiEl.appendChild(b);
 });
-var sb=document.createElement('button'); sb.textContent='🔊 BGM'; sb.onclick=function(){
-  bgmOn=!bgmOn; if(bgm){ bgmOn?bgm.play().catch(function(){}):bgm.pause(); }
-  sb.style.opacity=bgmOn?1:.45;
-}; uiEl.appendChild(sb);
+var mk = function (label, init, onToggle, title) {
+  var b = document.createElement('button');
+  b.textContent = label; b.title = title || '';
+  var on = init;
+  b.style.opacity = on ? 1 : .45;
+  b.onclick = function () { on = !on; b.style.opacity = on ? 1 : .45; onToggle(on); };
+  uiEl.appendChild(b);
+  return b;
+};
+var bgmOn = false;   // 默认不带背景音：剪映里自己配乐、自己配音，录屏要干净
+mk('🔊 BGM', bgmOn, function (on) {
+  bgmOn = on;
+  if (bgm) { on ? bgm.play().catch(function () {}) : bgm.pause(); }
+}, '录制时建议关闭：音乐与配音都在剪映里加');
+mk('🎙 参考音', refAudio, function (on) { refAudio = on; },
+   '本地合成的旧配音，仅作节奏参考，默认关');
+mk('⏱ 时长表', false, function (on) {
+  shotEl.classList.toggle('on', on); renderShot(idx);
+}, '剪映配音用的每句话时间段（快捷键 T）');
 
-document.addEventListener('keydown',function(e){
-  if(e.code==='Space'){ e.preventDefault(); playing?stopAll():playDay(day); }
-  if(e.key==='r'||e.key==='R') playDay(day);
-  if(e.key==='h'||e.key==='H'){
-    ['ui','hud'].forEach(function(id){var el=document.getElementById(id);
-      el.style.display=el.style.display==='none'?'':'none';});
+document.addEventListener('keydown', function (e) {
+  if (e.code === 'Space') { e.preventDefault(); playing ? stopAll() : playDay(day); }
+  if (e.key === 'r' || e.key === 'R') playDay(day);
+  if (e.key === 't' || e.key === 'T') { shotEl.classList.toggle('on'); renderShot(idx); }
+  if (e.key === 'h' || e.key === 'H') {
+    ['ui', 'hud'].forEach(function (id) {
+      var el = document.getElementById(id);
+      el.style.display = el.style.display === 'none' ? '' : 'none';
+    });
   }
 });
-document.getElementById('goBtn').onclick=function(){
-  document.getElementById('gate').style.display='none';
-  bgm=new Audio('bgm.wav'); bgm.loop=true; bgm.volume=0.16;
-  if(bgmOn) bgm.play().catch(function(){});
+document.getElementById('goBtn').onclick = function () {
+  document.getElementById('gate').style.display = 'none';
+  bgm = new Audio('bgm.wav'); bgm.loop = true; bgm.volume = 0.16;
+  if (bgmOn) bgm.play().catch(function () {});
   playDay(1);
 };
 </script>
