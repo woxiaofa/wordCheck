@@ -64,7 +64,8 @@ var MAX_ROUNDS = 3;
 var DEFAULT_WORDS = 10;
 
 /** 这几种题型属于"写"：给更宽的超时，且题面要给音标 */
-var WRITE_TYPES = { dictation: 1, spell: 1, listen: 1 };
+/** 需要动笔写的题型（超时按字母数放宽、拼错降键盘难度）：情景填句也算 */
+var WRITE_TYPES = { dictation: 1, spell: 1, listen: 1, cloze: 1 };
 
 var PHASE_TEXT = { recog: '认', spell: '写', loop: '巩固' };
 
@@ -322,6 +323,9 @@ Page({
     // 巩固轮：随机用现有抽查方式（选义 / 拼写 / 听写）
     var types = quizLib.QUESTION_TYPES;
     var type = types[Math.floor(Math.random() * types.length)];
+    // 情景填句：有这个词的例句素材时才插进来（约三成）—— 只换考查方式，
+    // 不改变"必须写出来"这件事；没素材的词由 buildQuestion 自动降级成拼写
+    if (quizLib.hasSentence(w.word) && Math.random() < 0.3) type = 'cloze';
     // 听写题必须出声 —— 没有本地发音的词（如外研四上新增词）出听写就是哑巴题，
     // 孩子听不到只能瞎拼。降级为"看中文拼写"，答案仍然是这个词
     if (type === 'listen' && !tts.hasAudio(w.word)) type = 'spell';
@@ -360,7 +364,8 @@ Page({
     var self = this;
     var labels = {
       binary: '选意思', meaning: '选意思',
-      spell: '看中文拼写', listen: '听写', dictation: '听音拼写'
+      spell: '看中文拼写', listen: '听写', dictation: '听音拼写',
+      cloze: '情景填句'
     };
     this.setData({
       state: 'run',
@@ -378,7 +383,8 @@ Page({
 
     // 自动读音：单词一出现就念。
     // 例外：巩固轮的 spell（看中文拼写）题面只有中文，一念就是把答案读出来。
-    if (q.type !== 'spell') this.speak();
+    // cloze 同理：句子里挖掉的那个词正是答案，念出来等于报答案。
+    if (q.type !== 'spell' && q.type !== 'cloze') this.speak();
     this.startTimer();
     this._qShownAt = Date.now();     // 学习时长的计时起点（judge 里取用）
   },

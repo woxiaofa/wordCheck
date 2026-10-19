@@ -12,7 +12,11 @@
 
 /* ---------------- 题型与抽查结构 ---------------- */
 
+var sentences = require('./sentences');
+
+/** 情景填句：给中文 + 场景，把句子里的目标词挖空让孩子拼（D4 宣传形态） */
 var QUESTION_TYPES = ['meaning', 'spell', 'listen'];
+var EXTRA_TYPES = ['cloze'];
 
 var DEFAULT_COUNT = 10;
 
@@ -178,15 +182,33 @@ function buildQuestion(type, word, pool) {
     q.options = shuffleWithAnswer(word.def_cn, distractors);
   } else if (type === 'spell') {
     q.stem = word.def_cn;                                      // 题干给中文，拼写单词
+  } else if (type === 'cloze') {
+    // 情景填句：没有例句的词降级成普通拼写 —— 宁可少一个花活，不能出空题
+    var item = sentences.get(word.word);
+    if (!item) {
+      q.type = 'spell';
+      q.stem = word.def_cn;
+    } else {
+      q.cloze = { pic: item.pic, cn: item.cn, en: item.en };
+      q.stem = item.cn;
+    }
   } else {
     q.stem = '';                                               // 听写不给文字提示
   }
   return q;
 }
 
+/** 某个词有没有情景句（出题方决定要不要派 cloze 题时用） */
+function hasSentence(word) {
+  return !!sentences.get(String(word || '').toLowerCase());
+}
+
 module.exports = {
   QUESTION_TYPES: QUESTION_TYPES,
+  /** 巩固轮可追加的题型：有素材才用，没素材自动降级 */
+  EXTRA_TYPES: EXTRA_TYPES,
   DEFAULT_COUNT: DEFAULT_COUNT,
+  hasSentence: hasSentence,
   planTypes: planTypes,
   normalizeSpelling: normalizeSpelling,
   splitVariants: splitVariants,

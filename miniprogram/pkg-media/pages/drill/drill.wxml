@@ -43,11 +43,18 @@
     <view class="card qcard {{judgedOk ? 'flash' : ''}}">
       <!-- 题干：认=显示单词；写=只给中文+音标（单词绝不出现在题面上） -->
       <view class="qword-row" bindtap="onSpeak">
-        <text class="qword {{q.type === 'binary' || q.type === 'meaning' ? '' : 'qword-hint'}}">{{q.type === 'listen' ? '🔊 听写' : (q.type === 'spell' ? '✏️ 拼写' : (q.type === 'dictation' ? '✏️ 拼写' : q.wordId))}}</text>
-        <text class="speaker" wx:if="{{q.type !== 'spell'}}">🔊</text>
+        <text class="qword {{q.type === 'binary' || q.type === 'meaning' ? '' : 'qword-hint'}}">{{q.type === 'listen' ? '🔊 听写' : (q.type === 'cloze' ? '🧩 填句' : (q.type === 'spell' || q.type === 'dictation' ? '✏️ 拼写' : q.wordId))}}</text>
+        <text class="speaker" wx:if="{{q.type !== 'spell' && q.type !== 'cloze'}}">🔊</text>
       </view>
-      <view class="qph" wx:if="{{q.type !== 'spell'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
+      <view class="qph" wx:if="{{q.type !== 'spell' && q.type !== 'cloze'}}">{{q.word.phonetic}}　{{q.word.pos}}</view>
       <view class="qstem" wx:if="{{q.type === 'dictation' || q.type === 'spell'}}">{{q.stem}}</view>
+
+      <!-- 情景填句：中文 + 场景图标 + 挖空句子，空的词用键盘敲进去 -->
+      <view wx:if="{{q.type === 'cloze' && q.cloze}}" class="cloze">
+        <view class="cloze-pic">{{q.cloze.pic}}</view>
+        <view class="cloze-cn">{{q.cloze.cn}}</view>
+        <view class="cloze-en">{{q.cloze.en[0]}}<text class="cloze-blank {{kbText ? 'filled' : ''}}">{{kbText || '____'}}</text>{{q.cloze.en[1]}}</view>
+      </view>
 
       <!-- 选项/键盘区：贴到卡片底部，视线不用往上够 -->
       <view class="qbody">

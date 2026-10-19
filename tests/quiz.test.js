@@ -265,7 +265,30 @@ test('同一道题多次组装的选项顺序一致（便于复现问题）', fu
 
 /* ---------------- 汇总 ---------------- */
 
+test('情景填句（D4 形态）：有例句的词出 cloze，含中文 + 挖空句子', function () {
+  var word = { word: 'clean', def_cn: '清理；使干净', pos: 'v.' };
+  var q = quiz.buildQuestion('cloze', word, [word, { word: 'desk', def_cn: '书桌' }]);
+  assert.strictEqual(q.type, 'cloze');
+  assert.ok(q.cloze && q.cloze.cn, '要带中文');
+  assert.ok(q.cloze.en && q.cloze.en.length === 2, '句子要拆成挖空前/后两段');
+  assert.strictEqual(q.cloze.en[0] + 'clean' + q.cloze.en[1], 'I clean my room every day.', '拼装后应是完整句子');
+});
+
+test('情景填句：没有例句的词自动降级成拼写题（绝不出空题）', function () {
+  var w2 = { word: 'zzzznotaword', def_cn: '不存在的词' };
+  var q2 = quiz.buildQuestion('cloze', w2, [w2]);
+  assert.strictEqual(q2.type, 'spell', '应降级为 spell，实际 ' + q2.type);
+  assert.strictEqual(q2.stem, '不存在的词');
+});
+
+test('hasSentence：只有配了例句的词才派填句题', function () {
+  assert.ok(quiz.hasSentence('clean'), 'clean 应配有例句');
+  assert.ok(quiz.hasSentence('sweep'), 'sweep 应配有例句');
+  assert.ok(!quiz.hasSentence('zzzznotaword'), '未配例句的词应返回 false');
+});
+
 console.log('');
+
 if (failed.length) {
   console.log('失败 ' + failed.length + ' 项，通过 ' + passed + ' 项');
   process.exit(1);

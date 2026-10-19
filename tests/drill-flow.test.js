@@ -494,7 +494,12 @@ test('⑰ 巩固轮 spell 不泄题：不自动读音、题面不出单词', fun
     assert.strictEqual(spoken.length, 0, '点喇叭也不能念');
     var wxml = require('fs').readFileSync(
       path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.wxml'), 'utf8');
-    assert.ok(/q\.type === 'spell' \? '✏️ 拼写'/.test(wxml), '拼写题题面必须隐藏单词');
+    assert.ok(/q\.type === 'spell' \|\| q\.type === 'dictation' \? '✏️ 拼写'/.test(wxml),
+      '拼写题题面必须隐藏单词（cloze 加入后写法变了，断言同步更新）');
+    // 情景填句同理：句子里挖掉的那个词就是答案，题面不能给、喇叭也不能念
+    assert.ok(/q\.type === 'cloze' \? '🧩 填句'/.test(wxml), '填句题要显示「🧩 填句」而不是单词');
+    assert.ok(/q\.type !== 'spell' && q\.type !== 'cloze'/.test(wxml),
+      '填句题不能显示喇叭（点了就是报答案）');
   } finally {
     tts.speak = origSpeak;
   }

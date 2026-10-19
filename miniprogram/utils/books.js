@@ -42,6 +42,10 @@ var BOOKS = [
  */
 function getWords(key) {
   if (!key || key === 'all') return WORDS;
+  // 自定义词库：直接回它的词表（字段已补齐，下游无需区分）。
+  // 注意不能用前缀判断 key —— 内置词书 cet4 也以 c 开头（踩过一次，cet4 变空）
+  var c = key ? findCustom(key) : null;
+  if (c) return (c.words || []);
   var book = null;
   for (var i = 0; i < BOOKS.length; i++) {
     if (BOOKS[i].key === key) { book = BOOKS[i]; break; }
@@ -69,28 +73,92 @@ function setKey(key) {
   return true;
 }
 
+/* ---------------- 自定义词库（粘贴 / 表格导入，2026-10-19） ---------------- */
+
+var CUSTOM_KEY = 'word_books_custom';
+
+/** 用户自己导入的词库：[{ key, name, words:[{word, def_cn}], created_at }] */
+function customBooks() {
+  try {
+    var arr = wx.getStorageSync(CUSTOM_KEY);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomBooks(arr) {
+  try { wx.setStorageSync(CUSTOM_KEY, arr); } catch (e) { /* 测试环境忽略 */ }
+}
+
+/**
+ * 存一本自定义词库。
+ * 词对象补齐与内置词表一致的字段（unit/unit_order/volume），这样下游（学习、
+ * 巩固轮、错词本）完全不用知道它来自导入 —— 换一个数据源不该改调用方。
+ */
+function addCustomBook(name, words) {
+  if (!words || !words.length) return null;
+  var arr = customBooks();
+  var key = 'c' + Date.now();
+  var list = words.map(function (w, i) {
+    return {
+      word: w.word,
+      def_cn: w.def_cn || '',
+      phonetic: '',
+      pos: '',
+      tags: ['自定义'],
+      volume: 'custom',
+      unit: 1,
+      unit_order: i + 1
+    };
+  });
+  arr.push({ key: key, name: (name || '我的词库').slice(0, 12), words: list, created_at: Date.now() });
+  saveCustomBooks(arr);
+  return key;
+}
+
+function removeCustomBook(key) {
+  var arr = customBooks().filter(function (b) { return b.key !== key; });
+  saveCustomBooks(arr);
+  // 正用着这本就退回默认：不能出现"选了不存在的词库 → 一个词都没有"
+  if (getKey() === key) setKey(DEFAULT_KEY);
+  return true;
+}
+
+function findCustom(key) {
+  var arr = customBooks();
+  for (var i = 0; i < arr.length; i++) if (arr[i].key === key) return arr[i];
+  return null;
+}
+
 function isValidKey(key) {
   for (var i = 0; i < BOOKS.length; i++) if (BOOKS[i].key === key) return true;
-  return false;
+  return !!findCustom(key);
 }
 
 /** 给界面用的词书列表（带每本的词数，让用户知道选了什么） */
 function list() {
-  return BOOKS.map(function (b) {
-    return {
+  var out = BOOKS.map(function (b) {
+    return { key: b.key, name: b.name, desc: b.desc, count: getWords(b.key).length };
+  });
+  customBooks().forEach(function (b) {
+    out.push({
       key: b.key,
       name: b.name,
-      desc: b.desc,
-      count: getWords(b.key).length
-    };
+      desc: '自己导入 · ' + (b.words || []).length + ' 个词',
+      count: (b.words || []).length,
+      custom: true
+    });
   });
+  return out;
 }
 
 /** 当前词书的名字，用于首页/学习页展示 */
 function currentName() {
   var k = getKey();
   for (var i = 0; i < BOOKS.length; i++) if (BOOKS[i].key === k) return BOOKS[i].name;
-  return '全部';
+  var c = findCustom(k);
+  return c ? c.name : '全部';
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,7 +239,11 @@ function unitLabel(volumeKey, unitNo) {
 module.exports = {
   BOOKS: BOOKS,
   STORAGE_KEY: STORAGE_KEY,
+  CUSTOM_KEY: CUSTOM_KEY,
   DEFAULT_KEY: DEFAULT_KEY,
+  customBooks: customBooks,
+  addCustomBook: addCustomBook,
+  removeCustomBook: removeCustomBook,
   getWords: getWords,
   getKey: getKey,
   setKey: setKey,

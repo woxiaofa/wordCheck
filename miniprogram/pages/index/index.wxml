@@ -33,6 +33,8 @@
     <view class="muted center mt-s" style="font-size:24rpx">
       {{bookDesc}} · 换词库不会清除已记住的词
     </view>
+    <!-- 添加词库：课本词表能直接粘进来（拍照导入后续加） -->
+    <view class="link center mt-s" style="font-size:26rpx" bindtap="goImport">➕ 添加词库（粘贴 / 表格导入）</view>
   </view>
 
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->

@@ -267,6 +267,11 @@ Page({
     wx.showToast({ title: '已切换到「' + books.currentName() + '」', icon: 'none' });
   },
 
+  /** 添加词库：粘贴 / 表格导入（D7 承诺的拍照导入先做这一步） */
+  goImport: function () {
+    wx.navigateTo({ url: '/pkg-media/pages/import/import' });
+  },
+
   refresh: function () {
     var mirror = wx.getStorageSync(STORAGE_KEY) || {};
     var now = Date.now();

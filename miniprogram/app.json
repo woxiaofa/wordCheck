@@ -12,14 +12,17 @@
       "pages": [
         "pages/drill/drill",
         "pages/study/study",
-        "pages/quiz/quiz"
+        "pages/quiz/quiz",
+        "pages/import/import"
       ]
     }
   ],
   "preloadRule": {
     "pages/index/index": {
       "network": "all",
-      "packages": ["pkg-media"]
+      "packages": [
+        "pkg-media"
+      ]
     }
   },
   "window": {

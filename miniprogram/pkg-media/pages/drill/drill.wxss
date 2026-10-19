@@ -23,6 +23,35 @@
 .qph { text-align: center; color: #8fa3b7; font-size: 28rpx; margin-top: 8rpx; }
 .qstem { text-align: center; font-size: 34rpx; margin-top: 20rpx; }
 
+/* 情景填句：给中文 + 场景，把句子里的词挖空（句子级考查，对应真听写） */
+.cloze {
+  margin-top: 18rpx;
+  padding: 24rpx 22rpx;
+  background: #16202c;
+  border: 2rpx solid #2b3949;
+  border-radius: 16rpx;
+  text-align: center;
+}
+.cloze-pic { font-size: 76rpx; line-height: 1.1; }
+.cloze-cn { margin-top: 10rpx; font-size: 30rpx; color: #c8d4e0; }
+.cloze-en {
+  margin-top: 16rpx;
+  font-size: 34rpx;
+  line-height: 1.7;
+  color: #e8f0f8;
+  font-weight: 600;
+  word-break: break-word;
+}
+.cloze-blank {
+  display: inline-block;
+  min-width: 120rpx;
+  margin: 0 6rpx;
+  padding: 0 10rpx;
+  border-bottom: 4rpx solid #6b7a8c;
+  color: #6b7a8c;
+}
+.cloze-blank.filled { border-bottom-color: #2fd07a; color: #2fd07a; }
+
 /* 选项/键盘区：推到卡片底部 */
 .qbody { margin-top: auto; }
 
