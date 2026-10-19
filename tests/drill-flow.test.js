@@ -765,7 +765,7 @@ test('㉘ QWERTY 布局：退格在第三行末尾且比字母键宽（防误触
   assert.ok(/\.wide \.kb-row\s*\{[^}]*gap/.test(app), '宽屏也要有行间距适配');
 });
 
-test('㉙ 答对庆祝（#36）：动画层 + 音效 + 停约 1 秒再跳题；答错低沉音 + 震动', function () {
+test('㉙ 答对庆祝（#36）：动画层 + 音效 + 短停即跳题；答错低沉音 + 震动', function () {
   var fs = require('fs');
   var js = fs.readFileSync(
     path.resolve(__dirname, '../miniprogram/pkg-media/pages/drill/drill.js'), 'utf8');
@@ -777,10 +777,13 @@ test('㉙ 答对庆祝（#36）：动画层 + 音效 + 停约 1 秒再跳题；�
   assert.ok(/require\('\.\.\/\.\.\/\.\.\/utils\/sfx'\)/.test(js), 'drill.js 要引入 utils/sfx');
   assert.ok(/sfx\.playCorrect\(\)/.test(js), '答对要播庆祝音');
   assert.ok(/sfx\.playWrong\(\)/.test(js), '答错要播低沉提示音');
-  // 答对跳题节奏：从 180ms 放慢到约 1 秒（用户：犹豫的一下就过去了，下一题没反应过来）
+  // 答对跳题节奏：180ms 太快（2026-10-10）→ 1s 太慢显得散漫（2026-10-19）→ 定格 550ms。
+  // 下限 400ms 保证"看得见"，上限 800ms 防止有人改回拖节奏的旧值。
   var m = js.match(/celebrate:\s*true[\s\S]*?setTimeout\(function \(\)\s*\{[\s\S]*?\},\s*(\d+)\)/);
   assert.ok(m, '答对分支要亮 celebrate 并用 setTimeout 延迟跳题');
-  assert.ok(Number(m[1]) >= 800, '跳题延迟要 ≥800ms（实际 ' + m[1] + '）');
+  var delay = Number(m[1]);
+  assert.ok(delay >= 400 && delay <= 800,
+    '跳题延迟要落在 400~800ms（实际 ' + m[1] + '，太快看不清、太慢显散漫）');
   // 动画层
   assert.ok(/wx:if="\{\{celebrate\}\}" class="celebrate"/.test(wxml), 'wxml 要有庆祝动画层');
   assert.ok(/@keyframes celebrate-pop/.test(wxss), 'wxss 要有 ✓ 缩放弹跳动画');

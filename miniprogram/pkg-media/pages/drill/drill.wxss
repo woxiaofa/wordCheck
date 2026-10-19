@@ -90,7 +90,7 @@
   background: rgba(10, 16, 24, 0.45);
   z-index: 90;
   pointer-events: none;
-  animation: celebrate-fade 1s ease forwards;
+  animation: celebrate-fade 0.55s ease forwards;
 }
 .celebrate-pop {
   width: 180rpx;
@@ -104,7 +104,7 @@
   color: #ffffff;
   font-size: 110rpx;
   font-weight: 700;
-  animation: celebrate-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+  animation: celebrate-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
 }
 .celebrate-text {
   margin-top: 24rpx;

@@ -398,8 +398,14 @@ Page({
    */
   onShareAppMessage: function () {
     var s = this.data.mySummary;
-    var title = (s && s.text) ? String(s.text).slice(0, 28) : '单词抽查 · 每天五分钟，单词真记住';
+    // 动态标题优先（个性化状态更有点开欲），兜底用固定口号；品牌名必须是注册名「功课抽查」
+    var title = (s && s.text) ? String(s.text).slice(0, 28) : '功课抽查 · 一天十个词，两分钟';
     return { title: title, path: '/pages/index/index' };
+  },
+
+  /** 朋友圈分享：家长晒到朋友圈的入口（只有 title 生效，落地页固定首页） */
+  onShareTimeline: function () {
+    return { title: '功课抽查 · 一天十个词，两分钟' };
   }
 });
 

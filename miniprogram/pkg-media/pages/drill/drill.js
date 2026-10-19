@@ -594,16 +594,16 @@ Page({
     }
 
     var self = this;
-    // 答对：中央 ✓ 庆祝动画 + 清脆音效 + 轻震，停 ~1 秒再跳下一词 ——
-    // 2026-10-10 用户反馈：之前 180ms 一闪而过，"有点犹豫的一下就过去了，
-    // 下一题没反应过来"。答对是值得看见的事，节奏放慢一点。
+    // 答对：中央 ✓ 庆祝动画 + 清脆音效 + 轻震，短暂停留后进下一词。
+    // 2026-10-10 曾因 180ms 太快被说"一闪而过"放到 1s；2026-10-19 用户反馈
+    // 1s 又偏慢、显得散漫，孩子连续答题的劲头会断 —— 折中 550ms，动画同步压短。
     this.setData({ judgedOk: true, celebrate: true });
     sfx.playCorrect();
     if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
     setTimeout(function () {
       self.setData({ judgedOk: false, celebrate: false });
       self.next();
-    }, 1000);
+    }, 550);
   },
 
   /** 详情页「跟着念完了，继续」：把看详情的时长记进总学习时长（简报口径） */

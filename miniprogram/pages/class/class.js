@@ -733,8 +733,11 @@ Page({
   onShareAppMessage: function () {
     var cls = this.data.cls || {};
     var code = cls.code || '';
+    // 文案带行动指令：对方看到就知道「要做什么」（输入邀请码加班），不只是个名字
     return {
-      title: code ? ('【' + (cls.name || '我的班级') + '】邀请码 ' + code) : '单词抽查 · 班级',
+      title: code
+        ? ('邀你加入【' + (cls.name || '我的班级') + '】 · 邀请码 ' + code)
+        : '功课抽查 · 输入邀请码加入班级',
       path: '/pages/class/class',
       imageUrl: ''
     };
