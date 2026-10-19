@@ -1,0 +1,46 @@
+.page { padding: 24rpx 24rpx 60rpx; background: #0f1620; min-height: 100vh; }
+.t1 { font-size: 32rpx; font-weight: 700; color: #e8f0f8; }
+.muted { color: #8b9bad; font-size: 26rpx; }
+.warn { color: #ffb020; font-size: 26rpx; }
+.empty { text-align: center; color: #8b9bad; font-size: 28rpx; padding: 40rpx 0; }
+.row-between { display: flex; align-items: center; justify-content: space-between; }
+.row { display: flex; align-items: center; }
+
+/* 照片要够大才看得清：照着录的整个前提就是"看得清" */
+.shot {
+  width: 100%;
+  margin-top: 16rpx;
+  border-radius: 14rpx;
+  background: #16202c;
+}
+.broken {
+  margin-top: 16rpx;
+  padding: 80rpx 0;
+  text-align: center;
+  color: #8b9bad;
+  font-size: 28rpx;
+  background: #16202c;
+  border: 2rpx dashed #2b3949;
+  border-radius: 14rpx;
+}
+
+.inp {
+  padding: 20rpx;
+  box-sizing: border-box;
+  background: #16202c;
+  border: 2rpx solid #2b3949;
+  border-radius: 14rpx;
+  color: #e8f0f8;
+  font-size: 28rpx;
+}
+.inp.w { width: 300rpx; }
+.inp.d { flex: 1; margin-left: 12rpx; }
+
+.pv { padding: 14rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); }
+/* 外层必须是 view：text 里套 text 混排字号会把行盒撑成两倍高（layout ⑫ 拦过一次） */
+.pv-left { flex: 1; min-width: 0; }
+.pv-w { color: #e8f0f8; font-weight: 600; font-size: 30rpx; }
+.del { color: #ff8a95; font-size: 26rpx; padding-left: 20rpx; }
+
+.mt { margin-top: 20rpx; }
+.mt-s { margin-top: 12rpx; }

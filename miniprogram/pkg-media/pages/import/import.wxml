@@ -50,6 +50,23 @@
     </view>
   </view>
 
+  <view class="card">
+    <view class="t1">拍照记词</view>
+    <view class="muted mt-s" style="line-height:1.7">
+      课本词表来不及抄？先拍一张存下来，回头对着照片一个词一行地录。
+      照片只存本机，不上传。
+    </view>
+    <button class="btn mt" bindtap="takePhoto">拍一张 / 从相册选</button>
+  </view>
+
+  <view class="card" wx:if="{{draftList.length}}">
+    <view class="t1">没录完的草稿</view>
+    <view class="row-between mt-s" wx:for="{{draftList}}" wx:key="id">
+      <text class="link" data-id="{{item.id}}" bindtap="goDraft">{{item.name || '未命名草稿'}} · 已录 {{item.words.length}} 个</text>
+      <text class="link" data-id="{{item.id}}" bindtap="removeDraft">删除</text>
+    </view>
+  </view>
+
   <view class="card" wx:if="{{custom.length}}">
     <view class="t1">我已经添加的词库</view>
     <view class="row-between mt-s" wx:for="{{custom}}" wx:key="key">
@@ -59,6 +76,6 @@
   </view>
 
   <view class="muted center mt-s" style="font-size:24rpx">
-    拍照上传课本词表（自动整理）会在后面加上，数据存在本机，不上传。
+    词库和照片都只存在本机，不上传服务器。
   </view>
 </view>

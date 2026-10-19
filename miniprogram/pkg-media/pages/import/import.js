@@ -6,6 +6,8 @@
  */
 var books = require('../../utils/books');
 var importer = require('../../utils/wordimport');
+var drafts = require('../../utils/drafts');
+var privacy = require('../../utils/privacy');
 
 Page({
   data: {
@@ -14,11 +16,44 @@ Page({
     parsed: null,        // { words, skipped, total }
     saved: false,
     custom: [],          // 已导入的词库
+    draftList: [],       // 没录完的拍照草稿
     toast: ''
   },
 
   onShow: function () {
-    this.setData({ custom: books.customBooks() });
+    this.setData({ custom: books.customBooks(), draftList: drafts.list() });
+  },
+
+  /* -------------------- 拍照记词：先拍下来，回家对着照片录 -------------------- */
+
+  takePhoto: function () {
+    var self = this;
+    drafts.pickPhoto().then(function (path) {
+      var d = drafts.add(path);
+      wx.navigateTo({ url: '/pkg-media/pages/organize/organize?id=' + d.id });
+    }).catch(function (err) {
+      if (privacy.onDenied(err)) return;                    // 拒绝隐私指引：给一句人话
+      if (err && err.message === 'CANCELED') return;        // 自己取消的，别弹提示
+      wx.showToast({ title: '没拿到照片', icon: 'none' });
+    });
+  },
+
+  goDraft: function (e) {
+    wx.navigateTo({ url: '/pkg-media/pages/organize/organize?id=' + e.currentTarget.dataset.id });
+  },
+
+  removeDraft: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var self = this;
+    wx.showModal({
+      title: '删掉这份草稿？',
+      content: '照片和已经录的词一起删，删了就找不回来了。',
+      success: function (res) {
+        if (!res.confirm) return;
+        drafts.remove(id);
+        self.setData({ draftList: drafts.list() });
+      }
+    });
   },
 
   onInput: function (e) {
@@ -53,7 +88,7 @@ Page({
     var self = this;
     wx.showModal({
       title: '已添加 ' + r.words.length + ' 个词',
-      content: '已经切到「' + name + '」，现在去背的就是这份词表。拍照导入会在后面加上。',
+      content: '已经切到「' + name + '」，现在去背的就是这份词表。',
       confirmText: '去背单词',
       cancelText: '继续添加',
       success: function (res) {

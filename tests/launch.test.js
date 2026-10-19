@@ -168,5 +168,35 @@ ok('⑪ #小程序:// 口令带 token（空路径版打不开），且四处文�
   assert.ok(read('cloud/functions/class/index.js').indexOf("require('./links')") >= 0, '云端催一催要走 ./links');
 });
 
+/* ⑫ 拍照记词：选图是隐私接口，漏一处授权线上就是静默失败；照片也不许偷偷上传 */
+ok('⑫ 拍照记词：选图只走 drafts.pickPhoto（先过隐私授权），照片只存本机不上传', function () {
+  var d = read('miniprogram/utils/drafts.js');
+  assert.ok(d.indexOf('privacy.ensure()') >= 0, 'drafts.js 选图前没过隐私授权');
+  assert.ok(d.indexOf('wx.chooseMedia') >= 0, 'drafts.js 应统一用 chooseMedia 取图');
+  assert.ok(d.indexOf('saveFile') >= 0, '照片要另存本机持久路径（临时路径会失效）');
+  // 照片只存本机：出现云存储上传就说明改了承诺（页面上写的是"不上传"）
+  assert.ok(d.indexOf('cloud.uploadFile') < 0 && d.indexOf('wx.cloud.uploadFile') < 0,
+    'drafts.js 不该把照片传到云端（页面承诺只存本机）');
+
+  // 别处一律不许裸调选图接口 —— 每多一处就多一处漏授权的风险
+  walk('miniprogram', '.js').forEach(function (f) {
+    if (f.indexOf('utils/drafts.js') >= 0) return;
+    var s = read(f);
+    assert.ok(s.indexOf('wx.chooseMedia') < 0, f + ' 里裸调了 wx.chooseMedia');
+    assert.ok(s.indexOf('wx.chooseImage') < 0, f + ' 里裸调了 wx.chooseImage');
+  });
+
+  // 新页面必须落在分包（主包 pages 有 ≤5 的硬约束）
+  var j = JSON.parse(read('miniprogram/app.json'));
+  var sub = (j.subpackages || []).reduce(function (a, s) { return a.concat(s.pages || []); }, []);
+  assert.ok(sub.indexOf('pages/organize/organize') >= 0, 'organize 页必须放 pkg-media 分包');
+  assert.ok(j.pages.indexOf('pages/organize/organize') < 0, 'organize 页不该进主包');
+
+  // 隐私保护指引要写明相册/摄像头，否则提审会被以"未声明收集的隐私"打回
+  var doc = read('docs/上线检查清单.md');
+  assert.ok(doc.indexOf('相册') >= 0, '清单里没写相册授权');
+  assert.ok(doc.indexOf('摄像头') >= 0, '清单里没写摄像头授权');
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
