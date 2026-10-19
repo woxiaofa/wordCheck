@@ -18,6 +18,7 @@ var cloud = require('../../utils/cloud');
 var asgcache = require('../../utils/asgcache');
 var learnlog = require('../../utils/learnlog');
 var privacy = require('../../utils/privacy');
+var links = require('../../utils/links');
 var layout = require('../../utils/layout');
 var fit = require('../../utils/fit');
 
@@ -226,8 +227,9 @@ Page({
     var text = s.honor
       ? s.text + '\n' + s.honor.badge + ' · ' + s.honor.detail
       : s.text;
-    // 末尾带上 #小程序:// 文本链接：粘贴到微信聊天会变成可点链接，对方一点就开
-    text += '\n点这里打开小程序看详情 👉 #小程序://功课抽查/';
+    // 末尾带真口令（#小程序:// 短链）：必须用微信「复制链接」签发的带随机码版本，
+    // 见 utils/links.js —— 手拼的空路径版本点了永远「链接无效」（2026-10-19 实测）
+    text += '\n' + links.openLine('看详情');
     privacy.copy(text, function () { wx.showToast({ title: '简报已复制', icon: 'none' }); });
   },
 

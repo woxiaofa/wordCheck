@@ -493,14 +493,16 @@ ok('⑭ 催一催/简报/邀请码文案：末尾带 #小程序://功课抽查/ 
     assert.ok(lines[lines.length - 1].indexOf('#小程序://') >= 0,
       '链接要放在最后一行，实际末行：' + lines[lines.length - 1]);
 
-    // 静态钉死：三处"复制出去给别人看"的文案都要带链接
+    // 静态钉死：三处"复制出去给别人看"的文案都要带链接。
+    // 2026-10-19 起链接统一由 shared/links.js 提供真口令（手拼空路径版点了「链接无效」），
+    // 所以这里断言调用 openLine，而不是断言源码里出现字面量。
     var fs = require('fs');
     var path = require('path');
     var root = path.join(__dirname, '..');
     ['miniprogram/pages/class/class.js', 'miniprogram/pages/index/index.js'].forEach(function (f) {
       var src = fs.readFileSync(path.join(root, f), 'utf8');
-      assert.ok(src.indexOf('#小程序://功课抽查/') >= 0,
-        f + ' 的外发文案（简报/邀请码）必须带小程序直达链接');
+      assert.ok(src.indexOf('links.openLine(') >= 0,
+        f + ' 的外发文案（简报/邀请码）必须带小程序直达链接（走 utils/links）');
     });
   });
 });

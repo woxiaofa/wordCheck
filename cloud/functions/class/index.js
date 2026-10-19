@@ -19,6 +19,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 const { getLocalDate, getLocalDayStart } = require('./time');
+const { openLine } = require('./links');
 const { queryStates, STATE_COLL, ensureCollection } = require('./state-store');
 const wrongLib = require('./wrong');
 
@@ -1080,7 +1081,7 @@ async function onNudge(openid, { studentId }) {
   // 家长把催学文案发给孩子，孩子点一下就直接打开小程序，不用再找入口。
   // 它带不了参数（邀请码场景仍走分享卡片），所以这里只做"直接打开"的引导。
   // 必须放在最后一行：链接是收尾的行动指引，插中间会打断文案的故事线。
-  parts.push('点这里直接打开小程序 👉 #小程序://功课抽查/');
+  parts.push(openLine('打开就是今天的作业'));
 
   return ok({ text: parts.join('\n') });
 }

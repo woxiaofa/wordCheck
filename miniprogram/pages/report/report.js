@@ -16,6 +16,7 @@ var cloud = require('../../utils/cloud');
 var time = require('../../utils/time');
 var wrongLib = require('../../utils/wrong');
 var privacy = require('../../utils/privacy');
+var links = require('../../utils/links');
 
 Page({
   data: {
@@ -171,7 +172,7 @@ Page({
     var s = this.data.summary;
     if (!s || !s.text) return;
     var text = s.text + (s.honor ? '\n' + s.honor.badge + ' · ' + s.honor.detail : '');
-    text += '\n点这里打开小程序看详情 👉 #小程序://功课抽查/';
+    text += '\n' + links.openLine('看这份报告');
     privacy.copy(text, function () { wx.showToast({ title: '简报已复制', icon: 'none' }); });
   },
 

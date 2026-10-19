@@ -144,5 +144,29 @@ ok('⑩ 调试入口被 envVersion 开关卡住（正式版不渲染，云端还
   assert.ok(rev.indexOf("fail('FORBIDDEN'") >= 0, 'review 云函数缺 FORBIDDEN 拒绝分支');
 });
 
+/* ⑪ 小程序口令：必须是微信签发的真短链，且由 shared/links.js 单点提供 */
+ok('⑪ #小程序:// 口令带 token（空路径版打不开），且四处文案统一走 shared/links.js', function () {
+  var links = read('shared/links.js');
+  assert.ok(/OPEN_LINK\s*=\s*'#小程序:\/\/[^']+\/[A-Za-z0-9_-]{6,}'/.test(links),
+    'shared/links.js 的 OPEN_LINK 必须带随机码 token（手拼空路径版在微信里永远「链接无效」）');
+
+  // 任何页面/云函数都不许再写死空路径口令（2026-10-19 前的写法）
+  var files = [
+    'miniprogram/pages/index/index.js',
+    'miniprogram/pages/report/report.js',
+    'miniprogram/pages/class/class.js',
+    'cloud/functions/class/index.js'
+  ];
+  files.forEach(function (f) {
+    var s = read(f);
+    assert.ok(s.indexOf("'#小程序://功课抽查/'") < 0,
+      f + ' 里还写死了空路径口令（应为 links.openLine(...)）');
+  });
+  // 复制入口必须来自共享模块
+  assert.ok(read('miniprogram/pages/index/index.js').indexOf('utils/links') >= 0, '首页复制文案要走 utils/links');
+  assert.ok(read('miniprogram/pages/report/report.js').indexOf('utils/links') >= 0, '报告页复制文案要走 utils/links');
+  assert.ok(read('cloud/functions/class/index.js').indexOf("require('./links')") >= 0, '云端催一催要走 ./links');
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);

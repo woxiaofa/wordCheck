@@ -14,6 +14,7 @@ var srs = require('../../utils/srs');
 var time = require('../../utils/time');
 var layout = require('../../utils/layout');
 var privacy = require('../../utils/privacy');
+var links = require('../../utils/links');
 var books = require('../../utils/books');
 var env = require('../../utils/env');
 var WORDS = require('../../data/words');
@@ -717,11 +718,11 @@ Page({
     var code = this.data.cls && this.data.cls.code;
     if (!code) return;
     // 不只复制光秃秃的码：带上打开链接和用法，对方收到就知道怎么用。
-    // #小程序:// 文本粘贴到微信聊天会自动变成可点链接（但带不了参数，
-    // 所以邀请码还是要手输 —— 文案里把这一步说清楚）
+    // 口令由 utils/links.js 统一提供：必须是微信「复制链接」签发的带随机码版本，
+    // 手拼的空路径版点了只会「链接无效」。口令带不了参数，邀请码仍要手输。
     var name = (this.data.cls && this.data.cls.name) || '我的班级';
     var text = '【' + name + '】邀请码：' + code +
-      '\n点这里打开小程序 👉 #小程序://功课抽查/ ，在「班级」页输入邀请码就能加入';
+      '\n' + links.openLine('在「班级」页输入邀请码就能加入');
     privacy.copy(text, function () { wx.showToast({ title: '邀请文案已复制', icon: 'success' }); });
   },
 
