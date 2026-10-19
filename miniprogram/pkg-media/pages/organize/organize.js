@@ -5,10 +5,10 @@
  * 关键体验是**随时能停下**：每加一个词立刻写进草稿，退出、被打断、杀进程都不丢，
  * 下次从草稿箱进来接着录 —— 这才是"离线整理"的意思。
  */
-var books = require('../../utils/books');
-var drafts = require('../../utils/drafts');
-var importer = require('../../utils/wordimport');
-var privacy = require('../../utils/privacy');
+var books = require('../../../utils/books');
+var drafts = require('../../../utils/drafts');
+var importer = require('../../../utils/wordimport');
+var privacy = require('../../../utils/privacy');
 
 Page({
   data: {

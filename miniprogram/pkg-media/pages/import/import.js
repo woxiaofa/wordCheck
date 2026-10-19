@@ -4,10 +4,10 @@
  * 为什么单独一页：它是一次性的"倒数据"动作，不该挤进首页的每日任务区；
  * 而且需要预览 + 纠错的空间（解析错了要能看见哪几行没进去）。
  */
-var books = require('../../utils/books');
-var importer = require('../../utils/wordimport');
-var drafts = require('../../utils/drafts');
-var privacy = require('../../utils/privacy');
+var books = require('../../../utils/books');
+var importer = require('../../../utils/wordimport');
+var drafts = require('../../../utils/drafts');
+var privacy = require('../../../utils/privacy');
 
 Page({
   data: {

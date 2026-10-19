@@ -198,5 +198,30 @@ ok('⑫ 拍照记词：选图只走 drafts.pickPhoto（先过隐私授权），�
   assert.ok(doc.indexOf('摄像头') >= 0, '清单里没写摄像头授权');
 });
 
+/* ⑬ require 的相对路径必须指向真实存在的文件 */
+ok('⑬ 端上所有 require 的相对路径都指向真实文件（分包多一层目录，少写一个 ../ 编译期才炸）', function () {
+  // 2026-10-19 实锤：pkg-media 分包里的页面写成 require('../../utils/books')，
+  // 实际应是 ../../../utils/books（分包根多一层）。npm run check 全绿看不出来，
+  // 只有开发者工具编译时才 ENOENT —— 上传直接失败。这类错误必须机械拦住。
+  var files = walk('miniprogram', '.js');
+  var bad = [];
+  files.forEach(function (f) {
+    // 注释里的用法示例不算：先剥掉块注释与行注释，只看真代码
+    var s = read(f)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[\s;])(\/\/[^\n]*)/g, '$1');
+    var re = /require\(['"](\.[^'"]+)['"]\)/g;
+    var m;
+    while ((m = re.exec(s))) {
+      var target = path.resolve(path.join(ROOT, path.dirname(f)), m[1]);
+      if (fs.existsSync(target)) continue;
+      if (fs.existsSync(target + '.js')) continue;
+      if (fs.existsSync(path.join(target, 'index.js'))) continue;
+      bad.push(f + ' → ' + m[1]);
+    }
+  });
+  assert.strictEqual(bad.length, 0, 'require 指向不存在的文件：\n    ' + bad.join('\n    '));
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
