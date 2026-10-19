@@ -4,11 +4,15 @@
  * 播放优先级（详见 docs/词库与发音方案.md）：
  *   1. 本地预生成音频：Piper（MIT 协议）离线合成，打包在 /assets/audio/<word>.mp3
  *      —— 零网络、零权限、真机必出声，且音色统一
- *   2. WechatSI 插件 textToSpeech：后台添加插件后自动启用，覆盖词库外的词
- *   3. 都不可用：回调 false，页面给一次性提示，不崩
+ *   2. 云端 TTS（2026-10-19 新增）：tts 云函数按词合成英文发音存云存储，客户端下载后
+ *      缓存到本机，之后零等待。覆盖自定义词库 —— 个人主体搜不到同声传译插件
+ *      （2026-10-05 / 10-19 两次实锤），这一级是自定义词库唯一有声路径
+ *   3. WechatSI 插件 textToSpeech：保留兜底（当前插件未授权，实际不生效）
+ *   4. 都不可用：回调 false，页面给一次性提示，不崩
  *
- * 为什么本地优先：插件需要后台授权（个人主体曾搜不到），且按次消耗额度；
- * 本地 mp3 是一次性成本（包体积 ~1.5MB），体验最稳。
+ * 为什么本地优先：插件需要后台授权（个人主体搜不到），且按次消耗额度；
+ * 本地 mp3 是一次性成本（包体积 ~1.5MB），体验最稳。云端合成一次全端共享，
+ * 但首次点击要等 1~2 秒，所以只当本地没有时才走。
  *
  * 实现要点：
  *   1. 全局复用一个 InnerAudioContext，播放前先 stop —— 连点不会叠音
@@ -33,6 +37,12 @@ var byLower = {};
 var plugin = null;
 try { plugin = requirePlugin('WechatSI'); } catch (e) { plugin = null; }
 
+// 云端发音：tts 云函数 + 云存储缓存。wx.cloud 不在（Node 测试/未初始化）时自动降级，
+// 行为与没有云端分支时完全一致 —— 这个文件可以安全跑在任何环境。
+var audioKeyLib = require('./audio-key');
+var CLOUD_CACHE_KEY = 'tts_audio_cache';   // storage：wordKey -> 本地缓存文件路径
+var cloudOn = typeof wx !== 'undefined' && !!wx.cloud && typeof wx.cloud.callFunction === 'function';
+
 /**
  * 词文本 → 清单键：空格转连字符（"ice cream" → ice-cream）。
  * 2026-10-10 新版词库收录短语后，mp3 文件名不带空格（gen_audio_piper.py 同规则净化），
@@ -52,9 +62,12 @@ function hasLocalAudio() {
   return false;
 }
 
-/** 这个词有没有本地发音（大小写不敏感、短语按净化键；没有的词不能出听写题 —— 一道哑巴题只能错） */
+/** 这个词能不能发声：本地清单有，或云端 TTS 可用（第一次点会现场合成并缓存）。
+ * 听写题派发靠它 —— 云端可用后自定义词也能出听写题，不再静默降级成拼写。 */
 function hasAudio(word) {
-  return !!(word && byLower[fileKey(word)]);
+  if (!word) return false;
+  if (byLower[fileKey(word)]) return true;
+  return cloudOn;
 }
 
 /** 本地音频路径（用清单里的原样文件名）；不在清单里返回 '' */
@@ -94,6 +107,51 @@ function finish(word, ok) {
   for (var i = 0; i < list.length; i++) list[i](ok);
 }
 
+/** 云端发音：storage 本地缓存命中直接播；未命中 → tts 云函数 → 下载 → 存本机 → 写索引 */
+function cloudFetch(word, cb) {
+  var key = audioKeyLib.key(word);
+  if (!key) { cb(false); return; }
+
+  var cacheMap = wx.getStorageSync(CLOUD_CACHE_KEY) || {};
+  if (cacheMap[key]) { cb(play(cacheMap[key])); return; }
+
+  // 并发合并：同一个词同时只发一次云端请求（与插件路径共用 pending 机制）
+  if (pending[word]) { pending[word].push(cb); return; }
+  pending[word] = [cb];
+
+  wx.cloud.callFunction({
+    name: 'tts',
+    data: { action: 'synthesize', word: word },
+    success: function (res) {
+      var r = res && res.result;
+      if (!r || !r.ok || !r.fileID) { finish(word, false); return; }
+      wx.cloud.downloadFile({
+        fileID: r.fileID,
+        success: function (d) {
+          if (!d || !d.tempFilePath) { finish(word, false); return; }
+          var dst = wx.env.USER_DATA_PATH + '/tts-' + key + '.mp3';
+          var fsm = wx.getFileSystemManager();
+          fsm.saveFile({
+            tempFilePath: d.tempFilePath,
+            filePath: dst,
+            success: function () {
+              try {
+                var m = wx.getStorageSync(CLOUD_CACHE_KEY) || {};
+                m[key] = dst;
+                wx.setStorageSync(CLOUD_CACHE_KEY, m);
+              } catch (e) { /* 索引写失败只影响下次速度，不影响本次 */ }
+              finish(word, play(dst));
+            },
+            fail: function () { finish(word, play(d.tempFilePath)); } // 存不下来至少这次能响
+          });
+        },
+        fail: function () { finish(word, false); }
+      });
+    },
+    fail: function () { finish(word, false); }
+  });
+}
+
 /**
  * 朗读一个单词
  * @param {string} word 要读的英文单词
@@ -109,7 +167,10 @@ function speak(word, done) {
   var src = localSrc(word);
   if (src) { cb(play(src)); return; }
 
-  // 2) 插件兜底（词库外的词）
+  // 2) 云端 TTS：本地文件缓存命中秒响，未命中现场合成（首次 1~2 秒）
+  if (cloudOn) { cloudFetch(word, cb); return; }
+
+  // 3) 插件兜底（当前未授权，实际走不到这里）
   if (!plugin) { cb(false); return; }
 
   // 同一个词的并发请求合并成一次 textToSpeech
