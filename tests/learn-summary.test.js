@@ -168,7 +168,59 @@ ok('⑤ 学员报告（studentDetail）也带同一份简报', function () {
     });
 });
 
-ok('⑥ 越权：教练只能看自己班里的学员', function () {
+/**
+ * ⑥⑦ 今日掌握率（2026-10-19 实锤修的坑）
+ * 主流程是 drill（认→拼→巩固），每题评价只写 review_logs；quiz_items 只有旧抽查页在写。
+ * 所以"只走 drill 的学员"如果只盯 quiz_items，报告页的掌握率永远是 — ，
+ * 哪怕他今天全对。这两条把这个口径钉死。
+ */
+ok('⑥ 只走 drill（无 quiz_items）且全对：掌握率必须是 100%，不能是 —', function () {
+  base();
+  seedLearn(10);                       // 10 条 review_logs，全 known，没有 quiz_items
+  return as(COACH, function () { return classFn.main({ action: 'summary', studentId: 'A' }); })
+    .then(function (r) {
+      var s = r.data;
+      assert.strictEqual(s.quiz_total, 0, '本例确实没有 quiz_items（模拟主流程）');
+      assert.strictEqual(s.rate_total, 10, '分母应是今日 10 条评价');
+      assert.strictEqual(s.rate_mastered, 10);
+      assert.strictEqual(s.rate, 100, '全对应为 100%，实际 ' + s.rate);
+    });
+});
+
+ok('⑦ drill 里有错：掌握率按 known 占比算，且与班级页 todayRate 同一个数字', function () {
+  base();
+  db.seed('review_logs', [
+    { _id: 'l0', user_id: 'A', word_id: 'w0', feedback: 'known', mode: 'learn', duration_ms: 60000, review_date: today, created_at: Date.now() },
+    { _id: 'l1', user_id: 'A', word_id: 'w1', feedback: 'forgot', mode: 'learn', duration_ms: 60000, review_date: today, created_at: Date.now() - 1000 },
+    { _id: 'l2', user_id: 'A', word_id: 'w2', feedback: 'vague', mode: 'learn', duration_ms: 60000, review_date: today, created_at: Date.now() - 2000 },
+    { _id: 'l3', user_id: 'A', word_id: 'w3', feedback: 'known', mode: 'learn', duration_ms: 60000, review_date: today, created_at: Date.now() - 3000 }
+  ]);
+  return as(COACH, function () { return classFn.main({ action: 'summary', studentId: 'A' }); })
+    .then(function (r) {
+      var s = r.data;
+      assert.strictEqual(s.rate_total, 4);
+      assert.strictEqual(s.rate_mastered, 2, '两个 known');
+      assert.strictEqual(s.rate, 50, '2/4 = 50%，实际 ' + s.rate);
+      // 班级页 todayRate 必须与报告页同源：同一个孩子不能出现两个数字
+      return as(COACH, function () { return classFn.main({ action: 'students' }); });
+    })
+    .then(function (r) {
+      var stu = (r.data.students || []).filter(function (x) { return x.id === 'A'; })[0];
+      assert.ok(stu, '班级列表里要有小明');
+      assert.strictEqual(stu.todayRate, 50, '班级页 todayRate 应与报告页一致，实际 ' + stu.todayRate);
+    });
+});
+
+ok('⑧ 今天一条评价都没有：rate 为 null（前端显示 —，不是 0%）', function () {
+  base();
+  return as(S_A, function () { return classFn.main({ action: 'summary' }); })
+    .then(function (r) {
+      assert.strictEqual(r.data.rate, null, '没评价就不该编一个 0% 出来，实际 ' + r.data.rate);
+      assert.strictEqual(r.data.rate_total, 0);
+    });
+});
+
+ok('⑨ 越权：教练只能看自己班里的学员', function () {
   base();
   // 注意：db.seed 会替换整个集合，这里只能追加，别把教练/小明冲掉
   (db.raw.users || (db.raw.users = [])).push(

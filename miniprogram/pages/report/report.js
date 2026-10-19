@@ -114,10 +114,11 @@ Page({
     var kpis = [];
     if (summary) {
       kpis.push({ num: String(summary.learned || 0), label: '今日练词' });
-      kpis.push({
-        num: summary.quiz_total ? (Math.round(summary.mastered / summary.quiz_total * 100) + '%') : '—',
-        label: '今日掌握率'
-      });
+      // 掌握率优先用云端算好的 rate（含 drill 主流程的 review_logs 口径）。
+      // 兜底：老版本云函数还没下发 rate 时退回只看 quiz_items，不至于显示成 —。
+      var rateNum = (summary.rate === 0 || summary.rate) ? summary.rate
+        : (summary.quiz_total ? Math.round(summary.mastered / summary.quiz_total * 100) : null);
+      kpis.push({ num: rateNum === null ? '—' : (rateNum + '%'), label: '今日掌握率' });
       kpis.push({ num: String((stu.stats && stu.stats.learned_words) || 0), label: '累计学词' });
     }
 

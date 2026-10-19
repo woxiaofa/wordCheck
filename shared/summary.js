@@ -10,6 +10,7 @@
  *   learned  = 今天学过的去重词数（学习页评价 + 抽查涉及，取并集）
  *   mastered / failed = quiz_items 今日 is_correct 的真/假计数
  *   forgotToday = 学习页今日评价为 forgot 的次数
+ *   rate = 今日掌握率（review_logs 的 known + quiz_items 答对）/ 两侧总题次；无评价时为 null
  */
 
 var COLL = {
@@ -68,6 +69,20 @@ async function learnSummary(db, userId, name, today) {
   var failed = quizTotal - mastered;
   var forgotToday = logRows.filter(function (r) { return r.feedback === 'forgot'; }).length;
 
+  /* --- 今日掌握率（2026-10-19 修） ---
+   * 踩过的坑：掌握率原本只看 quiz_items，而 quiz_items **只有旧抽查页在写**
+   * （cloud/functions/quiz/index.js）。现在的主流程是 drill（认→拼→巩固），
+   * 每一题的评价全落在 review_logs。于是"今日掌握率"永远显示 — ，
+   * 学员明明全对也显示 — ，家长只会以为数据坏了。
+   *
+   * 新口径与班级页 todayRate 完全一致（当日评价里 known 占几成）：
+   *   分母 = 今日 review_logs 条数 + 今日 quiz_items 条数
+   *   分子 = 今日 feedback==='known' 的条数 + quiz_items 答对条数
+   * 两端同一个孩子必须只有一个数字，这是本项目反复强调的底线。 */
+  var rateTotal = logRows.length + quizTotal;
+  var rateMastered = logRows.filter(function (r) { return r.feedback === 'known'; }).length + mastered;
+  var rate = rateTotal ? Math.round(rateMastered / rateTotal * 100) : null;
+
   var out = {
     minutes: minutes,
     learned: learned,
@@ -75,6 +90,9 @@ async function learnSummary(db, userId, name, today) {
     mastered: mastered,
     failed: failed,
     forgot_today: forgotToday,
+    rate_total: rateTotal,
+    rate_mastered: rateMastered,
+    rate: rate,                    // null = 今天还没有任何评价，前端显示"—"而不是 0%
     // 还要不要继续循环：有任何一个词没过（抽查答错 或 评价忘了）就得接着来
     need_loop: failed > 0 || forgotToday > 0,
     honor: null,
