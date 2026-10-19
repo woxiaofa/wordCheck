@@ -62,7 +62,8 @@ Page({
       return cloud.api.myClass().catch(function () { return {}; });
     }).then(function (clsRes) {
       var patch = self.build(detail);
-      patch.clsName = (clsRes && clsRes.class && clsRes.class.name) || '';
+      // 服务端带回的班级名优先（转发链路的打开者自己没有班，myClass 拿不到）
+      patch.clsName = detail.class_name || (clsRes && clsRes.class && clsRes.class.name) || '';
       wx.hideLoading();
       self.setData(patch);
       // 标题带学员名：几十个学员来回切时不至于分不清在看谁
@@ -262,24 +263,30 @@ Page({
     }).catch(function (err) { privacy.onDenied(err); });
   },
 
-  /** 手绘报告长图；返回画布实际高度 */
+  /**
+   * 手绘报告长图；返回画布实际高度（canvasToTempFilePath 坐标系）。
+   * 2026-10-19 重排：旧版布局坐标按宽屏写死（标题缩进 250px、每行 30 字），
+   * 真机画布只有 ~350px 宽，标题重叠、右侧全被裁掉。现在布局固定按 750 逻辑宽算，
+   * 再整体缩放到实际画布 —— 任何屏幕上比例一致。
+   */
   drawCard: function (canvas, width) {
     var self = this;
     var ctx = canvas.getContext('2d');
+    var W = 750;                // 逻辑宽：布局的唯一依据
+    var k = width / W;          // 逻辑 → 物理比例
     var dpr = 2;
-    var W = width;
-    var pad = 48;
+    var pad = 64;
     var y = 0;
 
     // 先按内容把高度算出来（一次性设定 canvas 尺寸，避免画到一半撑高）
     var blocks = this.cardBlocks();
-    var H = pad + 200 + 140;   // 头部 + KPI 区
+    var H = 96 + 90 + 190;     // 品牌条 + 学员行 + KPI 区
     blocks.forEach(function (b) { H += b.height; });
     H += 120;                  // 落款
 
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    ctx.scale(dpr, dpr);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(H * dpr * k);
+    ctx.scale(dpr * k, dpr * k);
 
     // 纸底 + 顶部品牌条（打印出来也像一回事）
     ctx.fillStyle = '#ffffff';
@@ -287,63 +294,74 @@ Page({
     ctx.fillStyle = '#2b6cb0';
     ctx.fillRect(0, 0, W, 96);
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('学员学习报告', pad, 60);
-    ctx.font = '20px sans-serif';
-    ctx.fillText(this.data.clsName || '功课抽查', pad + 250, 60);
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('学员学习报告', pad, 62);
+    var titleW = ctx.measureText('学员学习报告').width;
+    if (this.data.clsName) {
+      // 班级名给足右边界（留 160px 给右侧日期），放不下就截断 —— 不再叠到标题上
+      ctx.font = '22px sans-serif';
+      ctx.globalAlpha = 0.92;
+      ctx.fillText(fitText(ctx, this.data.clsName, W - pad * 2 - titleW - 160), pad + titleW + 24, 62);
+      ctx.globalAlpha = 1;
+    }
+    ctx.font = '22px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(this.data.dateText, W - pad, 60);
+    ctx.fillText(this.data.dateText, W - pad, 62);
     ctx.textAlign = 'left';
 
-    // 学员行
+    // 学员行：状态紧跟姓名（旧版 +160 固定缩进会把状态挤出屏幕）
     y = 150;
     var stu = this.data.student || {};
     var name = stu.nickname || '学员';
     ctx.fillStyle = '#1a2432';
-    ctx.font = 'bold 40px sans-serif';
+    ctx.font = 'bold 44px sans-serif';
     ctx.fillText(name, pad, y);
+    var nameW = ctx.measureText(name).width;
     if (this.data.status) {
-      ctx.font = '22px sans-serif';
+      ctx.font = '24px sans-serif';
       ctx.fillStyle = this.data.status.tone === 'green' ? '#1f8a4c'
         : (this.data.status.tone === 'amber' ? '#b37602' : '#6b7a8c');
-      ctx.fillText(this.data.status.icon + ' ' + this.data.status.label, pad + ctx.measureText(name).width + 160, y);
+      ctx.fillText(this.data.status.icon + ' ' + this.data.status.label,
+        pad + nameW + 28, y);
     }
 
     // KPI 三格
-    var kpiY = y + 34;
+    var kpiY = y + 36;
     var colW = (W - pad * 2) / 3;
-    this.data.kpis.forEach(function (k, i) {
+    this.data.kpis.forEach(function (k2, i) {
       var x = pad + colW * i;
       ctx.fillStyle = '#f2f6fa';
-      ctx.fillRect(x, kpiY, colW - 12, 110);
+      ctx.fillRect(x, kpiY, colW - 16, 118);
       ctx.fillStyle = '#0f1620';
-      ctx.font = 'bold 40px sans-serif';
-      ctx.fillText(k.num, x + 20, kpiY + 56);
+      ctx.font = 'bold 44px sans-serif';
+      ctx.fillText(k2.num, x + 24, kpiY + 60);
       ctx.fillStyle = '#6b7a8c';
-      ctx.font = '20px sans-serif';
-      ctx.fillText(k.label, x + 20, kpiY + 88);
+      ctx.font = '22px sans-serif';
+      ctx.fillText(k2.label, x + 24, kpiY + 96);
     });
-    y = kpiY + 150;
+    y = kpiY + 118 + 48;
 
     // 分区
     blocks.forEach(function (b) {
       ctx.fillStyle = '#0f1620';
-      ctx.font = 'bold 26px sans-serif';
+      ctx.font = 'bold 28px sans-serif';
       ctx.fillText(b.title, pad, y);
-      y += 16;
+      y += 18;
       ctx.fillStyle = '#2b6cb0';
-      ctx.fillRect(pad, y, 60, 4);
-      y += 32;
+      ctx.fillRect(pad, y, 64, 5);
+      y += 34;
       y = b.draw(ctx, pad, y, W - pad * 2) || y;
       y += 40;
     });
 
     ctx.fillStyle = '#9aa8b6';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('功课抽查小程序 · 数据截至 ' + this.data.dateText +
+    ctx.font = '20px sans-serif';
+    ctx.fillText(fitText(ctx, '功课抽查小程序' +
+      (this.data.clsName ? ' · ' + this.data.clsName : '') +
+      ' · 数据截至 ' + this.data.dateText +
       (this.data.wrongCounted ? ' · 诊断依据 ' + this.data.wrongCounted + ' 条错拼记录' : ''),
-      pad, H - 40);
-    return Promise.resolve(H);
+      W - pad * 2), pad, H - 44);
+    return Promise.resolve(Math.round(H * k));
   },
 
   /** 长图上要出现的分区（页面上的按钮、提示一律不上图） */
@@ -353,18 +371,20 @@ Page({
 
     var s = this.data.summary;
     if (s && s.text) {
-      var lines = wrap(s.text, 30);
+      // 折行宽度跟着画布走：24px 字号下每行约 26 个汉字（旧版写死 30 字会裁掉右半）
+      var chars = Math.floor((750 - 64 * 2) / 24);
+      var lines = wrap(s.text, chars);
       out.push({
         title: '今日简报',
-        height: 60 + lines.length * 34 + ((s.honor ? 40 : 0)),
+        height: 64 + lines.length * 38 + ((s.honor ? 46 : 0)),
         draw: function (ctx, x, y, w) {
           ctx.fillStyle = '#33404f';
-          ctx.font = '22px sans-serif';
-          lines.forEach(function (ln) { ctx.fillText(ln, x, y); y += 34; });
+          ctx.font = '24px sans-serif';
+          lines.forEach(function (ln) { ctx.fillText(ln, x, y); y += 38; });
           if (s.honor) {
             ctx.fillStyle = '#1f8a4c';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.fillText(s.honor.badge + '  ' + (s.honor.detail || '').slice(0, 40), x, y + 20);
+            ctx.font = 'bold 26px sans-serif';
+            ctx.fillText(fitText(ctx, s.honor.badge + '  ' + (s.honor.detail || ''), w), x, y + 22);
           }
           return y;
         }
@@ -374,20 +394,21 @@ Page({
     if (this.data.assignments.length) {
       out.push({
         title: '作业完成度',
-        height: 60 + this.data.assignments.length * 62,
+        height: 64 + this.data.assignments.length * 66,
         draw: function (ctx, x, y, w) {
           self.data.assignments.forEach(function (a) {
             ctx.fillStyle = '#33404f';
-            ctx.font = '22px sans-serif';
-            ctx.fillText(a.name.slice(0, 22), x, y);
+            ctx.font = '24px sans-serif';
+            // 名称里常带日期+教材+单元，很长：给右侧数字留 110px，放不下截断加 …
+            ctx.fillText(fitText(ctx, a.name, w - 110), x, y);
             ctx.textAlign = 'right';
             ctx.fillText(a.done + '/' + a.count, x + w, y);
             ctx.textAlign = 'left';
             ctx.fillStyle = '#dfe6ee';
-            ctx.fillRect(x, y + 12, w, 12);
+            ctx.fillRect(x, y + 14, w, 14);
             ctx.fillStyle = a.done >= a.count ? '#1f8a4c' : '#2b6cb0';
-            ctx.fillRect(x, y + 12, w * (a.pct / 100), 12);
-            y += 62;
+            ctx.fillRect(x, y + 14, w * (a.pct / 100), 14);
+            y += 66;
           });
           return y;
         }
@@ -468,4 +489,12 @@ function wrap(text, perLine) {
   var s = String(text || '');
   for (var i = 0; i < s.length; i += perLine) out.push(s.slice(i, i + perLine));
   return out.length ? out : [''];
+}
+
+/** 长图里的超长文本截断（按当前字体实测宽度，超出加 …）—— 作业名/落款专用 */
+function fitText(ctx, text, maxW) {
+  var s = String(text || '');
+  if (!s || ctx.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+  return s + '…';
 }

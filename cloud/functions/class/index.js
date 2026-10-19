@@ -888,11 +888,28 @@ async function onStudents(openid) {
 /* 教练端：单个学员详情（学习记录 + 各作业完成度）                          */
 /* ------------------------------------------------------------------ */
 async function onStudentDetail(openid, { studentId }) {
-  const ctx = await requireCoach(openid);
-  if (ctx.err) return ctx.err;
+  // 2026-10-19 转发链路：报告卡片会被教练转给家长看，家长既不是教练也不是学员本人，
+  // 旧的 requireCoach 一刀切让他们全部吃 NOT_COACH —— 转发功能等于白做。
+  // 新口径：sid 是不可猜测的文档 id，「拿到链接」本身就是授权（转发即授权）。
+  // 教练打开走归属校验（顺带拿到班级名）；学员本人永远可看自己的。
+  const viewer = await getUser(openid);
+  if (!viewer) return fail('NO_USER', '用户不存在，请先 login');
+  const isSelf = viewer._id === studentId;
 
-  const ids = ctx.cls.student_ids || [];
-  if (!ids.includes(studentId)) return fail('FORBIDDEN', '该学生不在你的班级');
+  const byStudent = db.collection(COLL.classes)
+    .where({ student_ids: studentId }).limit(1).get()
+    .catch(() => ({ data: [] }));
+
+  let cls = null;
+  const owned = isSelf ? null : await findOwnedClass(viewer._id).catch(() => null);
+  if (owned && (owned.student_ids || []).includes(studentId)) {
+    cls = owned;                                   // 教练看自己班的学员（原逻辑）
+  } else if (isSelf) {
+    cls = (await byStudent).data[0] || null;       // 学员本人：看自己的
+  } else {
+    cls = (await byStudent).data[0] || null;       // 转发链路：凭 sid 放行
+    if (!cls) return fail('NOT_COACH', '仅班级创建者可查看学员简报');
+  }
 
   const uRes = await db.collection(COLL.users).doc(studentId).get().catch(() => null);
   if (!uRes || !uRes.data) return fail('NOT_FOUND', '学生不存在');
@@ -923,11 +940,11 @@ async function onStudentDetail(openid, { studentId }) {
     });
   }
 
-  const assignments = await db.collection(COLL.assignments)
-    .where({ class_id: ctx.cls._id })
-    .orderBy('created_at', 'desc')
-    .limit(20)
-    .get();
+  const assignments = cls
+    ? await db.collection(COLL.assignments)
+      .where({ class_id: cls._id })
+      .orderBy('created_at', 'desc').limit(20).get()
+    : { data: [] };
   const withProgress = [];
   for (const a of (assignments.data || [])) {
     const texts = await wordsForStudent(a, studentId);
@@ -946,6 +963,8 @@ async function onStudentDetail(openid, { studentId }) {
   );
 
   return ok({
+    // 班级名：报告头和长图落款用。转发链路的打开者自己没有班，必须由服务端带过去
+    class_name: cls ? (cls.name || '') : '',
     student: {
       id: uRes.data._id,
       nickname: uRes.data.nickname || '',
