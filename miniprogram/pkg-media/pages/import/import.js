@@ -34,6 +34,26 @@ Page({
     }).catch(function (err) {
       if (privacy.onDenied(err)) return;                    // 拒绝隐私指引：给一句人话
       if (err && err.message === 'CANCELED') return;        // 自己取消的，别弹提示
+      var msg = String((err && err.message) || '');
+      if (msg.indexOf('not declared') >= 0 || msg.indexOf('privacy') >= 0) {
+        // 隐私指引没声明相机/相册：端上无解，只能在 mp 后台补配置（配置完即时生效，不用发版）
+        wx.showModal({
+          title: '暂时拍不了',
+          content: '拍照功能要等小程序后台的隐私指引补上「摄像头 / 相册」权限才会生效，我们会尽快修好。',
+          showCancel: false,
+          confirmText: '知道了'
+        });
+        return;
+      }
+      if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+        wx.showModal({
+          title: '需要相机 / 相册权限',
+          content: '拍课本词表需要用到相机或相册，去设置里打开就能用了。',
+          confirmText: '去设置',
+          success: function (r) { if (r.confirm) wx.openSetting(); }
+        });
+        return;
+      }
       wx.showToast({ title: '没拿到照片', icon: 'none' });
     });
   },

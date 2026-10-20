@@ -248,16 +248,25 @@ Page({
           });
         },
         fail: function (err) {
-          var msg = String((err && err.errMsg) || '');
-          if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+          var raw = String((err && err.errMsg) || '');
+          // toast 别再显示 "saveImageToPhotosAlb" 这种截断的 API 名 —— 取 fail 后面的真原因
+          var msg = raw.indexOf('fail') >= 0 ? raw.slice(raw.indexOf('fail') + 5) : raw;
+          if (raw.indexOf('auth deny') >= 0 || raw.indexOf('authorize') >= 0) {
             wx.showModal({
               title: '需要相册权限',
               content: '保存报告图片需要「保存到相册」权限，去设置里开一下就能用了。',
               confirmText: '去设置',
               success: function (r) { if (r.confirm) wx.openSetting(); }
             });
+          } else if (raw.indexOf('not declared') >= 0 || raw.indexOf('privacy') >= 0) {
+            wx.showModal({
+              title: '暂时存不了相册',
+              content: '保存相册要等小程序后台的隐私指引补上「相册」权限才会生效，我们会尽快修好。也可以先截图发给家长。',
+              showCancel: false,
+              confirmText: '知道了'
+            });
           } else {
-            wx.showToast({ title: '保存失败：' + msg.slice(0, 20), icon: 'none' });
+            wx.showToast({ title: '保存失败：' + (msg || '未知原因').slice(0, 30), icon: 'none' });
           }
         }
       });

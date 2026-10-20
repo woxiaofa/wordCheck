@@ -133,7 +133,16 @@ function choose() {
         if (!f || !f.tempFilePath) { reject(new Error('NO_FILE')); return; }
         resolve(f.tempFilePath);
       },
-      fail: function () { reject(new Error('CANCELED')); }
+      fail: function (res) {
+        // 2026-10-20 实锤：这里曾经把所有 fail 一律吞成 CANCELED —— 用户拒绝授权、
+        // 隐私指引没声明相机/相册，全都"点击无反应"。必须把真原因透传出去：
+        //   cancel            → 用户自己取消（静默）
+        //   auth deny         → 引导去设置
+        //   not declared/隐私 → 提示去后台配置隐私指引
+        var msg = String((res && res.errMsg) || '');
+        if (msg.indexOf('cancel') >= 0) { reject(new Error('CANCELED')); return; }
+        reject(new Error(msg || 'CHOOSE_FAIL'));
+      }
     });
   });
 }

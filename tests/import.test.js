@@ -185,5 +185,61 @@ ok('草稿录完存成词库，切过去就能背到这些词', function () {
   assert.strictEqual(drafts.list().length, 0);
 });
 
-console.log('\n通过：' + pass + ' 项' + (process.exitCode ? '，有失败' : ' ✓'));
-process.exit(process.exitCode || 0);
+/* ------------------- 拍照失败必须可解释（2026-10-20 真机实锤） -------------------
+ * 曾经 choose() 把所有 fail 一律吞成 CANCELED：用户拒绝授权、隐私指引没声明
+ * 相机/相册，全都"点击无反应"。钉死三条路径：取消静默、真原因必须透传。 */
+
+global.wx.getPrivacySetting = function (o) { o.success({ needAuthorization: false }); };
+global.wx.chooseMedia = function (o) { lastChoose = o; };
+var lastChoose = null;
+
+var chain = Promise.resolve();
+function okAsync(name, fn) {
+  chain = chain.then(function () { return fn(); })
+    .then(function () { pass++; console.log('  ✓ ' + name); })
+    .catch(function (e) {
+      console.log('  ✗ ' + name + '\n    ' + e.message);
+      process.exitCode = 1;
+    });
+}
+
+console.log('\n拍照失败分类（choose fail 必须透传真原因）：');
+
+/** 发起 pickPhoto，等 chooseMedia mock 被调用后触发 fail，返回 reject 到的错误 */
+function pickAndFail(errMsg) {
+  return new Promise(function (resolve, reject) {
+    var p = drafts.pickPhoto();
+    setTimeout(function () {
+      try {
+        if (!lastChoose) return reject(new Error('chooseMedia mock 未被调用'));
+        lastChoose.fail({ errMsg: errMsg });
+        p.then(function () { reject(new Error('不应成功')); }, resolve);
+      } catch (e) { reject(e); }
+    }, 0);
+  });
+}
+
+okAsync('用户自己取消 → CANCELED（页面静默，不弹提示）', function () {
+  return pickAndFail('chooseMedia:fail cancel').then(function (e) {
+    assert.strictEqual(e.message, 'CANCELED');
+  });
+});
+
+okAsync('隐私指引未声明 → 原样透传（页面上要给"等后台配置"的提示）', function () {
+  return pickAndFail('chooseMedia:fail api scope is not declared in the privacy agreement').then(function (e) {
+    assert.ok(e.message.indexOf('not declared') >= 0,
+      '错误信息必须含 not declared，实际: ' + e.message);
+    assert.notStrictEqual(e.message, 'CANCELED', '绝不能再吞成已取消');
+  });
+});
+
+okAsync('授权被拒 → 透传 auth deny（页面上引导去设置）', function () {
+  return pickAndFail('chooseMedia:fail auth deny').then(function (e) {
+    assert.ok(e.message.indexOf('auth deny') >= 0);
+  });
+});
+
+chain.then(function () {
+  console.log('\n通过：' + pass + ' 项' + (process.exitCode ? '，有失败' : ' ✓'));
+  process.exit(process.exitCode || 0);
+});
