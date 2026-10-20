@@ -19,29 +19,69 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
-/** 压到 OCR 能收的大小：先 60，不够再降；降到 35 还超就认输 */
-function compressForOcr(src) {
+/** 顺便量一下文件多大：拿不到就报 0，让云端那道 700KB 闸兜底 */
+function fileSize(file) {
+  return new Promise(function (resolve) {
+    var done = function (n) { resolve(n || 0); };
+    try {
+      var fs = wx.getFileSystemManager();
+      if (fs && fs.getFileInfo) {
+        fs.getFileInfo({ filePath: file, success: function (r) { done(r.size); }, fail: function () { done(0); } });
+        return;
+      }
+    } catch (e) { /* 落到老接口 */ }
+    if (wx.getFileInfo) {
+      wx.getFileInfo({ filePath: file, success: function (r) { done(r.size); }, fail: function () { done(0); } });
+    } else { done(0); }
+  });
+}
+
+/** 压一张图：只负责"压"，量大小的事交给 compressForOcr */
+function squeezeOnce(src, width, quality) {
   return new Promise(function (resolve, reject) {
-    function attempt(quality) {
-      wx.compressImage({
-        src: src,
-        quality: quality,
-        success: function (r) {
-          var out = (r && r.tempFilePath) || src;
-          wx.getFileInfo({
-            filePath: out,
-            success: function (info) {
-              if (info.size <= MAX_OCR_BYTES) { resolve(out); return; }
-              if (quality > 35) { attempt(quality - 25); return; }
-              reject(new Error('TOO_BIG'));
-            },
-            fail: function () { resolve(out); }
-          });
-        },
-        fail: function () { reject(new Error('COMPRESS_FAIL')); }
-      });
+    var opts = {
+      src: src,
+      quality: quality,
+      success: function (r) {
+        if (r && r.tempFilePath) resolve(r.tempFilePath);
+        else reject(new Error('COMPRESS_FAIL'));
+      },
+      fail: function () { reject(new Error('COMPRESS_FAIL')); }
+    };
+    // 老基础库不认 compressedWidth：多传的参数会被忽略，真不支持就让它 fail 掉走下一档
+    if (width) opts.compressedWidth = width;
+    wx.compressImage(opts);
+  });
+}
+
+/**
+ * 压到 OCR 能收的大小。
+ * 为什么先缩边长：真机原图 3000px 宽，光把质量降到 35 也还有 1MB+（base64 后必超
+ * callFunction 的传输上限，真机上直接"云函数没连上"）。先缩到 1600/1200/900，
+ * 再配合质量档，词表照片 200~400KB 就稳了，OCR 也够用。
+ */
+function compressForOcr(src) {
+  var plans = [];
+  [1600, 1200, 900].forEach(function (w) {
+    [60, 40].forEach(function (q) { plans.push({ w: w, q: q }); });
+  });
+  plans.push({ w: 0, q: 40 }, { w: 0, q: 20 });   // 兜底：老基础库只认质量
+
+  return new Promise(function (resolve, reject) {
+    var i = 0;
+    function next() {
+      if (i >= plans.length) { reject(new Error('TOO_BIG')); return; }
+      var p = plans[i++];
+      squeezeOnce(src, p.w, p.q)
+        .then(function (out) { return fileSize(out).then(function (size) { return [out, size]; }); })
+        .then(function (pair) {
+          // size=0 = 量不出来：别卡死用户，放行（云端 700KB 闸会拦真正超的）
+          if (!pair[1] || pair[1] <= MAX_OCR_BYTES) { resolve(pair[0]); return; }
+          next();
+        })
+        .catch(next);
     }
-    attempt(60);
+    next();
   });
 }
 
@@ -63,17 +103,32 @@ function callOcr(b64) {
       name: 'ocr',
       data: { action: 'recognize', image: b64 },
       success: function (res) { resolve(res && res.result); },
-      fail: function () { reject(new Error('CLOUD_FAIL')); }
+      fail: function (e) {
+        // 2026-10-20 真机实锤：这里曾把所有 fail 一律吞成 CLOUD_FAIL —— 图片太大、
+        // 超时、函数没部署，全显示"云函数没连上"，真机上没法排查。必须透传：
+        var m = String((e && e.errMsg) || '');
+        if (m.indexOf('Payload Too Large') >= 0 || m.indexOf('413') >= 0) {
+          reject(new Error('PAYLOAD_TOO_LARGE')); return;
+        }
+        if (m.indexOf('FUNCTION_NOT_FOUND') >= 0 || m.indexOf('not found') >= 0) {
+          reject(new Error('FUNC_MISSING')); return;
+        }
+        if (m.indexOf('timeout') >= 0) { reject(new Error('CLOUD_TIMEOUT')); return; }
+        reject(new Error('CLOUD_FAIL|' + m.slice(0, 70)));
+      }
     });
   });
 }
 
 /** 云端/端上所有失败都要翻成一句人话 —— 用户不需要知道 TOO_LARGE 是什么 */
 var OCR_TEXT = {
-  TOO_BIG: '照片太大了，靠近一点只拍词表',
-  TOO_LARGE: '照片太大了，靠近一点只拍词表',
+  TOO_BIG: '这张图压不小，靠太近重拍一张（只拍词表那几行）',
+  TOO_LARGE: '图片传不过去，靠太近重拍一张（只拍词表那几行）',
+  PAYLOAD_TOO_LARGE: '图片传不过去，靠太近重拍一张（只拍词表那几行）',
   COMPRESS_FAIL: '这张图压不小，重拍一张试试',
   READ_FAIL: '照片读不出来，重拍一张吧',
+  FUNC_MISSING: '识别功能还没上线，过几分钟再点一次',
+  CLOUD_TIMEOUT: '识别超时了，再点一次「重新识别」',
   CLOUD_FAIL: '云函数没连上，先手动录、回头再识别',
   OCR_UNAVAILABLE: '识别服务暂时连不上，先手动录、回头再识别',
   RATE_LIMIT: '识别太频繁了，歇一分钟再点「重新识别」',
@@ -89,6 +144,11 @@ function ocrErrorText(res) {
 
 function localErrorText(err) {
   var msg = String((err && err.message) || '');
+  var parts = msg.split('|');
+  if (OCR_TEXT[parts[0]]) {
+    // 带上原始尾码（如 CLOUD_FAIL|errCode…，截前 70 字）：用户一截图就能定位，不用猜
+    return OCR_TEXT[parts[0]] + (parts[1] ? '（' + parts[1] + '）' : '');
+  }
   return OCR_TEXT[msg] || '识别没成功，先手动录、回头再试一次';
 }
 

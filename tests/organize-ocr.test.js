@@ -17,9 +17,11 @@ var path = require('path');
 /* ------------------------------ 环境桩 ------------------------------ */
 
 var storage = {};
-var cloud = { calls: [], result: null, fail: false };
+var cloud = { calls: [], result: null, fail: false, failMsg: '' };
 var toast = [];
 var modal = null;
+var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
+var compressCalls = [];           // compressImage 的调用记录（width/quality）
 
 global.wx = {
   getStorageSync: function (k) { return storage[k]; },
@@ -28,15 +30,18 @@ global.wx = {
     return {
       readFile: function (o) { o.success({ data: 'QkFTRTY0' }); },
       saveFile: function (o) { o.success({ savedFilePath: 'wxfile://saved' }); },
-      unlink: function (o) { if (o.success) o.success(); }
+      unlink: function (o) { if (o.success) o.success(); },
+      getFileInfo: function (o) { o.success({ size: fsSize }); }
     };
   },
-  compressImage: function (o) { o.success({ tempFilePath: o.src + '?q' + o.quality }); },
-  getFileInfo: function (o) { o.success({ size: 120 * 1024 }); },
+  compressImage: function (o) {
+    compressCalls.push((o.compressedWidth || 0) + '/' + o.quality);
+    o.success({ tempFilePath: o.src + '?q' + o.quality });
+  },
   cloud: {
     callFunction: function (o) {
       cloud.calls.push(o.name);
-      if (cloud.fail) { o.fail({ errMsg: 'cloud.callFunction:fail' }); return; }
+      if (cloud.fail) { o.fail({ errMsg: cloud.failMsg || 'cloud.callFunction:fail' }); return; }
       o.success({ result: cloud.result });
     }
   },
@@ -100,9 +105,12 @@ function reset(words, imgPath) {
   Object.keys(storage).forEach(function (k) { delete storage[k]; });
   cloud.calls.length = 0;
   cloud.fail = false;
+  cloud.failMsg = '';
   cloud.result = { ok: true, text: '' };
   toast.length = 0;
   modal = null;
+  fsSize = 120 * 1024;
+  compressCalls.length = 0;
   storage[drafts.STORAGE_KEY] = [];
   storage[books.CUSTOM_KEY] = [];
   var d = drafts.add(imgPath === undefined ? 'wxfile://shot.jpg' : imgPath);
@@ -195,6 +203,47 @@ steps.push(function () {
     return tick(20).then(function () {
       assert.strictEqual(page.data.recognizing, false, '失败也必须关掉识别中状态');
       assert.ok(page.data.ocrNote, '要有提示');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④b 图片被传输层拒（Payload Too Large）→ 提示靠太近重拍，不是"连不上"', function () {
+    var d = reset();
+    cloud.fail = true;
+    cloud.failMsg = 'cloud.callFunction:fail Error: errCode: -401003 cloud function execution error ' +
+      '(Payload Too Large)';
+    var page = makePage(d.id);
+    return tick(20).then(function () {
+      assert.ok(page.data.ocrNote.indexOf('靠太近') >= 0, '提示要指向动作：' + page.data.ocrNote);
+      assert.ok(page.data.ocrNote.indexOf('连不上') < 0, '不能误导用户去怀疑网络：' + page.data.ocrNote);
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④c 未知 fail：原始 errMsg 必须露在提示里（用户截图就能定位，不用猜）', function () {
+    var d = reset();
+    cloud.fail = true;
+    cloud.failMsg = 'cloud.callFunction:fail Error: errCode -401003 sdk wxcloud unknown error';
+    var page = makePage(d.id);
+    return tick(20).then(function () {
+      assert.ok(page.data.ocrNote.indexOf('-401003') >= 0, '原始错误码要透出：' + page.data.ocrNote);
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④d 图怎么压都超 500KB：走完压缩阶梯后停下，且一个字都没发给云函数', function () {
+    var d = reset();
+    fsSize = 600 * 1024;              // 每一档都超限
+    var page = makePage(d.id);
+    return tick(30).then(function () {
+      assert.strictEqual(cloud.calls.length, 0, '超限的图不该发出去');
+      assert.ok(page.data.ocrNote.indexOf('靠太近') >= 0, '提示要能看懂：' + page.data.ocrNote);
+      assert.ok(compressCalls.indexOf('1600/60') >= 0, '阶梯要从 1600 起步');
+      assert.ok(compressCalls.indexOf('900/40') >= 0, '阶梯要一路降到 900');
+      assert.ok(compressCalls.indexOf('0/20') >= 0, '最后还有老基础库兜底档');
     });
   });
 });
