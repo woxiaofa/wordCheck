@@ -36,11 +36,38 @@
 .inp.w { width: 300rpx; }
 .inp.d { flex: 1; margin-left: 12rpx; }
 
+/* 核对列表：英文框略宽、释义框吃掉剩下的，删字固定在右边 */
+.ew { flex: 1.1; min-width: 0; }
+.ed { flex: 1; min-width: 0; margin-left: 10rpx; }
+/* 红框只标"不像英文"的那一格，不整行变红 —— 释义本来就可能认成符号 */
+.inp.bad { border-color: #ff5c6c; background: rgba(255, 92, 108, .08); }
+
+/* 识别中的呼吸条：没有它就只是"正在认字…"四个字，用户以为卡住了 */
+.ocr-bar {
+  display: flex;
+  align-items: center;
+  margin-top: 16rpx;
+  padding: 18rpx 20rpx;
+  background: rgba(64, 158, 255, .1);
+  border: 1rpx solid rgba(64, 158, 255, .28);
+  border-radius: 14rpx;
+}
+.spin {
+  width: 18rpx;
+  height: 18rpx;
+  margin-right: 14rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(64, 158, 255, .25);
+  border-top-color: #409eff;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .pv { padding: 14rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); }
 /* 外层必须是 view：text 里套 text 混排字号会把行盒撑成两倍高（layout ⑫ 拦过一次） */
 .pv-left { flex: 1; min-width: 0; }
 .pv-w { color: #e8f0f8; font-weight: 600; font-size: 30rpx; }
-.del { color: #ff8a95; font-size: 26rpx; padding-left: 20rpx; }
+.del { color: #ff8a95; font-size: 26rpx; padding-left: 16rpx; flex-shrink: 0; }
 
 .mt { margin-top: 20rpx; }
 .mt-s { margin-top: 12rpx; }

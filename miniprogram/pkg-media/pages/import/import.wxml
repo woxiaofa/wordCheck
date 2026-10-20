@@ -53,8 +53,8 @@
   <view class="card">
     <view class="t1">拍照记词</view>
     <view class="muted mt-s" style="line-height:1.7">
-      课本词表来不及抄？先拍一张存下来，回头对着照片一个词一行地录。
-      照片只存本机，不上传。
+      课本词表来不及抄？拍一张，自动认成英文单词，认出来你再改。
+      照片存在手机上；认字时会把缩小的图临时发给识别服务，认完不留。
     </view>
     <button class="btn mt" bindtap="takePhoto">拍一张 / 从相册选</button>
   </view>
@@ -76,6 +76,6 @@
   </view>
 
   <view class="muted center mt-s" style="font-size:24rpx">
-    词库和照片都只存在本机，不上传服务器。
+    词库存本机；照片存手机，只在认字时临时发一次，不保存。
   </view>
 </view>

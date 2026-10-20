@@ -7,9 +7,15 @@
   <block wx:if="{{id}}">
     <view class="card">
       <view class="row-between">
-        <text class="t1">对着照片录</text>
-        <text class="muted">已录 {{words.length}} 个</text>
+        <text class="t1">{{recognizing ? '正在认字…' : '识别结果'}}</text>
+        <text class="muted" wx:if="{{words.length}}">已认 {{words.length}} 个</text>
       </view>
+
+      <view class="ocr-bar" wx:if="{{recognizing}}">
+        <text class="spin"></text>
+        <text class="muted">照片发去识别，一般 3~8 秒，别退出</text>
+      </view>
+
       <image
         wx:if="{{img && !imgBroken}}"
         class="shot"
@@ -19,14 +25,56 @@
         binderror="onImgError"
       />
       <view wx:else class="broken" bindtap="retake">照片打不开了，点这里重拍一张</view>
-      <view class="muted mt-s">点照片可以放大慢慢看；拍糊了就重拍一张。</view>
-      <button class="btn ghost mt" bindtap="retake">重拍 / 换一张</button>
+
+      <view class="warn mt-s" wx:if="{{ocrNote}}">{{ocrNote}}</view>
+      <view class="muted mt-s" wx:else>点照片可以放大对着核对；拍糊了重拍一张，会自动重认。</view>
+
+      <button class="btn ghost mt" bindtap="retake" disabled="{{recognizing}}">重拍 / 换一张</button>
+      <button
+        class="btn ghost mt-s"
+        bindtap="doOcr"
+        disabled="{{recognizing || !img}}"
+      >{{words.length ? '重新识别这一张' : '识别这一张'}}</button>
+    </view>
+
+    <view class="card" wx:if="{{words.length}}">
+      <view class="row-between">
+        <text class="t1">核对一下（{{words.length}}）</text>
+        <text class="muted">点格子直接改</text>
+      </view>
+      <view class="muted mt-s" style="line-height:1.7">
+        英文基本认得准，中文释义经常认成符号，照着照片改一下就行；不要的删掉。
+      </view>
+
+      <view class="pv" wx:for="{{words}}" wx:key="_k">
+        <view class="row">
+          <input
+            class="inp ew {{item.bad ? 'bad' : ''}}"
+            value="{{item.word}}"
+            data-i="{{index}}"
+            bindinput="onEditWord"
+            maxlength="30"
+          />
+          <input
+            class="inp ed"
+            value="{{item.def_cn}}"
+            placeholder="释义（可空）"
+            data-i="{{index}}"
+            bindinput="onEditDef"
+            maxlength="20"
+          />
+          <text class="del" data-i="{{index}}" bindtap="removeWord">删</text>
+        </view>
+      </view>
+
+      <view class="warn mt-s" wx:if="{{badCount}}">红框的 {{badCount}} 个不像英文单词，改一下或删掉才能存。</view>
+      <view class="warn mt-s" wx:if="{{toast}}">{{toast}}</view>
     </view>
 
     <view class="card">
-      <view class="muted" style="line-height:1.7">
-        看着上面的照片，一个词一行地录。中文可以不填，照样能拼能听写。
-        录一半退出也没事 —— 已经存好了，回来接着录。
+      <view class="row-between">
+        <text class="t1">漏了的补一个</text>
+        <text class="muted">识别没认出来的</text>
       </view>
       <view class="row mt">
         <input
@@ -47,18 +95,6 @@
         />
       </view>
       <button class="btn mt {{w ? '' : 'ghost'}}" bindtap="addWord">加一个（回车也行）</button>
-      <view class="warn mt-s" wx:if="{{toast}}">{{toast}}</view>
-    </view>
-
-    <view class="card" wx:if="{{words.length}}">
-      <view class="row-between">
-        <text class="t1">已录 {{words.length}} 个</text>
-        <text class="muted">点右边删掉录错的</text>
-      </view>
-      <view class="row-between pv" wx:for="{{words}}" wx:key="word">
-        <view class="pv-left"><text class="pv-w">{{item.word}}</text> <text class="muted">{{item.def_cn}}</text></view>
-        <text class="del" data-i="{{index}}" bindtap="removeWord">删除</text>
-      </view>
     </view>
 
     <view class="card" wx:if="{{words.length}}">
@@ -70,7 +106,7 @@
         maxlength="12"
       />
       <button class="btn mt" bindtap="finish">存成我的词库</button>
-      <button class="btn ghost mt" bindtap="saveLater">先存着，回头再录</button>
+      <button class="btn ghost mt" bindtap="saveLater">先存着，回头再改</button>
     </view>
   </block>
 </view>

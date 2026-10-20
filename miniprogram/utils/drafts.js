@@ -1,16 +1,17 @@
 /**
- * 拍照记词草稿箱（D7 承诺的"拍照上传"落地版：拍照存底 → 对照速录）
+ * 拍照记词草稿箱（D7 承诺的"拍照上传"落地版：拍照存底 → 识别 → 核对修改 → 入库）
  *
- * 为什么不是真 OCR：
- *   小程序端做印刷体识别必须挂 OCR 插件或第三方密钥，插件要申请、密钥要付费额度，
- *   通过时间不可控（2026-10-19 用户拍板）。而"拍照 → 回家对照照片录入"这条路人已经走通了：
- *   书店/学校顺手拍一张，回家坐着录，不用抄一遍单词表。所以先把它做到能日常用。
+ * 识别怎么做的（2026-10-20 定稿）：
+ *   云函数 ocr 走 OCR.space 免费额度（注册只要邮箱，不实名不付费），图片压到 ~500KB
+ *   后以 base64 进 callFunction，不走云存储（云存储要升级付费，用户明确不用）。
+ *   识别结果一律落到"可编辑的核对列表"里 —— 实测英文能认全、中文释义会认成符号，
+ *   所以这一页的定位是**帮用户少打字**，不是替用户做决定。
  *
  * 设计要点：
  *   1) 照片只存本机（FileSystemManager.saveFile），不上传云存储 —— 页面上也是这么写的，
- *      承诺了"不上传"就不能偷偷传。
- *   2) 每加一个词立刻落盘 —— "离线整理"的关键就是随时能停下、随时能接着录，
- *      中途退出、被电话打断、杀掉小程序都不该丢已经录的。
+ *      承诺了"不上传"就不能偷偷传；识别那次是把压缩后的图临时发给云函数，不落地。
+ *   2) 每改一个词立刻落盘（输入有 400ms 防抖，退出/切后台强制 flush）——
+ *      "离线整理"的关键就是随时能停下、随时能接着录。
  *   3) 选图是隐私接口，只有本文件的 pickPhoto 能调 wx.chooseMedia，别处一律不许裸调
  *      （漏一处就是线上静默失败，上线断言 ⑫ 会拦）。
  */
@@ -94,6 +95,19 @@ function setPath(id, path) {
   var arr = list();
   for (var i = 0; i < arr.length; i++) {
     if (arr[i].id === id) { unlink(arr[i].path); arr[i].path = path || ''; save(arr); return true; }
+  }
+  return false;
+}
+
+/**
+ * 记一笔"这张已经识别过了"。
+ * 为什么需要：OCR 是外部免费额度（OCR.space 25000 次/月），自动识别只在首次进页面跑，
+ * 否则每次点进草稿都重识别一遍，额度会莫名其妙见底；想再识别一次有按钮可点。
+ */
+function markOcr(id) {
+  var arr = list();
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id === id) { arr[i].ocr_at = Date.now(); save(arr); return true; }
   }
   return false;
 }
@@ -183,6 +197,7 @@ module.exports = {
   setWords: setWords,
   setName: setName,
   setPath: setPath,
+  markOcr: markOcr,
   remove: remove,
   pickPhoto: pickPhoto
 };
