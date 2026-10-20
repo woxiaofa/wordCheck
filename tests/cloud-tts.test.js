@@ -1,25 +1,27 @@
 /**
- * tts 云函数集成测试（假数据库 + 假腾讯云 SDK）
+ * tts 云函数集成测试（假数据库 + 假发音源）
  *
- * 覆盖：词校验（拒中文/注入/超长）、audio-key 缓存键一致性、缓存命中不重复合成、
- * 未配密钥明确降级（部署先于配密钥，客户端照旧）、合成→上传→写缓存闭环、
- * 集合不存在自动建（用户零操作）、同 openid 连点限频。
+ * 2026-10-20 推倒重来后的口径：
+ *   - 发音源是**免费公开接口**，不用密钥、不用开通、不用云存储
+ *   - 音频以 base64 放进返回值，客户端自己写本地文件
+ *   - 云数据库只做 kv 缓存（key → base64），集合不存在自动建
  *
- * 假数据库刻意复刻云端两个真实行为：
+ * 假数据库复刻云端两个真实行为：
  *   1) 集合必须显式存在，写不存在的集合报 -502005
  *   2) doc(id).get() 对缺失文档返回 { data: null }（不抛错）
  */
 
 var assert = require('assert');
 var Module = require('module');
+var EventEmitter = require('events');
 
 /* ---------------- 假数据库 ---------------- */
 
 function createFakeDb() {
-  var colls = {};          // name -> { id: doc }
-  var missing = {};        // name -> true = 集合尚未创建
+  var colls = {};
+  var missing = {};
   var api = {
-    created: [],           // createCollection 调用记录
+    created: [],
     raw: colls,
     reset: function () {
       Object.keys(colls).forEach(function (k) { delete colls[k]; });
@@ -51,9 +53,8 @@ function createFakeDb() {
             },
             set: function (o) {
               if (missing[n]) return rejectMissing();
-              var data = JSON.parse(JSON.stringify(o.data));
               colls[n] = colls[n] || {};
-              colls[n][id] = data;
+              colls[n][id] = JSON.parse(JSON.stringify(o.data));
               return Promise.resolve({ stats: { updated: 1 } });
             }
           };
@@ -66,42 +67,54 @@ function createFakeDb() {
 
 var db = createFakeDb();
 
-/* ---------------- 假 SDK ---------------- */
+/* ---------------- 假发音源（https） ---------------- */
 
-var uploaded = [];           // cloud.uploadFile 调用记录
-var ttsCalls = [];           // TextToVoice 调用记录
+var youdao = {
+  calls: [],
+  status: 200,
+  body: Buffer.from('FAKE-MP3-BYTES'),
+  netError: false
+};
+
+var fakeHttps = {
+  get: function (url, opts, cb) {
+    youdao.calls.push(url);
+    if (typeof opts === 'function') { cb = opts; }
+    var req = new EventEmitter();
+    req.destroy = function (err) { if (err) req.emit('error', err); };
+    process.nextTick(function () {
+      if (youdao.netError) { req.emit('error', new Error('ECONNRESET')); return; }
+      var res = new EventEmitter();
+      res.statusCode = youdao.status;
+      res.resume = function () {};
+      cb(res);
+      if (youdao.status === 200) {
+        res.emit('data', youdao.body);
+        res.emit('end');
+      }
+    });
+    return req;
+  }
+};
+
 var currentOpenid = 'test-openid';
 var fakeSdk = {
   DYNAMIC_CURRENT_ENV: 'test',
   init: function () {},
   getWXContext: function () { return { OPENID: currentOpenid }; },
-  database: function () { return db; },
-  uploadFile: function (o) {
-    uploaded.push(o);
-    return Promise.resolve({ fileID: 'cloud://env/' + o.cloudPath });
-  }
-};
-
-var fakeTencent = {
-  tts: {
-    v20190823: {
-      Client: function (opts) {
-        this.opts = opts;
-        this.TextToVoice = function (p) {
-          ttsCalls.push(p);
-          return Promise.resolve({ Audio: 'QUJDRA==' }); // 任意 base64
-        };
-      }
-    }
-  }
+  database: function () { return db; }
 };
 
 var origLoad = Module._load;
-Module._load = function (request) {
-  if (request === 'wx-server-sdk') return fakeSdk;
-  if (request === 'tencentcloud-sdk-nodejs-tts') return fakeTencent;
-  return origLoad.apply(this, arguments);
-};
+function patchLoad() {
+  Module._load = function (request) {
+    if (request === 'wx-server-sdk') return fakeSdk;
+    if (request === 'https') return fakeHttps;
+    return origLoad.apply(this, arguments);
+  };
+}
+
+patchLoad();
 var ttsFn = require('../cloud/functions/tts/index.js');
 Module._load = origLoad;
 
@@ -123,129 +136,111 @@ function call(word) {
   return ttsFn.main({ action: 'synthesize', word: word }, {});
 }
 
-function withEnv(id, key, fn) {
-  return function () {
-    process.env.TTS_SECRET_ID = id;
-    process.env.TTS_SECRET_KEY = key;
-    return Promise.resolve().then(fn).then(function (r) {
-      delete process.env.TTS_SECRET_ID;
-      delete process.env.TTS_SECRET_KEY;
-      return r;
-    }, function (e) {
-      delete process.env.TTS_SECRET_ID;
-      delete process.env.TTS_SECRET_KEY;
-      throw e;
-    });
-  };
+function resetAll() {
+  db.reset();
+  youdao.calls.length = 0;
+  youdao.status = 200;
+  youdao.netError = false;
 }
 
 var steps = [];
 
 steps.push(function () {
-  return ok('① 词校验：中文/空串/超长/注入串/数字开头 一律 BAD_WORD，不打引擎', function () {
-    db.reset(); ttsCalls.length = 0; uploaded.length = 0;
+  return ok('① 词校验：中文/空串/超长/注入串/数字开头 一律 BAD_WORD，不请求发音源', function () {
+    resetAll();
     var bad = ['苹果', '', 'a'.repeat(41), 'hi<script>', '1word', null];
-    return Promise.all(bad.map(function (w) { return call(w); })).then(function (rs) {
+    return Promise.all(bad.map(call)).then(function (rs) {
       rs.forEach(function (r, i) {
         assert.strictEqual(r.ok, false, '第 ' + i + ' 个词应拒绝');
         assert.strictEqual(r.code, 'BAD_WORD');
       });
-      assert.strictEqual(ttsCalls.length, 0, '不该碰 TTS 引擎');
-      assert.strictEqual(uploaded.length, 0, '不该上传云存储');
+      assert.strictEqual(youdao.calls.length, 0, '不该请求发音源');
     });
   });
 });
 
 steps.push(function () {
   return ok('② 缓存键净化：短语/撇号与 shared/audio-key 同键（存了就得找得到）', function () {
-    db.reset(); ttsCalls.length = 0;
-    db.raw.tts_audio = { 'ice-cream': { fileID: 'cloud://c/ice-cream.mp3' } };
+    resetAll();
+    db.raw.tts_audio = { 'ice-cream': { audio: 'CACHED_MP3' } };
     return call('ICE CREAM').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
       assert.strictEqual(r.cached, true);
       assert.strictEqual(r.key, 'ice-cream');
-      assert.strictEqual(r.fileID, 'cloud://c/ice-cream.mp3');
+      assert.strictEqual(r.audio, 'CACHED_MP3');
+      assert.strictEqual(youdao.calls.length, 0, '命中缓存不该请求发音源');
     });
   });
 });
 
 steps.push(function () {
-  return ok('③ 缓存命中：直接回 fileID，不调引擎、不上传', function () {
-    db.reset(); ttsCalls.length = 0; uploaded.length = 0;
-    db.raw.tts_audio = { hello: { fileID: 'cloud://c/hello.mp3' } };
+  return ok('③ 未命中：请求免费发音源 → 返回 base64 → 写缓存（一词一条）', function () {
+    resetAll();
     return call('hello').then(function (r) {
-      assert.strictEqual(r.ok, true);
-      assert.strictEqual(r.cached, true);
-      assert.strictEqual(ttsCalls.length, 0, '命中不应调 TTS');
-      assert.strictEqual(uploaded.length, 0, '命中不应上传');
-    });
-  });
-});
-
-steps.push(function () {
-  return ok('④ 未配密钥：UNAVAILABLE 明确降级，不打引擎（可先于配密钥部署）', function () {
-    db.reset(); ttsCalls.length = 0;
-    delete process.env.TTS_SECRET_ID;
-    delete process.env.TTS_SECRET_KEY;
-    return call('hello').then(function (r) {
-      assert.strictEqual(r.ok, false);
-      assert.strictEqual(r.code, 'UNAVAILABLE');
-      assert.strictEqual(ttsCalls.length, 0);
-    });
-  });
-});
-
-steps.push(function () {
-  return ok('⑤ 合成闭环：调引擎(英文参数) → 上传云存储 → 写缓存 → 二次命中', withEnv('id', 'key', function () {
-    db.reset(); ttsCalls.length = 0; uploaded.length = 0;
-    return call('world').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
       assert.strictEqual(r.cached, false);
-      assert.strictEqual(r.fileID, 'cloud://env/tts-cache/world.mp3');
-      assert.strictEqual(ttsCalls.length, 1, '应调一次 TextToVoice');
-      assert.strictEqual(ttsCalls[0].Text, 'world');
-      assert.strictEqual(ttsCalls[0].VoiceType, 1001, '英文音色');
-      assert.strictEqual(ttsCalls[0].Language, 'en-US');
-      assert.strictEqual(uploaded.length, 1, '应上传一次');
-      assert.strictEqual(uploaded[0].cloudPath, 'tts-cache/world.mp3');
-      assert.strictEqual(db.raw.tts_audio.world.fileID, 'cloud://env/tts-cache/world.mp3', '缓存索引应写入');
-      return call('WORLD').then(function (r2) {
+      assert.strictEqual(r.audio, youdao.body.toString('base64'), '应原样返回 base64');
+      assert.strictEqual(youdao.calls.length, 1, '应请求一次发音源');
+      assert.ok(youdao.calls[0].indexOf('audio=hello') >= 0, 'URL 应带词：' + youdao.calls[0]);
+      assert.strictEqual(db.raw.tts_audio.hello.audio, r.audio, '缓存应写入 base64');
+      return call('HELLO').then(function (r2) {
         assert.strictEqual(r2.cached, true, '二次（大小写不同）应命中缓存');
-        assert.strictEqual(ttsCalls.length, 1, '不应重复合成');
+        assert.strictEqual(youdao.calls.length, 1, '不应重复请求发音源');
       });
     });
-  }));
+  });
 });
 
 steps.push(function () {
-  return ok('⑥ 集合不存在：自动建 tts_audio 后重试写入（用户零操作）', withEnv('id', 'key', function () {
-    db.reset(); ttsCalls.length = 0;
+  return ok('④ 发音源不可用：TTS_ERROR，不写缓存（下次还会再试）', function () {
+    resetAll();
+    youdao.netError = true;
+    return call('network').then(function (r) {
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.code, 'TTS_ERROR');
+      assert.ok(!(db.raw.tts_audio || {}).network, '失败不应写缓存');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑤ 发音源返回非 200：TTS_ERROR（不把错误页当音频存下来）', function () {
+    resetAll();
+    youdao.status = 404;
+    return call('notfound').then(function (r) {
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.code, 'TTS_ERROR');
+      assert.ok(!(db.raw.tts_audio || {}).notfound, '失败不应写缓存');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑥ 集合不存在：自动建 tts_audio 后重试写入（用户零操作）', function () {
+    resetAll();
     db.setMissing('tts_audio');
     return call('brandnew').then(function (r) {
       assert.strictEqual(r.ok, true, JSON.stringify(r));
       assert.ok(db.created.indexOf('tts_audio') !== -1, '应自动 createCollection');
       assert.ok(db.raw.tts_audio.brandnew, '重试后应写入成功');
     });
-  }));
+  });
 });
 
 steps.push(function () {
-  return ok('⑦ 限频：同一 openid 1 秒内第 9 次 RATE_LIMIT（防连点打爆额度）', function () {
-    // 全新模块实例：清零限频计数（重载期间必须重新打桩，否则 require 到真 wx-server-sdk）
-    Module._load = function (request) {
-      if (request === 'wx-server-sdk') return fakeSdk;
-      if (request === 'tencentcloud-sdk-nodejs-tts') return fakeTencent;
-      return origLoad.apply(this, arguments);
-    };
+  return ok('⑦ 限频：同一 openid 1 秒内第 9 次 RATE_LIMIT（防连点刷爆）', function () {
+    resetAll();
+    patchLoad();
     delete require.cache[require.resolve('../cloud/functions/tts/index.js')];
     ttsFn = require('../cloud/functions/tts/index.js');
     Module._load = origLoad;
+
     currentOpenid = 'ratelimit-user';
-    delete process.env.TTS_SECRET_ID;
+    db.raw.tts_audio = {};
     var words = ['wa', 'wb', 'wc', 'wd', 'we', 'wf', 'wg', 'wh', 'wi'];
-    return Promise.all(words.map(function (w) { return call(w); })).then(function (rs) {
-      var codes = rs.map(function (r) { return r.code; });
-      assert.strictEqual(codes[7], 'UNAVAILABLE', '前 8 次放行（未配密钥则 UNAVAILABLE）');
+    return Promise.all(words.map(call)).then(function (rs) {
+      var codes = rs.map(function (r) { return r.code || 'OK'; });
+      assert.strictEqual(codes[7], 'OK', '前 8 次放行');
       assert.strictEqual(codes[8], 'RATE_LIMIT', '第 9 次应限频');
       currentOpenid = 'test-openid';
     });

@@ -122,9 +122,8 @@ console.log('\n阶段一通过：' + pass + ' 项 ✓');
 
 var storage = {};
 var cloudCalls = [];          // 记录 callFunction 入参
-var cloudBehavior = { fail: false, result: { ok: true, fileID: 'cloud://tts/word.mp3' } };
-var downloadBehavior = { fail: false };
-var savedFiles = [];
+var cloudBehavior = { fail: false, result: { ok: true, audio: 'QkFTRTY0' } };
+var written = [];
 
 global.wx = {
   createInnerAudioContext: function () {
@@ -139,7 +138,10 @@ global.wx = {
   env: { USER_DATA_PATH: '/user-data' },
   getFileSystemManager: function () {
     return {
-      saveFile: function (o) { savedFiles.push(o.filePath); if (o.success) o.success(); }
+      writeFile: function (o) {
+        written.push({ filePath: o.filePath, encoding: o.encoding, data: o.data });
+        if (o.success) o.success();
+      }
     };
   },
   cloud: {
@@ -147,10 +149,6 @@ global.wx = {
       cloudCalls.push({ name: o.name, data: o.data });
       if (cloudBehavior.fail) { if (o.fail) o.fail({ errMsg: 'cloud function error' }); return; }
       if (o.success) o.success({ result: cloudBehavior.result });
-    },
-    downloadFile: function (o) {
-      if (downloadBehavior.fail) { if (o.fail) o.fail({}); return; }
-      if (o.success) o.success({ tempFilePath: '/tmp/dl.mp3' });
     }
   }
 };
@@ -187,8 +185,8 @@ okAsync('本地命中的词仍走本地包内音频，不打云端', function ()
   return Promise.resolve();
 });
 
-okAsync('清单外的词：云端合成 → 下载 → 存本机 → 写缓存索引 → 播放', function () {
-  cloudCalls.length = 0; savedFiles.length = 0;
+okAsync('清单外的词：云端取 base64 → 写本机 → 写缓存索引 → 播放', function () {
+  cloudCalls.length = 0; written.length = 0;
   return new Promise(function (resolve) {
     tts2.speak('zzqword', function (f) { resolve(f); });
   }).then(function (f) {
@@ -197,7 +195,10 @@ okAsync('清单外的词：云端合成 → 下载 → 存本机 → 写缓存�
     assert.strictEqual(cloudCalls[0].name, 'tts');
     assert.strictEqual(cloudCalls[0].data.action, 'synthesize');
     assert.strictEqual(cloudCalls[0].data.word, 'zzqword');
-    assert.deepStrictEqual(savedFiles, ['/user-data/tts-zzqword.mp3'], '应存到 USER_DATA_PATH');
+    assert.strictEqual(written.length, 1, '应写一个本地文件');
+    assert.strictEqual(written[0].filePath, '/user-data/tts-zzqword.mp3');
+    assert.strictEqual(written[0].encoding, 'base64', 'base64 原样写盘');
+    assert.strictEqual(written[0].data, 'QkFTRTY0');
     var idx = storage['tts_audio_cache'] || {};
     assert.strictEqual(idx['zzqword'], '/user-data/tts-zzqword.mp3', 'storage 索引应记录映射');
     assert.strictEqual(calls[calls.length - 1], 'play:/user-data/tts-zzqword.mp3');

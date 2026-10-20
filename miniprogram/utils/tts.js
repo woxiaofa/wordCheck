@@ -4,9 +4,10 @@
  * 播放优先级（详见 docs/词库与发音方案.md）：
  *   1. 本地预生成音频：Piper（MIT 协议）离线合成，打包在 /assets/audio/<word>.mp3
  *      —— 零网络、零权限、真机必出声，且音色统一
- *   2. 云端 TTS（2026-10-19 新增）：tts 云函数按词合成英文发音存云存储，客户端下载后
- *      缓存到本机，之后零等待。覆盖自定义词库 —— 个人主体搜不到同声传译插件
- *      （2026-10-05 / 10-19 两次实锤），这一级是自定义词库唯一有声路径
+ *   2. 云端发音（2026-10-20 重做）：tts 云函数调免费发音源，音频以 base64 直接返回，
+ *      客户端写进本机文件后直读，之后零等待。覆盖自定义词库 —— 个人主体搜不到
+ *      同声传译插件（2026-10-05 / 10-19 两次实锤），这一级是自定义词库唯一有声路径。
+ *      全程不碰付费服务：无密钥、无云存储、无额外开通。
  *   3. WechatSI 插件 textToSpeech：保留兜底（当前插件未授权，实际不生效）
  *   4. 都不可用：回调 false，页面给一次性提示，不崩
  *
@@ -107,7 +108,7 @@ function finish(word, ok) {
   for (var i = 0; i < list.length; i++) list[i](ok);
 }
 
-/** 云端发音：storage 本地缓存命中直接播；未命中 → tts 云函数 → 下载 → 存本机 → 写索引 */
+/** 云端发音：storage 本地缓存命中直接播；未命中 → tts 云函数取 base64 → 写本机 → 写索引 */
 function cloudFetch(word, cb) {
   var key = audioKeyLib.key(word);
   if (!key) { cb(false); return; }
@@ -124,26 +125,21 @@ function cloudFetch(word, cb) {
     data: { action: 'synthesize', word: word },
     success: function (res) {
       var r = res && res.result;
-      if (!r || !r.ok || !r.fileID) { finish(word, false); return; }
-      wx.cloud.downloadFile({
-        fileID: r.fileID,
-        success: function (d) {
-          if (!d || !d.tempFilePath) { finish(word, false); return; }
-          var dst = wx.env.USER_DATA_PATH + '/tts-' + key + '.mp3';
-          var fsm = wx.getFileSystemManager();
-          fsm.saveFile({
-            tempFilePath: d.tempFilePath,
-            filePath: dst,
-            success: function () {
-              try {
-                var m = wx.getStorageSync(CLOUD_CACHE_KEY) || {};
-                m[key] = dst;
-                wx.setStorageSync(CLOUD_CACHE_KEY, m);
-              } catch (e) { /* 索引写失败只影响下次速度，不影响本次 */ }
-              finish(word, play(dst));
-            },
-            fail: function () { finish(word, play(d.tempFilePath)); } // 存不下来至少这次能响
-          });
+      if (!r || !r.ok || !r.audio) { finish(word, false); return; }
+      var dst = wx.env.USER_DATA_PATH + '/tts-' + key + '.mp3';
+      var fsm = wx.getFileSystemManager();
+      // 音频以 base64 回来，直接写本地文件 —— 不用云存储，也就不用配存储权限
+      fsm.writeFile({
+        filePath: dst,
+        data: r.audio,
+        encoding: 'base64',
+        success: function () {
+          try {
+            var m = wx.getStorageSync(CLOUD_CACHE_KEY) || {};
+            m[key] = dst;
+            wx.setStorageSync(CLOUD_CACHE_KEY, m);
+          } catch (e) { /* 索引写失败只影响下次速度，不影响本次 */ }
+          finish(word, play(dst));
         },
         fail: function () { finish(word, false); }
       });
