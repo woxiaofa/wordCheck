@@ -81,8 +81,13 @@ function ok(name, fn) {
     });
 }
 
-function call(image) {
-  return ocrFn.main({ action: 'recognize', image: image }, {});
+/** ctx 用来模拟"云函数被配了多少超时" —— -504003 的真身就是这个 */
+function call(image, ctx) {
+  return ocrFn.main({ action: 'recognize', image: image }, ctx || {});
+}
+
+function ctxWith(remainMs) {
+  return { getRemainingTimeInMillis: function () { return remainMs; } };
 }
 
 /**
@@ -254,6 +259,49 @@ steps.push(function () {
   return ok('⑪ 未知 action：BAD_ACTION', function () {
     return ocrFn.main({ action: 'nope' }, {}).then(function (r) {
       assert.strictEqual(r.code, 'BAD_ACTION');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑫ ping：不出网、不花额度，只回"我还剩多少秒"（专查超时配置）', function () {
+    reset();
+    return ocrFn.main({ action: 'ping' }, ctxWith(42000)).then(function (r) {
+      assert.strictEqual(r.ok, true);
+      assert.strictEqual(r.left, 42000, '剩余时间要如实回，不然没法判断配置对不对');
+      assert.strictEqual(remote.calls.length, 0, 'ping 绝不能出网（一次额度都不能花）');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑬ 只给 3 秒（云函数默认值）：直接报 ENV_TIMEOUT_TOO_SMALL，一个字节都不发', function () {
+    reset();
+    return call(B64, ctxWith(3000)).then(function (r) {
+      assert.strictEqual(r.ok, false);
+      assert.strictEqual(r.code, 'ENV_TIMEOUT_TOO_SMALL', '真机上这条就是 -504003');
+      assert.ok(r.hint && r.hint.indexOf('60') >= 0, '提示要写明改到多少秒：' + r.hint);
+      assert.strictEqual(remote.calls.length, 0, '明知跑不完就别发请求，省额度也省用户等待');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑭ 成功结果带 ms：下次报慢能直接看出是哪一段慢', function () {
+    reset();
+    return call(B64, ctxWith(60000)).then(function (r) {
+      assert.strictEqual(r.ok, true);
+      assert.strictEqual(typeof r.ms, 'number', '要能看出 OCR 出网花了多久');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑮ 出网超时跟着剩余时间走：剩 8 秒时最多等 6 秒，不会硬等到被外层掐掉', function () {
+    reset();
+    return call(B64, ctxWith(8000)).then(function (r) {
+      assert.strictEqual(r.ok, true);
+      assert.strictEqual(remote.calls[0].timeout, 6000, '实际：' + remote.calls[0].timeout);
     });
   });
 });

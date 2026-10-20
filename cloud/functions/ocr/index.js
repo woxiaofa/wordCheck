@@ -33,7 +33,7 @@ function apiKey() {
 }
 
 /** POST application/x-www-form-urlencoded，返回解析后的 JSON */
-function post(body) {
+function post(body, timeout) {
   return new Promise(function (resolve, reject) {
     var req = https.request({
       host: ENDPOINT,
@@ -44,7 +44,7 @@ function post(body) {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(body)
       },
-      timeout: TIMEOUT
+      timeout: timeout || TIMEOUT
     }, function (res) {
       var chunks = [];
       res.on('data', function (c) { chunks.push(c); });
@@ -72,7 +72,32 @@ function rateLimited(openid) {
   return arr.length > RATE_MAX;
 }
 
-async function recognize(image, openid) {
+/**
+ * 还剩多少执行时间（毫秒）。老 runtime 没有这个接口，拿不到就当"够用"。
+ * 为什么量它：云函数超时默认是 3 秒，而 OCR.space 出网实测 1.7~2.5 秒 + 冷启动 1~2 秒，
+ * 3 秒必超（-504003）。与其让用户看到一句没用的"超时了"，不如直接说清是配置太小。
+ */
+function remainMs(context) {
+  try {
+    if (context && typeof context.getRemainingTimeInMillis === 'function') {
+      return context.getRemainingTimeInMillis();
+    }
+  } catch (e) { /* 拿不到就按够用处理 */ }
+  return 60000;
+}
+
+async function recognize(image, openid, context) {
+  var left = remainMs(context);
+  // 剩不到 6 秒就别发请求了：OCR 出网最少也要 1.5 秒，发出去也是被外层掐掉
+  if (left < 6000) {
+    return {
+      ok: false, code: 'ENV_TIMEOUT_TOO_SMALL',
+      msg: '云函数超时只给了 ' + Math.round(left / 1000) + ' 秒，识别跑不完',
+      hint: '云开发控制台 → 云函数 → ocr → 配置 → 超时时间改成 60 秒',
+      left: left
+    };
+  }
+
   if (typeof image !== 'string' || !image) {
     return { ok: false, code: 'BAD_IMAGE', msg: '没有图片' };
   }
@@ -89,12 +114,20 @@ async function recognize(image, openid) {
   var body = 'base64Image=' + encodeURIComponent('data:image/jpeg;base64,' + b64) +
     '&language=chs&isTable=true&scale=true&OCREngine=2';
 
+  // 出网超时跟着剩余时间走：外层 60 秒时用 25 秒；万一被改成 10 秒也不会硬等到被掐
+  var budget = Math.max(3000, Math.min(TIMEOUT, left - 2000));
+
+  var t0 = Date.now();
   var json;
   try {
-    json = await post(body);
+    json = await post(body, budget);
   } catch (e) {
-    return { ok: false, code: 'OCR_UNAVAILABLE', msg: '识别服务暂时不可用' };
+    return {
+      ok: false, code: 'OCR_UNAVAILABLE', msg: '识别服务暂时不可用',
+      ms: Date.now() - t0, err: String((e && e.message) || e), left: left
+    };
   }
+  var cost = Date.now() - t0;
 
   if (json && json.IsErroredOnProcessing) {
     var m = json.ErrorMessage;
@@ -104,17 +137,21 @@ async function recognize(image, openid) {
   var results = (json && json.ParsedResults) || [];
   var text = results.map(function (r) { return (r && r.ParsedText) || ''; }).join('\n');
   if (!text.replace(/\s/g, '')) {
-    return { ok: false, code: 'EMPTY', msg: '没识别出文字，重拍一张试试（对准、别反光）' };
+    return { ok: false, code: 'EMPTY', msg: '没识别出文字，重拍一张试试（对准、别反光）', ms: cost };
   }
-  return { ok: true, text: text };
+  return { ok: true, text: text, ms: cost };
 }
 
-exports.main = async function (event) {
+exports.main = async function (event, context) {
   const wxctx = cloud.getWXContext();
   const openid = wxctx.OPENID;
   const action = event && event.action;
   try {
-    if (action === 'recognize') return await recognize(event.image, openid);
+    if (action === 'recognize') return await recognize(event.image, openid, context);
+    // ping：不花钱、不出网，只回一句"我在 + 我还有多少秒"，专门用来查超时配置对不对
+    if (action === 'ping') {
+      return { ok: true, left: remainMs(context), ver: '2026-10-20c' };
+    }
     return { ok: false, code: 'BAD_ACTION', msg: '未知 action' };
   } catch (e) {
     return { ok: false, code: 'OCR_ERROR', msg: String((e && e.message) || e) };

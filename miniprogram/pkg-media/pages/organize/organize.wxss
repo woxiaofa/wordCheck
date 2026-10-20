@@ -1,7 +1,11 @@
 .page { padding: 24rpx 24rpx 60rpx; background: #0f1620; min-height: 100vh; }
 .t1 { font-size: 32rpx; font-weight: 700; color: #e8f0f8; }
 .muted { color: #8b9bad; font-size: 26rpx; }
-.warn { color: #ffb020; font-size: 26rpx; }
+.warn {
+  line-height: 1.6;
+  color: #ffb020;
+  font-size: 26rpx;
+}
 .empty { text-align: center; color: #8b9bad; font-size: 28rpx; padding: 40rpx 0; }
 .row-between { display: flex; align-items: center; justify-content: space-between; }
 .row { display: flex; align-items: center; }

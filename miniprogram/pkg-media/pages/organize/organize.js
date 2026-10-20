@@ -113,7 +113,12 @@ function callOcr(b64) {
         if (m.indexOf('FUNCTION_NOT_FOUND') >= 0 || m.indexOf('not found') >= 0) {
           reject(new Error('FUNC_MISSING')); return;
         }
-        if (m.indexOf('timeout') >= 0) { reject(new Error('CLOUD_TIMEOUT')); return; }
+        // 超时有四种写法，漏一种就又变成"云函数没连上"（2026-10-20 真机 -504003 踩实）：
+        //   errCode: -504003 | errMsg: Invoking task timed out after 3 seconds
+        if (m.indexOf('timed out') >= 0 || m.indexOf('timeout') >= 0 ||
+            m.indexOf('-504003') >= 0 || m.indexOf('TIME_LIMIT') >= 0) {
+          reject(new Error('CLOUD_TIMEOUT')); return;
+        }
         reject(new Error('CLOUD_FAIL|' + m.slice(0, 70)));
       }
     });
@@ -128,7 +133,10 @@ var OCR_TEXT = {
   COMPRESS_FAIL: '这张图压不小，重拍一张试试',
   READ_FAIL: '照片读不出来，重拍一张吧',
   FUNC_MISSING: '识别功能还没上线，过几分钟再点一次',
-  CLOUD_TIMEOUT: '识别超时了，再点一次「重新识别」',
+  // 超时和配置有关，得把"去哪改"写进提示，否则用户只会一遍遍重试。
+  // 用一整句不用 \n：ocrNote 是 view 渲染的，\n 在 view 里不换行，只会变成一串空格。
+  CLOUD_TIMEOUT: '识别超时（云函数默认只给 3 秒，认一张图要 3~5 秒）。去「云开发控制台 → 云函数 → ocr → 配置」把超时改成 60 秒；急用先手动录',
+  ENV_TIMEOUT_TOO_SMALL: '云函数超时太小，识别跑不完。去「云开发控制台 → 云函数 → ocr → 配置」把超时改成 60 秒',
   CLOUD_FAIL: '云函数没连上，先手动录、回头再识别',
   OCR_UNAVAILABLE: '识别服务暂时连不上，先手动录、回头再识别',
   RATE_LIMIT: '识别太频繁了，歇一分钟再点「重新识别」',
@@ -275,9 +283,26 @@ Page({
     this.setData({ recognizing: true, ocrNote: '', toast: '' });
 
     var before = this.data.words.length;
+    var retried = false;
+
+    /**
+     * 超时自动重试一次，只重试超时。
+     * 为什么值得重试：云函数冷启动（加载 wx-server-sdk）就要 1~2 秒，OCR.space 出网
+     * 实测 1.7~2.5 秒，加起来第一次很容易撞上超时闸；第二次函数已经热着，大概率能过。
+     * 为什么只重试超时：图片太大、函数没部署这类重试一万次也一样，白等还费额度。
+     */
+    function callWithRetry(b64) {
+      return callOcr(b64).then(function (r) { return r; }, function (err) {
+        if (String((err && err.message) || '').split('|')[0] !== 'CLOUD_TIMEOUT' || retried) throw err;
+        retried = true;
+        self.setData({ ocrNote: '第一次没跑完（云函数刚醒），正在重试…' });
+        return callOcr(b64);
+      });
+    }
+
     compressForOcr(this.data.img)
       .then(readBase64)
-      .then(callOcr)
+      .then(callWithRetry)
       .then(function (res) {
         if (!res || !res.ok) { self.setData({ ocrNote: ocrErrorText(res) }); return; }
         var parsed = importer.parse(res.text);

@@ -17,7 +17,8 @@ var path = require('path');
 /* ------------------------------ 环境桩 ------------------------------ */
 
 var storage = {};
-var cloud = { calls: [], result: null, fail: false, failMsg: '' };
+/** failTimes：先失败这么多次再成功 —— 用来验"超时自动重试"确实只重试一次 */
+var cloud = { calls: [], result: null, fail: false, failMsg: '', failTimes: 0 };
 var toast = [];
 var modal = null;
 var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
@@ -41,6 +42,7 @@ global.wx = {
   cloud: {
     callFunction: function (o) {
       cloud.calls.push(o.name);
+      if (cloud.failTimes > 0) { cloud.failTimes--; o.fail({ errMsg: cloud.failMsg }); return; }
       if (cloud.fail) { o.fail({ errMsg: cloud.failMsg || 'cloud.callFunction:fail' }); return; }
       o.success({ result: cloud.result });
     }
@@ -106,6 +108,7 @@ function reset(words, imgPath) {
   cloud.calls.length = 0;
   cloud.fail = false;
   cloud.failMsg = '';
+  cloud.failTimes = 0;
   cloud.result = { ok: true, text: '' };
   toast.length = 0;
   modal = null;
@@ -244,6 +247,67 @@ steps.push(function () {
       assert.ok(compressCalls.indexOf('1600/60') >= 0, '阶梯要从 1600 起步');
       assert.ok(compressCalls.indexOf('900/40') >= 0, '阶梯要一路降到 900');
       assert.ok(compressCalls.indexOf('0/20') >= 0, '最后还有老基础库兜底档');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④e 真机 -504003（timed out）：指向超时配置，不能再说"云函数没连上"', function () {
+    var d = reset();
+    cloud.fail = true;
+    // 真机原文：errCode: -504003 | errMsg: Invoking task timed out after 3 seconds
+    cloud.failMsg = 'cloud.callFunction:fail Error: errCode: -504003 | errMsg: ' +
+      'Invoking task timed out after 3 seconds';
+    var page = makePage(d.id);
+    return tick(40).then(function () {
+      assert.ok(page.data.ocrNote.indexOf('超时') >= 0, '要认出这是超时：' + page.data.ocrNote);
+      assert.ok(page.data.ocrNote.indexOf('60') >= 0, '要写明改到多少秒：' + page.data.ocrNote);
+      assert.ok(page.data.ocrNote.indexOf('连不上') < 0, '这句是误导：' + page.data.ocrNote);
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④f 超时自动重试一次：冷启动那次被掐，第二次函数热了就认出来', function () {
+    var d = reset();
+    cloud.failTimes = 1;              // 第一次超时，之后成功
+    cloud.failMsg = 'cloud.callFunction:fail Error: errCode: -504003 | errMsg: timed out';
+    cloud.result = { ok: true, text: 'apple 苹果\ntiger 老虎' };
+    var page = makePage(d.id);
+    return tick(40).then(function () {
+      assert.strictEqual(cloud.calls.length, 2, '超时要重试一次，实际调了 ' + cloud.calls.length + ' 次');
+      assert.strictEqual(page.data.words.length, 2, '重试成功就该把词填进来');
+      assert.strictEqual(page.data.words[0].word, 'apple');
+      assert.strictEqual(page.data.recognizing, false);
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④g 只重试超时：图片太大这类重试一万次也一样，不能白等', function () {
+    var d = reset();
+    cloud.fail = true;
+    cloud.failMsg = 'cloud.callFunction:fail Error: errCode: -401003 (Payload Too Large)';
+    var page = makePage(d.id);
+    return tick(40).then(function () {
+      assert.strictEqual(cloud.calls.length, 1, '非超时错误只调一次，实际 ' + cloud.calls.length + ' 次');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('④h 云端说"超时太小"：原样把去哪改讲清楚（不用用户自己猜）', function () {
+    var d = reset();
+    cloud.result = {
+      ok: false, code: 'ENV_TIMEOUT_TOO_SMALL',
+      msg: '云函数超时只给了 3 秒，识别跑不完',
+      hint: '云开发控制台 → 云函数 → ocr → 配置 → 超时时间改成 60 秒'
+    };
+    var page = makePage(d.id);
+    return tick(20).then(function () {
+      assert.ok(page.data.ocrNote.indexOf('60') >= 0, '要写明改到多少秒：' + page.data.ocrNote);
+      assert.ok(page.data.ocrNote.indexOf('云开发控制台') >= 0, '要写明去哪改：' + page.data.ocrNote);
+      assert.strictEqual(cloud.calls.length, 1, '这种重试也没用，不该重试');
     });
   });
 });
