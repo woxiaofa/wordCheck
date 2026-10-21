@@ -233,5 +233,22 @@ ok('⑬ 端上所有 require 的相对路径都指向真实文件（分包多一
   assert.strictEqual(bad.length, 0, 'require 指向不存在的文件：\n    ' + bad.join('\n    '));
 });
 
+
+/* ⑭ showModal 按钮文字最多 4 个字：超了整个弹窗 fail（"存，开始背"5 个字，
+   真机上保存流程无声死掉 5 天，2026-10-21 才靠分步回执现形） */
+ok('⑭ showModal 的 confirmText/cancelText 全部 ≤ 4 个字', function () {
+  var bad = [];
+  walk('miniprogram', '.js').forEach(function (f) {
+    var src = read(f);
+    var re = /(?:confirmText|cancelText)\s*:\s*'([^']*)'/g;
+    var m;
+    while ((m = re.exec(src))) {
+      if (m[1].length > 4) bad.push(f + ' → "' + m[1] + '" (' + m[1].length + ' 字)');
+    }
+  });
+  assert.strictEqual(bad.length, 0, '按钮文字超过 4 个字，showModal 会整体 fail：\n    ' + bad.join('\n    '));
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
+

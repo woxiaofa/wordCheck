@@ -444,7 +444,7 @@ steps.push(function () {
     page.finish();
     modal.fail(new Error('showModal:fail 调试模式吞弹窗'));
     assert.ok(navTitles.join('|').indexOf('✗ 出错') >= 0, '失败要写进标题：' + navTitles.join('|'));
-    assert.ok(navTitles.join('|').indexOf('showModal:fail') >= 0, '原因也要带上：' + navTitles.join('|'));
+    assert.ok(navTitles.join('|').indexOf('调试模式吞弹窗') >= 0, '原因也要带上：' + navTitles.join('|'));
   });
 });
 

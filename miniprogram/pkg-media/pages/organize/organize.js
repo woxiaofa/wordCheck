@@ -22,7 +22,7 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
  * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
  * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
  */
-var BUILD = '1.1.32';
+var BUILD = '1.1.33';
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
@@ -465,7 +465,9 @@ Page({
 
   /** 任何异常都不许无声死掉：标题 + toast 同时现形 */
   crash: function (e) {
-    var m = String((e && e.message) || e).slice(0, 30);
+    // wx API 的 fail 回调给的是 {errMsg} 不是 Error，两个都要接住
+    var m = String((e && (e.message || e.errMsg)) || e)
+      .replace(/^showModal:fail\s*/, '').slice(0, 30);
     this.step('✗ 出错：' + m);
     try { console.error('[organize] finish 出错：', e); } catch (e2) { /* 忽略 */ }
     try { wx.showToast({ title: '出错了：' + m, icon: 'none', duration: 4000 }); } catch (e3) { /* 忽略 */ }
@@ -509,7 +511,9 @@ Page({
       wx.showModal({
         title: '存成词库？',
         content: '「' + name + '」共 ' + words.length + ' 个词，存好就直接用这本背了。',
-        confirmText: '存，开始背',
+        // confirmText 最多 4 个字，超了整个 showModal 直接 fail（2026-10-21 真机实锤：
+        // "存，开始背"5 个字 → showModal:fail → 保存流程无声死掉，就是"点了没反应"的真凶）
+        confirmText: '存好就背',
         cancelText: '再想想',
         // showModal 自己失败（真机调试模式下出现过）也必须现形，不能无声
         fail: function (e) { self.crash(e || new Error('showModal fail')); },
