@@ -23,6 +23,8 @@ var toast = [];
 var modal = null;
 var scrollCalls = [];             // pageScrollTo 的记录（jumpToFirstBad 用）
 var navTitles = [];               // 导航栏标题的变化记录（ackTap 点击回执用）
+var tabJumps = [];                // switchTab 的记录（存好回首页用）
+var backs = 0;                    // navigateBack 次数
 var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
 var compressCalls = [];           // compressImage 的调用记录（width/quality）
 
@@ -51,7 +53,8 @@ global.wx = {
   },
   showToast: function (o) { toast.push(o.title); },
   showModal: function (o) { modal = o; },
-  navigateBack: function () {},
+  navigateBack: function () { backs++; },
+  switchTab: function (o) { tabJumps.push(o.url); },
   previewImage: function () {},
   pageScrollTo: function (o) { scrollCalls.push(o); },
   setNavigationBarTitle: function (o) { navTitles.push(o.title); },
@@ -129,6 +132,8 @@ function reset(words, imgPath) {
   modal = null;
   scrollCalls.length = 0;
   navTitles.length = 0;
+  tabJumps.length = 0;
+  backs = 0;
   fsSize = 120 * 1024;
   compressCalls.length = 0;
   storage[drafts.STORAGE_KEY] = [];
@@ -432,20 +437,26 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑧ 正常入库：存成自定义词库并清掉草稿', function () {
+  return ok('⑧ 正常入库：存成自定义词库并清掉草稿，然后直接跳回首页', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }, { word: 'zoo', def_cn: '动物园' }]);
     var page = makePage(d.id);
     page.data.name = 'Unit 1';
     page.finish();
     assert.ok(modal, '应弹确认框');
     modal.success({ confirm: true });
-    assert.strictEqual(drafts.list().length, 0, '入库后草稿要删掉');
-    var key = books.getKey();
-    var words = books.getWords(key);
-    assert.strictEqual(words.length, 2);
-    assert.strictEqual(words[0].word, 'apple');
-    assert.strictEqual(words[0].def_cn, '苹果');
-    assert.strictEqual(words[0]._k, undefined, '页面内临时字段不能进词库');
+    return tick(600).then(function () {
+      assert.strictEqual(drafts.list().length, 0, '入库后草稿要删掉');
+      assert.strictEqual(tabJumps.length, 1, '存好要跳转一次，实际 ' + JSON.stringify(tabJumps));
+      assert.ok(String(tabJumps[0]).indexOf('pages/index/index') >= 0,
+        '存好要 switchTab 回首页（用户不用自己找"存哪了"）：' + JSON.stringify(tabJumps));
+      var key = books.getKey();
+      var words = books.getWords(key);
+      assert.strictEqual(words.length, 2);
+      assert.strictEqual(words[0].word, 'apple');
+      assert.strictEqual(words[0].def_cn, '苹果');
+      assert.strictEqual(words[0]._k, undefined, '页面内临时字段不能进词库');
+      assert.ok(String(books.currentName()).indexOf('Unit 1') >= 0, '当前词库要切到新存的这本：' + books.currentName());
+    });
   });
 });
 

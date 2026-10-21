@@ -22,7 +22,7 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
  * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
  * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
  */
-var BUILD = '1.1.30';
+var BUILD = '1.1.31';
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
@@ -514,7 +514,15 @@ Page({
         books.setKey(key);
         if (self._saveTimer) { clearTimeout(self._saveTimer); self._saveTimer = null; }
         drafts.remove(self.data.id);            // 入库了草稿就没用了（照片一并删）
-        wx.navigateBack();
+        /**
+         * 存完直接回首页：新词库当场生效，首页卡片、pill 列表都会变成这一本。
+         * 以前 navigateBack 只退回导入页 —— 用户站在导入页里当然"不知道存哪了"
+         * （2026-10-21 反馈：显示点击存好，但不知道在哪里）。
+         */
+        wx.showToast({ title: '已存好「' + name + '」', icon: 'none', duration: 1200 });
+        setTimeout(function () {
+          wx.switchTab({ url: '/pages/index/index' });
+        }, 500);
       }
     });
   },
