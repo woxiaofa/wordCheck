@@ -103,7 +103,7 @@
       <button class="btn mt {{w ? '' : 'ghost'}}" bindtap="addWord">加进列表</button>
     </view>
 
-    <!-- ④ 起名（不填按日期自动起） -->
+    <!-- ④ 起名 + 内容流里的保存入口（不依赖 fixed，绝对点得到） -->
     <view class="card" wx:if="{{words.length}}">
       <input
         class="inp"
@@ -112,12 +112,19 @@
         bindinput="onName"
         maxlength="12"
       />
+      <button class="btn mt" bindtap="finish">存成我的词库（{{words.length}}）</button>
+      <button class="btn ghost mt-s" bindtap="saveLater">先存着，回头再改</button>
     </view>
 
-    <!-- 底部固定操作条：长页面里保存按钮永远在手边 -->
+    <!-- 底部固定操作条：人在页面中间时也能存。
+         主按钮占满整行，别留右下角给系统悬浮球（"转发截图"会压住按钮导致点不到）。
+         点击后按钮自报状态（barHint），能确认这一下到底有没有点到。 -->
+    <!-- 运行版本号：截图里能看到，避免"改了半天其实跑的是旧版" -->
+    <view class="ver" wx:if="{{ver}}">v{{ver}}</view>
+
     <view class="bottom-bar" wx:if="{{words.length}}">
-      <button class="bar-btn ghost" bindtap="saveLater">先存着</button>
-      <button class="bar-btn primary" bindtap="finish">存成我的词库（{{words.length}}）</button>
+      <view class="bar-sub" bindtap="saveLater">先存着，回头再改</view>
+      <button class="bar-btn primary" bindtap="finish">{{barHint || ('存成我的词库（' + words.length + '）')}}</button>
     </view>
   </block>
 </view>

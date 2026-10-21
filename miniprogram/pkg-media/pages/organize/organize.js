@@ -17,6 +17,13 @@ var privacy = require('../../../utils/privacy');
 var MAX_OCR_BYTES = 500 * 1024;   // 云函数入参上限 1MB，base64 膨胀 4/3，留余量
 var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 storage
 
+/**
+ * 构建号 —— 每次上传体验版手动改这里。
+ * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
+ * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
+ */
+var BUILD = '1.1.29';
+
 /* ---------------------------- OCR 取文 ---------------------------- */
 
 /** 顺便量一下文件多大：拿不到就报 0，让云端那道 700KB 闸兜底 */
@@ -232,11 +239,14 @@ Page({
     badCount: 0,
     toast: '',
     recognizing: false,
-    ocrNote: ''
+    ocrNote: '',
+    barHint: '',           // 底栏主按钮的临时文案：点完自己变字 = 证明这一下真的点到了
+    ver: ''                // 运行中的版本号（体验版会显示 1.1.29 这种），截图就能核对
   },
 
   onLoad: function (q) {
     var id = (q && q.id) || '';
+    this.readVersion();
     var d = drafts.get(id);
     if (!d) {
       this.setData({ toast: '这份草稿找不到了，回导入页重新拍一张吧' });
@@ -255,11 +265,23 @@ Page({
     if (!words.length && this.data.img && !d.ocr_at) this.doOcr();
   },
 
+  /** 拿运行版本号：体验版是 1.1.29 这种，开发版没有版本号就用 envVersion 顶上 */
+  readVersion: function () {
+    var env = '';
+    try {
+      var acc = wx.getAccountInfoSync && wx.getAccountInfoSync();
+      var p = acc && acc.miniProgram;
+      env = (p && (p.version || p.envVersion)) || '';
+    } catch (e) { /* 老基础库没有这个接口 */ }
+    this.setData({ ver: env ? BUILD + ' · ' + env : BUILD });
+  },
+
   /** 切后台 / 退出前把防抖里的改动强制落盘：不能等 400ms，进程可能就没了 */
   onHide: function () { this.flush(); },
   onUnload: function () {
     this.flush();
     if (this._flashTimer) { clearTimeout(this._flashTimer); this._flashTimer = null; }
+    if (this._hintTimer) { clearTimeout(this._hintTimer); this._hintTimer = null; }
   },
 
   flush: function () {
@@ -437,11 +459,23 @@ Page({
     // 所以现在三件事一起做：顶部 toast + 滚到第一个坏词 + 黄光闪烁标位。
     var bad = countBad(this.data.words);
     if (bad) {
-      this.setData({ badCount: bad, toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉' });
+      var me = this;
+      // barHint 是"点到了"的实证：按钮自己变成这句话。用户看不到 toast 时，
+      // 至少能分清"没点到按钮"还是"点到了但被拦住"（2026-10-21 反复说没反应）
+      this.setData({
+        badCount: bad,
+        toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉',
+        barHint: '先改好红底的词'
+      });
       wx.showToast({ title: '先改好红底的词再存', icon: 'none' });
       // 触觉兜底：就算 toast 被键盘/悬浮球挡住，手上也有感觉
       try { if (wx.vibrateShort) wx.vibrateShort({ type: 'light' }); } catch (e) { /* 老机没有就算了 */ }
       this.jumpToFirstBad();
+      if (this._hintTimer) clearTimeout(this._hintTimer);
+      this._hintTimer = setTimeout(function () {
+        me._hintTimer = null;
+        me.setData({ barHint: '' });
+      }, 1800);
       return;
     }
     var words = plainWords(this.data.words);

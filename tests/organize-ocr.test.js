@@ -396,6 +396,26 @@ steps.push(function () {
 });
 
 steps.push(function () {
+  return ok('⑦d 被拦时按钮自己变字：点了到底有没有生效，用户能自己看见', function () {
+    var d = reset([{ word: '图书馆', def_cn: '' }]);
+    var page = makePage(d.id);
+    page.finish();
+    assert.strictEqual(page.data.barHint, '先改好红底的词', '按钮文案要当场变，这是"点到了"的实证');
+    return tick(2000).then(function () {
+      assert.strictEqual(page.data.barHint, '', '1.8s 后恢复成「存成我的词库（N）」');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑦e 页面显示构建号：截图就能分清"没改对"还是"版本没更新"', function () {
+    var d = reset([{ word: 'apple', def_cn: '苹果' }]);
+    var page = makePage(d.id);
+    assert.ok(/^\d+\.\d+\.\d+/.test(String(page.data.ver)), '要能看出构建号：' + page.data.ver);
+  });
+});
+
+steps.push(function () {
   return ok('⑧ 正常入库：存成自定义词库并清掉草稿', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }, { word: 'zoo', def_cn: '动物园' }]);
     var page = makePage(d.id);

@@ -113,7 +113,10 @@
 }
 /* 表格式编辑用 ghost 框（只有一条底线），和"补一个/名称"的方框区分开 */
 .cell {
-  padding: 16rpx 8rpx;
+  /* 显式高度 + 行高：只靠 padding 撑高时，真机上中文会被垂直裁掉半行（2026-10-21 反馈） */
+  height: 76rpx;
+  line-height: 76rpx;
+  padding: 0 8rpx;
   box-sizing: border-box;
   background: transparent;
   border-bottom: 2rpx solid #223042;
@@ -123,9 +126,10 @@
   /* 显式声明：不指望继承，真机上吃过没对齐的亏 */
   text-align: left;
 }
-.ew { flex: 1.4; min-width: 0; font-weight: 600; }
-.ed { flex: 1; min-width: 0; margin-left: 16rpx; }
-.ph { color: #55677c; }
+/* 英文列按教材单词长度够用即可，把宽度让给中文释义 —— 中文才是经常被认错、需要改的那一列 */
+.ew { flex: 1; min-width: 0; font-weight: 600; }
+.ed { flex: 1.55; min-width: 0; margin-left: 14rpx; font-size: 26rpx; }
+.ph { color: #55677c; font-size: 26rpx; }
 .cell.bad { border-bottom-color: #ff5c6c; color: #ff8a95; }
 .del {
   width: 56rpx;
@@ -160,30 +164,41 @@
 .bottom-bar {
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  z-index: 100;
-  display: flex;
-  padding: 16rpx 24rpx;
-  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  z-index: 999;
+  padding: 12rpx 24rpx;
+  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
   /* 不透明底：半透明会让下面的词透出来，看着也像层级错了 */
   background: #0f1620;
   border-top: 1rpx solid rgba(255, 255, 255, .08);
   box-shadow: 0 -8rpx 24rpx rgba(0, 0, 0, .35);
 }
 .bar-btn {
-  flex: 1;
-  margin: 0 0 0 20rpx;
-  height: 84rpx;
-  line-height: 84rpx;
+  display: block;
+  width: 100% !important;
+  margin: 0;
+  height: 88rpx;
+  line-height: 88rpx;
   padding: 0;
   font-size: 30rpx;
   border-radius: 16rpx;
   color: #fff;
   background: linear-gradient(135deg, #2fd07a, #22a862);
+  /* button 自己成为可点层：不给 position，个别机型上 fixed 容器里的 button 会"看得见点不着" */
+  position: relative;
+  z-index: 1;
 }
-.bar-btn:first-child { margin-left: 0; }
 .bar-btn::after { border: none; }
-.bar-btn.ghost {
-  background: #1b2735;
-  color: #cfe0f0;
+.bar-sub {
+  padding: 4rpx 0 12rpx;
+  text-align: center;
+  color: #8b9bad;
+  font-size: 24rpx;
 }
-.bar-btn[disabled] { opacity: .45; }
+
+/* 版本号：极小极淡，只为截图排查用，不打扰阅读 */
+.ver {
+  padding: 8rpx 0 0;
+  text-align: center;
+  color: #3f4d5d;
+  font-size: 20rpx;
+}
