@@ -22,7 +22,7 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
  * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
  * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
  */
-var BUILD = '1.1.31';
+var BUILD = '1.1.32';
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
@@ -282,7 +282,6 @@ Page({
     this.flush();
     if (this._flashTimer) { clearTimeout(this._flashTimer); this._flashTimer = null; }
     if (this._hintTimer) { clearTimeout(this._hintTimer); this._hintTimer = null; }
-    if (this._titleTimer) { clearTimeout(this._titleTimer); this._titleTimer = null; }
   },
 
   flush: function () {
@@ -454,77 +453,94 @@ Page({
   },
 
   /**
-   * 点击回执：导航栏标题闪一下「✓ 已点击 · xx」。
-   * 为什么放导航栏：toast 会被键盘/悬浮球挡，按钮文案会被调试面板挡，
-   * 只有顶部标题栏永远可见 —— 用来钉死"事件到底有没有到达"（2026-10-21 连续三轮
-   * "按钮点不了"，最后发现用户一直开着 vConsole 调试模式在测）。
+   * 分步回执：把保存流程的每一步都写进导航栏标题。
+   * 为什么这么极端：真机上 toast / showModal / setData 的渲染都出现过"无声不响应"
+   * （2026-10-21：ackTap 的标题能显示，但紧跟着的 showModal 就是不弹），只有
+   * setNavigationBarTitle 每次都可靠。标题连起来就是一条执行轨迹 —— 卡在哪一步、
+   * 有没有异常，用户截一张图全知道，不用再猜。
    */
-  ackTap: function (label) {
-    var self = this;
-    try {
-      wx.setNavigationBarTitle({ title: '✓ 已点击 · ' + label });
-      if (this._titleTimer) clearTimeout(this._titleTimer);
-      this._titleTimer = setTimeout(function () {
-        self._titleTimer = null;
-        wx.setNavigationBarTitle({ title: '对着照片录词' });
-      }, 1500);
-    } catch (e) { /* 导航栏改不了就算了，不影响主流程 */ }
+  step: function (msg) {
+    try { wx.setNavigationBarTitle({ title: msg }); } catch (e) { /* 标题改不了就算了 */ }
+  },
+
+  /** 任何异常都不许无声死掉：标题 + toast 同时现形 */
+  crash: function (e) {
+    var m = String((e && e.message) || e).slice(0, 30);
+    this.step('✗ 出错：' + m);
+    try { console.error('[organize] finish 出错：', e); } catch (e2) { /* 忽略 */ }
+    try { wx.showToast({ title: '出错了：' + m, icon: 'none', duration: 4000 }); } catch (e3) { /* 忽略 */ }
   },
 
   finish: function () {
-    this.ackTap('存成我的词库');
-    // 先挡一道：带着错词存进去，背的时候才发现就晚了。
-    // 提示必须让人"当场看见"：以前 toast 写在核对卡片底部，而按钮在页面最下面，
-    // 中间隔着一屏 —— 用户点按钮视口里什么都不发生，就像按钮坏了（2026-10-21 真机反馈）。
-    // 所以现在三件事一起做：顶部 toast + 滚到第一个坏词 + 黄光闪烁标位。
-    var bad = countBad(this.data.words);
-    if (bad) {
-      var me = this;
-      // barHint 是"点到了"的实证：按钮自己变成这句话。用户看不到 toast 时，
-      // 至少能分清"没点到按钮"还是"点到了但被拦住"（2026-10-21 反复说没反应）
-      this.setData({
-        badCount: bad,
-        toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉',
-        barHint: '先改好红底的词'
-      });
-      wx.showToast({ title: '先改好红底的词再存', icon: 'none' });
-      // 触觉兜底：就算 toast 被键盘/悬浮球挡住，手上也有感觉
-      try { if (wx.vibrateShort) wx.vibrateShort({ type: 'light' }); } catch (e) { /* 老机没有就算了 */ }
-      this.jumpToFirstBad();
-      if (this._hintTimer) clearTimeout(this._hintTimer);
-      this._hintTimer = setTimeout(function () {
-        me._hintTimer = null;
-        me.setData({ barHint: '' });
-      }, 1800);
-      return;
-    }
-    var words = plainWords(this.data.words);
-    if (!words.length) { this.setData({ toast: '还没有词呢' }); return; }
-    var name = String(this.data.name || '').trim() || this.defaultName();
     var self = this;
-    wx.showModal({
-      title: '存成词库？',
-      content: '「' + name + '」共 ' + words.length + ' 个词，存好就直接用这本背了。',
-      confirmText: '存，开始背',
-      cancelText: '再想想',
-      success: function (res) {
-        if (!res.confirm) return;
-        var key = books.addCustomBook(name, words);
-        if (!key) { wx.showToast({ title: '没存上，再试一次', icon: 'none' }); return; }
-        books.setKey(key);
-        if (self._saveTimer) { clearTimeout(self._saveTimer); self._saveTimer = null; }
-        drafts.remove(self.data.id);            // 入库了草稿就没用了（照片一并删）
-        /**
-         * 存完直接回首页：新词库当场生效，首页卡片、pill 列表都会变成这一本。
-         * 以前 navigateBack 只退回导入页 —— 用户站在导入页里当然"不知道存哪了"
-         * （2026-10-21 反馈：显示点击存好，但不知道在哪里）。
-         */
-        wx.showToast({ title: '已存好「' + name + '」', icon: 'none', duration: 1200 });
-        setTimeout(function () {
-          wx.switchTab({ url: '/pages/index/index' });
-        }, 500);
+    this.step('✓ 已点击 · 存成我的词库');
+    try {
+      // 先挡一道：带着错词存进去，背的时候才发现就晚了。
+      // 提示必须让人"当场看见"：以前 toast 写在核对卡片底部，而按钮在页面最下面，
+      // 中间隔着一屏 —— 用户点按钮视口里什么都不发生，就像按钮坏了（2026-10-21 真机反馈）。
+      // 所以现在三件事一起做：顶部 toast + 滚到第一个坏词 + 黄光闪烁标位。
+      var bad = countBad(this.data.words);
+      if (bad) {
+        var me = this;
+        // barHint 是"点到了"的实证：按钮自己变成这句话。用户看不到 toast 时，
+        // 至少能分清"没点到按钮"还是"点到了但被拦住"（2026-10-21 反复说没反应）
+        this.setData({
+          badCount: bad,
+          toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉',
+          barHint: '先改好红底的词'
+        });
+        this.step('还有 ' + bad + ' 个待改，正在滚过去');
+        wx.showToast({ title: '先改好红底的词再存', icon: 'none' });
+        // 触觉兜底：就算 toast 被键盘/悬浮球挡住，手上也有感觉
+        try { if (wx.vibrateShort) wx.vibrateShort({ type: 'light' }); } catch (e) { /* 老机没有就算了 */ }
+        this.jumpToFirstBad();
+        if (this._hintTimer) clearTimeout(this._hintTimer);
+        this._hintTimer = setTimeout(function () {
+          me._hintTimer = null;
+          me.setData({ barHint: '' });
+          me.step('对着照片录词');           // 坏词分支的终点：标题复原
+        }, 1800);
+        return;
       }
-    });
+      var words = plainWords(this.data.words);
+      if (!words.length) { this.setData({ toast: '还没有词呢' }); this.step('还没有词'); return; }
+      var name = String(this.data.name || '').trim() || this.defaultName();
+      this.step('准备弹确认框…');
+      wx.showModal({
+        title: '存成词库？',
+        content: '「' + name + '」共 ' + words.length + ' 个词，存好就直接用这本背了。',
+        confirmText: '存，开始背',
+        cancelText: '再想想',
+        // showModal 自己失败（真机调试模式下出现过）也必须现形，不能无声
+        fail: function (e) { self.crash(e || new Error('showModal fail')); },
+        success: function (res) {
+          if (!res.confirm) { self.step('对着照片录词'); return; }
+          try {
+            self.step('正在存词库…');
+            var key = books.addCustomBook(name, words);
+            if (!key) { self.crash(new Error('词库没写进去')); return; }
+            books.setKey(key);
+            if (self._saveTimer) { clearTimeout(self._saveTimer); self._saveTimer = null; }
+            drafts.remove(self.data.id);        // 入库了草稿就没用了（照片一并删）
+            /**
+             * 存完直接回首页：新词库当场生效，首页卡片、pill 列表都会变成这一本。
+             * 以前 navigateBack 只退回导入页 —— 用户站在导入页里当然"不知道存哪了"
+             * （2026-10-21 反馈：显示点击存好，但不知道在哪里）。
+             */
+            self.step('已存好，回首页');
+            wx.showToast({ title: '已存好「' + name + '」', icon: 'none', duration: 1200 });
+            setTimeout(function () {
+              wx.switchTab({
+                url: '/pages/index/index',
+                fail: function (e) { self.crash(e || new Error('switchTab fail')); }
+              });
+            }, 500);
+          } catch (e2) { self.crash(e2); }
+        }
+      });
+    } catch (e) {
+      self.crash(e);
+    }
   },
 
   /** 滚动到第一个坏词并闪 1.6s：长页面里"为什么存不了"必须自己走到用户眼前 */
@@ -562,11 +578,19 @@ Page({
 
   /** "先存着"：草稿本就实时落盘，这里只是告诉用户一句，然后退回去 */
   saveLater: function () {
-    this.ackTap('先存着');
-    this.flush();
-    if (this.data.name) drafts.setName(this.data.id, this.data.name);
-    wx.showToast({ title: '已存 ' + this.data.words.length + ' 个词', icon: 'none' });
-    setTimeout(function () { wx.navigateBack(); }, 900);
+    var self = this;
+    this.step('✓ 已点击 · 先存着');
+    try {
+      this.flush();
+      if (this.data.name) drafts.setName(this.data.id, this.data.name);
+      this.step('已存草稿，退回');
+      wx.showToast({ title: '已存 ' + this.data.words.length + ' 个词', icon: 'none' });
+      setTimeout(function () {
+        wx.navigateBack({
+          fail: function (e) { self.crash(e || new Error('navigateBack fail')); }
+        });
+      }, 900);
+    } catch (e) { this.crash(e); }
   },
 
   goBack: function () { this.flush(); wx.navigateBack(); }

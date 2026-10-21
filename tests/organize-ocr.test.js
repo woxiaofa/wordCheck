@@ -424,15 +424,27 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑦f 点击回执写进导航栏标题：toast/按钮文案都可能被挡，标题栏挡不住', function () {
+  return ok('⑦f 分步回执写进导航栏标题：走到哪一步、卡在哪，截图全知道', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }]);
     var page = makePage(d.id);
     page.finish();
-    assert.ok(navTitles.join('|').indexOf('已点击 · 存成我的词库') >= 0,
-      '点击后导航栏要出现回执：' + navTitles.join('|'));
-    return tick(1600).then(function () {
-      assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '1.5s 后标题要复原');
-    });
+    var seq = navTitles.join(' → ');
+    assert.ok(seq.indexOf('✓ 已点击 · 存成我的词库') >= 0, '第一拍要点名：' + seq);
+    assert.ok(seq.indexOf('准备弹确认框') >= 0, '无坏词要走到弹确认框这一步：' + seq);
+    // 取消确认框：标题要复原
+    modal.success({ confirm: false });
+    assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '取消后标题要复原');
+  });
+});
+
+steps.push(function () {
+  return ok('⑦g showModal 自身失败也要现形：标题显示出错原因，不能无声', function () {
+    var d = reset([{ word: 'apple', def_cn: '苹果' }]);
+    var page = makePage(d.id);
+    page.finish();
+    modal.fail(new Error('showModal:fail 调试模式吞弹窗'));
+    assert.ok(navTitles.join('|').indexOf('✗ 出错') >= 0, '失败要写进标题：' + navTitles.join('|'));
+    assert.ok(navTitles.join('|').indexOf('showModal:fail') >= 0, '原因也要带上：' + navTitles.join('|'));
   });
 });
 
