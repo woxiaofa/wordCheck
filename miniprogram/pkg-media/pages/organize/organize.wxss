@@ -92,35 +92,39 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .ocr-hint { color: #8b9bad; font-size: 24rpx; }
 
-/* ---------- ② 核对列表：ghost 输入框 + 整行红底 ---------- */
+/* ---------- ② 核对列表：行有底色的 ghost 输入框 ---------- */
 .list { margin-top: 8rpx; }
 .wrow {
   display: flex;
   align-items: center;
-  padding: 8rpx 12rpx;
+  padding: 8rpx 16rpx;
   border-radius: 12rpx;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
+  /* 行给一层底色：纯 ghost 框悬空着，两列文字像散落的，中英文的边界看不出来 */
+  background: #141d28;
 }
 /* 不像英文的整行淡红：一眼扫到在哪，不用盯着边框找 */
-.wrow.bad-row { background: rgba(255, 92, 108, .08); }
+.wrow.bad-row { background: rgba(255, 92, 108, .10); }
 /* 点"存成词库"被拦时，滚到第一个坏词再闪一下黄光 —— 不然用户以为按钮坏了 */
 .wrow.flash { animation: flash 1.6s ease; }
 @keyframes flash {
   0%, 55% { background: rgba(255, 193, 7, .30); }
-  100% { background: rgba(255, 92, 108, .08); }
+  100% { background: rgba(255, 92, 108, .10); }
 }
 /* 表格式编辑用 ghost 框（只有一条底线），和"补一个/名称"的方框区分开 */
 .cell {
-  padding: 14rpx 8rpx;
+  padding: 16rpx 8rpx;
   box-sizing: border-box;
   background: transparent;
   border-bottom: 2rpx solid #223042;
   border-radius: 0;
   color: #e8f0f8;
   font-size: 28rpx;
+  /* 显式声明：不指望继承，真机上吃过没对齐的亏 */
+  text-align: left;
 }
 .ew { flex: 1.4; min-width: 0; font-weight: 600; }
-.ed { flex: 1; min-width: 0; margin-left: 14rpx; }
+.ed { flex: 1; min-width: 0; margin-left: 16rpx; }
 .ph { color: #55677c; }
 .cell.bad { border-bottom-color: #ff5c6c; color: #ff8a95; }
 .del {
@@ -135,28 +139,35 @@
 }
 .hint-line { line-height: 1.6; }
 
-/* ---------- 表单输入（补一个 / 名称）：保留方框 ---------- */
+/* ---------- 表单输入（补一个 / 名称）：保留方框，高度和底栏按钮一致 ---------- */
 .inp {
-  padding: 20rpx;
+  height: 84rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
   background: #16202c;
   border: 2rpx solid #2b3949;
   border-radius: 14rpx;
   color: #e8f0f8;
   font-size: 28rpx;
+  text-align: left;
 }
 .inp.w { width: 300rpx; }
-.inp.d { flex: 1; margin-left: 12rpx; }
+.inp.d { flex: 1; margin-left: 16rpx; }
 
 /* ---------- 底部固定操作条 ---------- */
+/* z-index 必须显式给：漏了它真机上列表内容会滚到按钮上面，视觉穿透 + 点击被吃掉
+   （2026-10-21 真机实锤 —— "点存成词库没反应"的根因就是这个，不是逻辑没跑） */
 .bottom-bar {
   position: fixed;
   left: 0; right: 0; bottom: 0;
+  z-index: 100;
   display: flex;
   padding: 16rpx 24rpx;
   padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
-  background: rgba(15, 22, 32, .94);
-  border-top: 1rpx solid rgba(255, 255, 255, .06);
+  /* 不透明底：半透明会让下面的词透出来，看着也像层级错了 */
+  background: #0f1620;
+  border-top: 1rpx solid rgba(255, 255, 255, .08);
+  box-shadow: 0 -8rpx 24rpx rgba(0, 0, 0, .35);
 }
 .bar-btn {
   flex: 1;

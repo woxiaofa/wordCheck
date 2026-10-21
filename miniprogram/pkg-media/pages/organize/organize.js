@@ -439,6 +439,8 @@ Page({
     if (bad) {
       this.setData({ badCount: bad, toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉' });
       wx.showToast({ title: '先改好红底的词再存', icon: 'none' });
+      // 触觉兜底：就算 toast 被键盘/悬浮球挡住，手上也有感觉
+      try { if (wx.vibrateShort) wx.vibrateShort({ type: 'light' }); } catch (e) { /* 老机没有就算了 */ }
       this.jumpToFirstBad();
       return;
     }
