@@ -21,6 +21,7 @@ var storage = {};
 var cloud = { calls: [], result: null, fail: false, failMsg: '', failTimes: 0 };
 var toast = [];
 var modal = null;
+var scrollCalls = [];             // pageScrollTo 的记录（jumpToFirstBad 用）
 var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
 var compressCalls = [];           // compressImage 的调用记录（width/quality）
 
@@ -50,7 +51,19 @@ global.wx = {
   showToast: function (o) { toast.push(o.title); },
   showModal: function (o) { modal = o; },
   navigateBack: function () {},
-  previewImage: function () {}
+  previewImage: function () {},
+  pageScrollTo: function (o) { scrollCalls.push(o); },
+  createSelectorQuery: function () {
+    var q = {
+      select: function () { return q; },
+      selectViewport: function () { return q; },
+      boundingClientRect: function () { return q; },
+      scrollOffset: function () { return q; },
+      // 假装第一个坏词在视口下方 500px、当前页面已滚 100px
+      exec: function (cb) { cb([{ top: 500 }, { scrollTop: 100 }]); }
+    };
+    return q;
+  }
 };
 
 var pageDef = null;
@@ -112,6 +125,7 @@ function reset(words, imgPath) {
   cloud.result = { ok: true, text: '' };
   toast.length = 0;
   modal = null;
+  scrollCalls.length = 0;
   fsSize = 120 * 1024;
   compressCalls.length = 0;
   storage[drafts.STORAGE_KEY] = [];
@@ -344,14 +358,40 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑦ 存之前挡住红框词：不弹确认框，只提示改哪几个', function () {
+  return ok('⑦ 存之前挡住红框词：不弹确认框，还要把人带到坏词跟前（滚动+toast）', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }, { word: '图书馆', def_cn: '' }]);
     var page = makePage(d.id);
     assert.strictEqual(page.data.badCount, 1, '「图书馆」不是英文单词，应标红');
     page.finish();
     assert.strictEqual(modal, null, '有错词时不该弹"存成词库？"');
-    assert.ok(String(page.data.toast).indexOf('不像英文') >= 0, '提示要说清楚：' + page.data.toast);
+    assert.ok(String(page.data.toast).indexOf('不像英文') >= 0, '页面提示要说清楚：' + page.data.toast);
+    assert.ok(toast.join('|').indexOf('红底') >= 0, '顶部 toast 也要响一声（以前只写卡片底部，按钮旁边啥都看不见）：' + toast.join('|'));
+    assert.strictEqual(scrollCalls.length, 1, '要滚动到坏词那里，实际滚了 ' + scrollCalls.length + ' 次');
+    assert.strictEqual(scrollCalls[0].scrollTop, 100 + 500 - 140, '滚动位置 = 当前 100 + 元素 500 - 顶部余量 140');
+    assert.strictEqual(page.data.words[1].flash, true, '坏词要闪一下标位');
     assert.strictEqual(drafts.list().length, 1, '草稿要留着，不能因为点了一下就没了');
+  });
+});
+
+steps.push(function () {
+  return ok('⑦b 闪完要熄灭：flash 只是临时标位，不能一直亮着', function () {
+    var d = reset([{ word: '图书馆', def_cn: '' }]);
+    var page = makePage(d.id);
+    page.finish();
+    assert.strictEqual(page.data.words[0].flash, true);
+    return tick(2000).then(function () {
+      assert.strictEqual(page.data.words[0].flash, false, '1.8s 后要恢复');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑦c 全改好了再点：正常弹确认框，不再拦截', function () {
+    var d = reset([{ word: 'apple', def_cn: '苹果' }]);
+    var page = makePage(d.id);
+    page.finish();
+    assert.ok(modal, '没有坏词该弹"存成词库？"');
+    assert.strictEqual(scrollCalls.length, 0, '不该滚动');
   });
 });
 

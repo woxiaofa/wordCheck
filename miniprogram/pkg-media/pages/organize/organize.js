@@ -257,7 +257,10 @@ Page({
 
   /** 切后台 / 退出前把防抖里的改动强制落盘：不能等 400ms，进程可能就没了 */
   onHide: function () { this.flush(); },
-  onUnload: function () { this.flush(); },
+  onUnload: function () {
+    this.flush();
+    if (this._flashTimer) { clearTimeout(this._flashTimer); this._flashTimer = null; }
+  },
 
   flush: function () {
     if (this._saveTimer) { clearTimeout(this._saveTimer); this._saveTimer = null; }
@@ -428,10 +431,15 @@ Page({
   },
 
   finish: function () {
-    // 先挡一道：带着错词存进去，背的时候才发现就晚了
+    // 先挡一道：带着错词存进去，背的时候才发现就晚了。
+    // 提示必须让人"当场看见"：以前 toast 写在核对卡片底部，而按钮在页面最下面，
+    // 中间隔着一屏 —— 用户点按钮视口里什么都不发生，就像按钮坏了（2026-10-21 真机反馈）。
+    // 所以现在三件事一起做：顶部 toast + 滚到第一个坏词 + 黄光闪烁标位。
     var bad = countBad(this.data.words);
     if (bad) {
-      this.setData({ badCount: bad, toast: '还有 ' + bad + ' 个不像英文单词（红框那些），改一下或删掉' });
+      this.setData({ badCount: bad, toast: '还有 ' + bad + ' 个不像英文单词（红底那些），改一下或删掉' });
+      wx.showToast({ title: '先改好红底的词再存', icon: 'none' });
+      this.jumpToFirstBad();
       return;
     }
     var words = plainWords(this.data.words);
@@ -453,6 +461,39 @@ Page({
         wx.navigateBack();
       }
     });
+  },
+
+  /** 滚动到第一个坏词并闪 1.6s：长页面里"为什么存不了"必须自己走到用户眼前 */
+  jumpToFirstBad: function () {
+    var idx = -1;
+    for (var i = 0; i < this.data.words.length; i++) {
+      if (this.data.words[i].bad) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    var self = this;
+    var on = {};
+    on['words[' + idx + '].flash'] = true;
+    this.setData(on);
+    var q = wx.createSelectorQuery();
+    q.select('#row-' + idx).boundingClientRect();
+    q.selectViewport().scrollOffset();
+    q.exec(function (res) {
+      var rect = res && res[0];
+      var view = res && res[1];
+      if (rect && view) {
+        wx.pageScrollTo({
+          scrollTop: Math.max(0, view.scrollTop + rect.top - 140),   // 留出卡片上沿呼吸空间
+          duration: 300
+        });
+      }
+    });
+    if (this._flashTimer) clearTimeout(this._flashTimer);
+    this._flashTimer = setTimeout(function () {
+      self._flashTimer = null;
+      var off = {};
+      off['words[' + idx + '].flash'] = false;
+      self.setData(off);
+    }, 1800);
   },
 
   /** "先存着"：草稿本就实时落盘，这里只是告诉用户一句，然后退回去 */

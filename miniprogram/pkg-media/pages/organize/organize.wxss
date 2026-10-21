@@ -1,4 +1,4 @@
-.page { padding: 24rpx 24rpx 60rpx; background: #0f1620; min-height: 100vh; }
+.page { padding: 24rpx 24rpx 230rpx; background: #0f1620; min-height: 100vh; }
 .t1 { font-size: 32rpx; font-weight: 700; color: #e8f0f8; }
 .muted { color: #8b9bad; font-size: 26rpx; }
 .warn {
@@ -9,25 +9,133 @@
 .empty { text-align: center; color: #8b9bad; font-size: 28rpx; padding: 40rpx 0; }
 .row-between { display: flex; align-items: center; justify-content: space-between; }
 .row { display: flex; align-items: center; }
+.mt { margin-top: 20rpx; }
+.mt-s { margin-top: 12rpx; }
 
-/* 照片要够大才看得清：照着录的整个前提就是"看得清" */
-.shot {
-  width: 100%;
-  margin-top: 16rpx;
-  border-radius: 14rpx;
+/* ---------- ① 识别头：缩略图 + 状态 ---------- */
+.head { display: flex; align-items: flex-start; }
+.shot-wrap {
+  position: relative;
+  width: 220rpx;
+  height: 220rpx;
+  flex-shrink: 0;
+  border-radius: 16rpx;
+  overflow: hidden;
   background: #16202c;
 }
-.broken {
-  margin-top: 16rpx;
-  padding: 80rpx 0;
+.shot { width: 100%; height: 100%; }
+/* 底部一条半透明字：告诉用户照片还能点开放大 */
+.shot-mask {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 6rpx 0;
   text-align: center;
-  color: #8b9bad;
-  font-size: 28rpx;
-  background: #16202c;
-  border: 2rpx dashed #2b3949;
-  border-radius: 14rpx;
+  font-size: 20rpx;
+  color: #cfe0f0;
+  background: rgba(15, 22, 32, .55);
 }
+.broken-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b9bad;
+  font-size: 24rpx;
+  border: 2rpx dashed #2b3949;
+  box-sizing: border-box;
+}
+.head-main { flex: 1; min-width: 0; margin-left: 20rpx; }
+.head-title { font-size: 32rpx; font-weight: 700; color: #e8f0f8; }
+.pills { margin-top: 12rpx; display: flex; }
+.pill {
+  font-size: 22rpx;
+  color: #9fc3e8;
+  background: rgba(64, 158, 255, .12);
+  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+  margin-right: 12rpx;
+}
+.pill-bad { color: #ffb0c0; background: rgba(255, 92, 108, .12); }
+.note {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  /* 认错原因有时是一长串：最多两行，全文点照片后核对时看 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.head-btns { margin-top: 14rpx; display: flex; }
+.mini-btn {
+  margin: 0 16rpx 0 0;
+  padding: 0 26rpx;
+  height: 58rpx;
+  line-height: 58rpx;
+  font-size: 24rpx;
+  color: #cfe0f0;
+  background: #1b2735;
+  border-radius: 12rpx;
+}
+.mini-btn::after { border: none; }
+.mini-btn[disabled] { opacity: .4; }
 
+.ocr-bar { display: flex; align-items: center; margin-top: 12rpx; }
+.spin {
+  width: 16rpx;
+  height: 16rpx;
+  margin-right: 12rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(64, 158, 255, .25);
+  border-top-color: #409eff;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ocr-hint { color: #8b9bad; font-size: 24rpx; }
+
+/* ---------- ② 核对列表：ghost 输入框 + 整行红底 ---------- */
+.list { margin-top: 8rpx; }
+.wrow {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 12rpx;
+  border-radius: 12rpx;
+  margin-top: 6rpx;
+}
+/* 不像英文的整行淡红：一眼扫到在哪，不用盯着边框找 */
+.wrow.bad-row { background: rgba(255, 92, 108, .08); }
+/* 点"存成词库"被拦时，滚到第一个坏词再闪一下黄光 —— 不然用户以为按钮坏了 */
+.wrow.flash { animation: flash 1.6s ease; }
+@keyframes flash {
+  0%, 55% { background: rgba(255, 193, 7, .30); }
+  100% { background: rgba(255, 92, 108, .08); }
+}
+/* 表格式编辑用 ghost 框（只有一条底线），和"补一个/名称"的方框区分开 */
+.cell {
+  padding: 14rpx 8rpx;
+  box-sizing: border-box;
+  background: transparent;
+  border-bottom: 2rpx solid #223042;
+  border-radius: 0;
+  color: #e8f0f8;
+  font-size: 28rpx;
+}
+.ew { flex: 1.4; min-width: 0; font-weight: 600; }
+.ed { flex: 1; min-width: 0; margin-left: 14rpx; }
+.ph { color: #55677c; }
+.cell.bad { border-bottom-color: #ff5c6c; color: #ff8a95; }
+.del {
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  margin-left: 8rpx;
+  color: #66788c;
+  font-size: 30rpx;
+  flex-shrink: 0;
+}
+.hint-line { line-height: 1.6; }
+
+/* ---------- 表单输入（补一个 / 名称）：保留方框 ---------- */
 .inp {
   padding: 20rpx;
   box-sizing: border-box;
@@ -40,38 +148,31 @@
 .inp.w { width: 300rpx; }
 .inp.d { flex: 1; margin-left: 12rpx; }
 
-/* 核对列表：英文框略宽、释义框吃掉剩下的，删字固定在右边 */
-.ew { flex: 1.1; min-width: 0; }
-.ed { flex: 1; min-width: 0; margin-left: 10rpx; }
-/* 红框只标"不像英文"的那一格，不整行变红 —— 释义本来就可能认成符号 */
-.inp.bad { border-color: #ff5c6c; background: rgba(255, 92, 108, .08); }
-
-/* 识别中的呼吸条：没有它就只是"正在认字…"四个字，用户以为卡住了 */
-.ocr-bar {
+/* ---------- 底部固定操作条 ---------- */
+.bottom-bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
   display: flex;
-  align-items: center;
-  margin-top: 16rpx;
-  padding: 18rpx 20rpx;
-  background: rgba(64, 158, 255, .1);
-  border: 1rpx solid rgba(64, 158, 255, .28);
-  border-radius: 14rpx;
+  padding: 16rpx 24rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(15, 22, 32, .94);
+  border-top: 1rpx solid rgba(255, 255, 255, .06);
 }
-.spin {
-  width: 18rpx;
-  height: 18rpx;
-  margin-right: 14rpx;
-  border-radius: 50%;
-  border: 4rpx solid rgba(64, 158, 255, .25);
-  border-top-color: #409eff;
-  animation: spin .7s linear infinite;
+.bar-btn {
+  flex: 1;
+  margin: 0 0 0 20rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  padding: 0;
+  font-size: 30rpx;
+  border-radius: 16rpx;
+  color: #fff;
+  background: linear-gradient(135deg, #2fd07a, #22a862);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.pv { padding: 14rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); }
-/* 外层必须是 view：text 里套 text 混排字号会把行盒撑成两倍高（layout ⑫ 拦过一次） */
-.pv-left { flex: 1; min-width: 0; }
-.pv-w { color: #e8f0f8; font-weight: 600; font-size: 30rpx; }
-.del { color: #ff8a95; font-size: 26rpx; padding-left: 16rpx; flex-shrink: 0; }
-
-.mt { margin-top: 20rpx; }
-.mt-s { margin-top: 12rpx; }
+.bar-btn:first-child { margin-left: 0; }
+.bar-btn::after { border: none; }
+.bar-btn.ghost {
+  background: #1b2735;
+  color: #cfe0f0;
+}
+.bar-btn[disabled] { opacity: .45; }
