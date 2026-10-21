@@ -22,6 +22,7 @@ var cloud = { calls: [], result: null, fail: false, failMsg: '', failTimes: 0 };
 var toast = [];
 var modal = null;
 var scrollCalls = [];             // pageScrollTo 的记录（jumpToFirstBad 用）
+var navTitles = [];               // 导航栏标题的变化记录（ackTap 点击回执用）
 var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
 var compressCalls = [];           // compressImage 的调用记录（width/quality）
 
@@ -53,6 +54,7 @@ global.wx = {
   navigateBack: function () {},
   previewImage: function () {},
   pageScrollTo: function (o) { scrollCalls.push(o); },
+  setNavigationBarTitle: function (o) { navTitles.push(o.title); },
   createSelectorQuery: function () {
     var q = {
       select: function () { return q; },
@@ -126,6 +128,7 @@ function reset(words, imgPath) {
   toast.length = 0;
   modal = null;
   scrollCalls.length = 0;
+  navTitles.length = 0;
   fsSize = 120 * 1024;
   compressCalls.length = 0;
   storage[drafts.STORAGE_KEY] = [];
@@ -412,6 +415,19 @@ steps.push(function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }]);
     var page = makePage(d.id);
     assert.ok(/^\d+\.\d+\.\d+/.test(String(page.data.ver)), '要能看出构建号：' + page.data.ver);
+  });
+});
+
+steps.push(function () {
+  return ok('⑦f 点击回执写进导航栏标题：toast/按钮文案都可能被挡，标题栏挡不住', function () {
+    var d = reset([{ word: 'apple', def_cn: '苹果' }]);
+    var page = makePage(d.id);
+    page.finish();
+    assert.ok(navTitles.join('|').indexOf('已点击 · 存成我的词库') >= 0,
+      '点击后导航栏要出现回执：' + navTitles.join('|'));
+    return tick(1600).then(function () {
+      assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '1.5s 后标题要复原');
+    });
   });
 });
 

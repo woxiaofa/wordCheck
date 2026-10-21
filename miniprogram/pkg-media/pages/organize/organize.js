@@ -22,7 +22,7 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
  * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
  * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
  */
-var BUILD = '1.1.29';
+var BUILD = '1.1.30';
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
@@ -282,6 +282,7 @@ Page({
     this.flush();
     if (this._flashTimer) { clearTimeout(this._flashTimer); this._flashTimer = null; }
     if (this._hintTimer) { clearTimeout(this._hintTimer); this._hintTimer = null; }
+    if (this._titleTimer) { clearTimeout(this._titleTimer); this._titleTimer = null; }
   },
 
   flush: function () {
@@ -452,7 +453,26 @@ Page({
     return '照片词表 ' + (d.getMonth() + 1) + '-' + d.getDate();
   },
 
+  /**
+   * 点击回执：导航栏标题闪一下「✓ 已点击 · xx」。
+   * 为什么放导航栏：toast 会被键盘/悬浮球挡，按钮文案会被调试面板挡，
+   * 只有顶部标题栏永远可见 —— 用来钉死"事件到底有没有到达"（2026-10-21 连续三轮
+   * "按钮点不了"，最后发现用户一直开着 vConsole 调试模式在测）。
+   */
+  ackTap: function (label) {
+    var self = this;
+    try {
+      wx.setNavigationBarTitle({ title: '✓ 已点击 · ' + label });
+      if (this._titleTimer) clearTimeout(this._titleTimer);
+      this._titleTimer = setTimeout(function () {
+        self._titleTimer = null;
+        wx.setNavigationBarTitle({ title: '对着照片录词' });
+      }, 1500);
+    } catch (e) { /* 导航栏改不了就算了，不影响主流程 */ }
+  },
+
   finish: function () {
+    this.ackTap('存成我的词库');
     // 先挡一道：带着错词存进去，背的时候才发现就晚了。
     // 提示必须让人"当场看见"：以前 toast 写在核对卡片底部，而按钮在页面最下面，
     // 中间隔着一屏 —— 用户点按钮视口里什么都不发生，就像按钮坏了（2026-10-21 真机反馈）。
@@ -534,6 +554,7 @@ Page({
 
   /** "先存着"：草稿本就实时落盘，这里只是告诉用户一句，然后退回去 */
   saveLater: function () {
+    this.ackTap('先存着');
     this.flush();
     if (this.data.name) drafts.setName(this.data.id, this.data.name);
     wx.showToast({ title: '已存 ' + this.data.words.length + ' 个词', icon: 'none' });
