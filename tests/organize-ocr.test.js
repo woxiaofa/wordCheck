@@ -23,7 +23,7 @@ var toast = [];
 var modal = null;
 var scrollCalls = [];             // pageScrollTo 的记录（jumpToFirstBad 用）
 var navTitles = [];               // 导航栏标题的变化记录（ackTap 点击回执用）
-var tabJumps = [];                // switchTab 的记录（存好回首页用）
+var tabJumps = [];                // reLaunch 的记录（存好回首页用）
 var backs = 0;                    // navigateBack 次数
 var fsSize = 120 * 1024;          // getFileInfo 报的文件大小，用例里可调
 var compressCalls = [];           // compressImage 的调用记录（width/quality）
@@ -54,7 +54,7 @@ global.wx = {
   showToast: function (o) { toast.push(o.title); },
   showModal: function (o) { modal = o; },
   navigateBack: function () { backs++; },
-  switchTab: function (o) { tabJumps.push(o.url); },
+  reLaunch: function (o) { tabJumps.push(o.url); },
   previewImage: function () {},
   pageScrollTo: function (o) { scrollCalls.push(o); },
   setNavigationBarTitle: function (o) { navTitles.push(o.title); },
@@ -460,7 +460,7 @@ steps.push(function () {
       assert.strictEqual(drafts.list().length, 0, '入库后草稿要删掉');
       assert.strictEqual(tabJumps.length, 1, '存好要跳转一次，实际 ' + JSON.stringify(tabJumps));
       assert.ok(String(tabJumps[0]).indexOf('pages/index/index') >= 0,
-        '存好要 switchTab 回首页（用户不用自己找"存哪了"）：' + JSON.stringify(tabJumps));
+        '存好要 reLaunch 回首页（用户不用自己找"存哪了"）：' + JSON.stringify(tabJumps));
       var key = books.getKey();
       var words = books.getWords(key);
       assert.strictEqual(words.length, 2);

@@ -22,7 +22,7 @@ var SAVE_DELAY = 400;             // 输入防抖：连打一串字只写一次 
  * 为什么写死：体验版的 wx.getAccountInfoSync 拿不到具体版本（只回 'trial'），
  * 而"改了没生效"和"版本没更新"从截图上分不清。写死后截图里能直接看出跑的是哪一版。
  */
-var BUILD = '1.1.33';
+var BUILD = '1.1.34';
 
 /* ---------------------------- OCR 取文 ---------------------------- */
 
@@ -534,9 +534,12 @@ Page({
             self.step('已存好，回首页');
             wx.showToast({ title: '已存好「' + name + '」', icon: 'none', duration: 1200 });
             setTimeout(function () {
-              wx.switchTab({
+              // 注意：本项目没有原生 tabBar（首页底栏是自制组件），switchTab 会
+              // fail "can not switch to no-tabBar page"（2026-10-22 实锤）。
+              // reLaunch 关闭全部页面再开首页，对任何页面都有效。
+              wx.reLaunch({
                 url: '/pages/index/index',
-                fail: function (e) { self.crash(e || new Error('switchTab fail')); }
+                fail: function (e) { self.crash(e || new Error('reLaunch fail')); }
               });
             }, 500);
           } catch (e2) { self.crash(e2); }
