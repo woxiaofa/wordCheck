@@ -424,27 +424,36 @@ steps.push(function () {
 });
 
 steps.push(function () {
-  return ok('⑦f 分步回执写进导航栏标题：走到哪一步、卡在哪，截图全知道', function () {
+  return ok('⑦f 标题只说人话：正常流程不闪开发者文案，关键节点才给一句', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }]);
     var page = makePage(d.id);
     page.finish();
-    var seq = navTitles.join(' → ');
-    assert.ok(seq.indexOf('✓ 已点击 · 存成我的词库') >= 0, '第一拍要点名：' + seq);
-    assert.ok(seq.indexOf('准备弹确认框') >= 0, '无坏词要走到弹确认框这一步：' + seq);
-    // 取消确认框：标题要复原
+    assert.strictEqual(navTitles.length, 0, '正常弹确认框不该改标题：' + navTitles.join('|'));
     modal.success({ confirm: false });
-    assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '取消后标题要复原');
+    assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '取消后标题复原');
   });
 });
 
 steps.push(function () {
-  return ok('⑦g showModal 自身失败也要现形：标题显示出错原因，不能无声', function () {
+  return ok('⑦f2 坏词拦截时标题给一句人话（不是"正在滚过去"这种开发者口吻）', function () {
+    var d = reset([{ word: '图书馆', def_cn: '' }]);
+    var page = makePage(d.id);
+    page.finish();
+    assert.ok(navTitles.join('|').indexOf('还有 1 个词要改') >= 0, '标题要能看懂：' + navTitles.join('|'));
+    return tick(2000).then(function () {
+      assert.strictEqual(navTitles[navTitles.length - 1], '对着照片录词', '1.8s 后复原');
+    });
+  });
+});
+
+steps.push(function () {
+  return ok('⑦g showModal 自身失败也要现形：标题说人话，详细原因进 toast', function () {
     var d = reset([{ word: 'apple', def_cn: '苹果' }]);
     var page = makePage(d.id);
     page.finish();
     modal.fail(new Error('showModal:fail 调试模式吞弹窗'));
-    assert.ok(navTitles.join('|').indexOf('✗ 出错') >= 0, '失败要写进标题：' + navTitles.join('|'));
-    assert.ok(navTitles.join('|').indexOf('调试模式吞弹窗') >= 0, '原因也要带上：' + navTitles.join('|'));
+    assert.strictEqual(navTitles[navTitles.length - 1], '保存出错了', '标题只说人话：' + navTitles.join('|'));
+    assert.ok(toast.join('|').indexOf('调试模式吞弹窗') >= 0, '原因要能反馈给我：' + toast.join('|'));
   });
 });
 
