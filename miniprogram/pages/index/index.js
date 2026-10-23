@@ -109,8 +109,16 @@ Page({
       var flag = 'task_cleanup_at';
       var today = time.getLocalDate();
       if (wx.getStorageSync(flag) === today) return;
-      cloud.api.cleanupTasks().then(function () {
+      cloud.api.cleanupTasks().then(function (r) {
         try { wx.setStorageSync(flag, today); } catch (e) { }
+        // 打到控制台：清理有没有生效、库里还剩什么形态的脏数据，一眼可查
+        if (r && r.cleaned && r.cleaned.removed > 0) {
+          console.info('[cleanup] 已清理脏数据', r.cleaned.removed, '条；体检：',
+            JSON.stringify(r.health));
+        } else if (r && r.health && (r.health.emptyDate > 0 || r.health.dupKeys > 0)) {
+          console.warn('[cleanup] 本轮没清掉东西，但库里仍有脏数据，体检：',
+            JSON.stringify(r.health));
+        }
       }).catch(function () { });
     } catch (e) { }
   },

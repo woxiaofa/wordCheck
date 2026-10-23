@@ -34,6 +34,7 @@ function createFakeDb() {
   function collection(name) {
     var self = {
       get: function () { return Promise.resolve({ data: ensure(name).map(clone) }); },
+      skip: function (n) { var rows = ensure(name).slice(n); return { limit: function (m) { rows = rows.slice(0, m); return { get: function () { return Promise.resolve({ data: rows.map(clone) }); } }; } }; },
       doc: function (id) {
         var list = ensure(name);
         var at = -1;
@@ -227,6 +228,56 @@ var CASES = [
       }).then(function () { okWrite = true; }).catch(function () { okWrite = false; });
       assert.strictEqual(okWrite, true, '清理后同样的写入应成功');
     }
+  },
+  {
+    name: '⑦ 全库清（repairAll）：user_id 为空的孤儿脏文档也清得掉',
+    all: true,
+    seed: [
+      { _id: 'orphan-1', snapshot_json: {} },                                  // user_id、task_date 双空
+      { _id: 'orphan-2', user_id: null, task_date: null, snapshot_json: {} },
+      doc('daily:U1:2026-10-25', 'U1', '2026-10-25', 1000)
+    ],
+    expect: function (r, rows) {
+      assert.strictEqual(r.removed, 2, '孤儿文档必须被全库清掉（按用户清看不见它们）');
+      assert.strictEqual(r.scanned, 3);
+      assert.strictEqual(rows.length, 1);
+      assert.strictEqual(rows[0]._id, 'daily:U1:2026-10-25', '正常文档必须留下');
+    }
+  },
+  {
+    name: '⑧ repairAll 幂等 + 不误伤正常文档',
+    all: true,
+    seed: [
+      doc('daily:U1:2026-10-26', 'U1', '2026-10-26', 1000),
+      doc('daily:U2:2026-10-26', 'U2', '2026-10-26', 1000)
+    ],
+    expect: function (r, rows) {
+      assert.strictEqual(r.removed, 0, '不同用户同一天不是重复');
+      assert.strictEqual(rows.length, 2);
+    },
+    second: function (r2) {
+      assert.strictEqual(r2.removed, 0, '第二次不该再删东西');
+    }
+  },
+  {
+    name: '⑨ diagnose：报得出脏数据的形态与条数',
+    seed: [
+      { _id: 'orphan-1', snapshot_json: {} },
+      doc('legacy-1', 'U1', '2026-10-27', 900),
+      doc('legacy-2', 'U1', '2026-10-27', 1200)
+    ],
+    expect: function (r, rows) {
+      void r; void rows;
+    },
+    after: async function () {
+      var h = await cleanup.diagnose(db);
+      assert.strictEqual(h.total, 2, '用户级清完剩两份：孤儿 + 胜者');
+      assert.strictEqual(h.emptyDate, 1, '孤儿文档（task_date 空）还在——用户级清看不见它');
+      assert.strictEqual(h.emptyUser, 1);
+      assert.strictEqual(h.dupKeys, 0, '同键重复已被清掉');
+      assert.ok(h.samples.length >= 1 && h.samples[0]._id === 'orphan-1',
+        '抽样要能直接看到孤儿文档的 _id');
+    }
   }
 ];
 
@@ -238,11 +289,11 @@ async function main() {
     db.seed('daily_tasks', c.seed);
     try {
       if (c.before) await c.before();
-      var r = await cleanup.repairUserTasks(db, 'U1');
+      var r = c.all ? await cleanup.repairAll(db) : await cleanup.repairUserTasks(db, 'U1');
       c.expect(r, db.rows('daily_tasks'));
       if (c.after) await c.after();
       if (c.second) {
-        var r2 = await cleanup.repairUserTasks(db, 'U1');
+        var r2 = c.all ? await cleanup.repairAll(db) : await cleanup.repairUserTasks(db, 'U1');
         c.second(r2);
       }
       pass++; console.log('  ✓ ' + c.name);
