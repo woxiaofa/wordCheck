@@ -283,6 +283,18 @@ var CASES = [
 
 async function main() {
   console.log('daily_tasks 脏数据清理测试：');
+
+ok('⓪ task 云函数的 cleanup 可被控制台手动触发（不受 OPENID 检查拦截），版本戳已更新', function () {
+  var fs = require('fs');
+  var src = fs.readFileSync('cloud/functions/task/index.js', 'utf8');
+  var mainAt = src.indexOf('exports.main');
+  var cleanupAt = src.indexOf("event.action === 'cleanup'");
+  var guardAt = src.indexOf('NO_IDENTITY', mainAt);
+  assert.ok(mainAt >= 0 && cleanupAt > mainAt && cleanupAt < guardAt,
+    'cleanup 必须在 NO_IDENTITY 检查之前分流，否则控制台「云端测试」调不了它');
+  assert.ok(src.indexOf('task-20261023-cleanup') >= 0,
+    '版本戳要随清理能力更新——否则控制台看不出云端跑的是哪版代码');
+});
   for (var i = 0; i < CASES.length; i++) {
     var c = CASES[i];
     db.reset();

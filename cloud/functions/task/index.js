@@ -36,12 +36,16 @@ const DUE_LIMIT = 100;
 
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
+
+  // cleanup 放在身份检查之前：它是幂等的维护动作（只删重复/空键脏文档），
+  // 且开发者要在控制台「云端测试」手动跑 —— 那里没有真实 OPENID。
+  if (event && event.action === 'cleanup') return onCleanup();
+
   if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
 
   switch (event.action) {
-    case 'today':   return onToday(OPENID, event);
-    case 'cleanup': return onCleanup(OPENID, event);
-    default:        return fail('BAD_ACTION', '未知 action: ' + event.action);
+    case 'today': return onToday(OPENID, event);
+    default:      return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
 
@@ -258,6 +262,6 @@ async function classAssignmentWords(user) {
   return rawIds.map(id => map[id] || id);
 }
 
-const VERSION = 'task-20261007-nullfix';
+const VERSION = 'task-20261023-cleanup';
 const ok = (data) => ({ ok: true, _v: VERSION, data });
 const fail = (code, message) => ({ ok: false, _v: VERSION, code, message });

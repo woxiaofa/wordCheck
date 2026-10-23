@@ -106,20 +106,23 @@ Page({
    */
   maybeCleanupTasks: function () {
     try {
-      var flag = 'task_cleanup_at';
+      // v2：旧标记在清理还有 bug 时就会被写上，把修好的代码也挡住 —— 换键强制重跑
+      var flag = 'task_cleanup_at_v2';
       var today = time.getLocalDate();
       if (wx.getStorageSync(flag) === today) return;
       cloud.api.cleanupTasks().then(function (r) {
-        try { wx.setStorageSync(flag, today); } catch (e) { }
-        // 打到控制台：清理有没有生效、库里还剩什么形态的脏数据，一眼可查
-        if (r && r.cleaned && r.cleaned.removed > 0) {
-          console.info('[cleanup] 已清理脏数据', r.cleaned.removed, '条；体检：',
-            JSON.stringify(r.health));
-        } else if (r && r.health && (r.health.emptyDate > 0 || r.health.dupKeys > 0)) {
-          console.warn('[cleanup] 本轮没清掉东西，但库里仍有脏数据，体检：',
-            JSON.stringify(r.health));
+        var health = r && r.health;
+        var removed = (r && r.cleaned && r.cleaned.removed) || 0;
+        // 打到控制台：清了几条、库里还剩什么形态的脏数据（方便在开发者工具里核）
+        console.info('[cleanup] 已清 ' + removed + ' 条；体检 ' + JSON.stringify(health));
+        // 只有确认干净才记"今天跑过了"：还脏着就下次打开继续清，不写标记
+        if (health && health.emptyDate === 0 && health.dupKeys === 0) {
+          try { wx.setStorageSync(flag, today); } catch (e) { }
         }
-      }).catch(function () { });
+      }).catch(function (err) {
+        console.warn('[cleanup] 清理失败（不影响使用）：',
+          (err && (err.errMsg || err.message)) || err);
+      });
     } catch (e) { }
   },
 
