@@ -9,8 +9,8 @@
  *   卡片 = 大圆角 + 白描边 + 粉色投影（光源左上）+ 顶亮底暗的贴图；
  *   按钮 = 同光源的「凸起软糖」：彩色投影 + 顶亮底暗；
  *   底栏 = 悬浮胶囊（样式在组件自己的 wxss，页面层进不去）。
- * 贴图由 scripts/gen-candy-textures.py 生成，三张合计约 14KB
- * ——不做全图切图（每套 +2~3MB 不划算）。
+ * 贴图由 scripts/gen-candy-textures.py 生成后以 base64 内嵌在 theme-candy-textures.wxss
+ * （WXSS 的 url() 不认本地文件，控制台实锤），三张合计约 14KB ——不做全图切图。
  *
  * 三条硬规则（tests/theme.test.js ⑤d 守护）：
  *   1. 每条选择器都必须以 .skin-candy 开头；
@@ -21,7 +21,7 @@
 
 /* --- 页面底：粉底 + 细颗粒，避免大片纯色发死 --- */
 .skin-candy.page {
-  background-image: url("/assets/candy/candy-bg-grain.png");
+  background-image: var(--candy-bg-grain);
   background-repeat: repeat;
   background-size: 96rpx 96rpx;
 }
@@ -30,7 +30,7 @@
 .skin-candy .card {
   border-radius: 40rpx;
   border-color: rgba(255, 255, 255, .9);
-  background-image: url("/assets/candy/candy-card-gloss.png");
+  background-image: var(--candy-card-gloss);
   background-repeat: no-repeat;
   background-size: 100% 100%;
   box-shadow:
@@ -52,7 +52,7 @@
 /* --- 主按钮：凸起的软糖（光泽贴图叠在渐变之上） --- */
 .skin-candy .btn {
   background-image:
-    url("/assets/candy/candy-btn-gloss.png"),
+    var(--candy-btn-gloss),
     linear-gradient(135deg, var(--accent), #7c5cff);
   background-repeat: no-repeat;
   background-size: 100% 100%, 100% 100%;

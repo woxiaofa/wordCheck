@@ -129,13 +129,18 @@ ok('② 业务 wxss 里不再有 token 原色值', Object.keys(left).length === 
 // 每个在业务 wxss 里被引用的 var(--x)，token 表里都得真有 ——
 // 原来出现过 var(--ok) 这种悬空引用（漂移时写了 token 表里没有的名字），
 // 结果那条渐变直接失效，而且肉眼很难发现：颜色不对但不报错。
+// （贴图变量例外：它们定义在生成的 theme-candy-textures.wxss 里，也算「真有」）
+var texWxssPath = path.join(ROOT, 'theme-candy-textures.wxss');
+var texWxss = fs.existsSync(texWxssPath) ? fs.readFileSync(texWxssPath, 'utf8') : '';
 var dangling = {};
 css.forEach(function (f) {
   var re = /var\(\s*--([a-z0-9-]+)/gi;
   var m;
   var src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');   // 注释里举例不算
   while ((m = re.exec(src)) !== null) {
-    if (themeWxss.indexOf('--' + m[1] + ':') < 0) {
+    var defined = themeWxss.indexOf('--' + m[1] + ':') >= 0 ||
+                  texWxss.indexOf('--' + m[1] + ':') >= 0;
+    if (!defined) {
       (dangling[m[1]] = dangling[m[1]] || []).push(path.basename(f));
     }
   }
@@ -341,14 +346,24 @@ var candyCheck = (function () {
   if (m) return { ok: false, why: '造型层出现了 ' + m[2] + ': 声明 —— 配色只能走 token' };
   if (fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')
       .indexOf('@import "theme-candy.wxss";') < 0) return { ok: false, why: 'app.wxss 没引入' };
-  var tex = (src.match(/url\("([^"]+)"\)/g) || []).map(function (u) {
-    return u.match(/"([^"]+)"/)[1];
+  // 贴图：theme-candy.wxss 只能引用 var(--candy-*)，且每个变量必须在
+  // 生成的 theme-candy-textures.wxss 里有合法的 base64 data URI 定义
+  // （WXSS 的 url() 不认本地文件——控制台实锤过，所以贴图必须 base64 内嵌）
+  var texFile = path.join(ROOT, 'theme-candy-textures.wxss');
+  if (!fs.existsSync(texFile)) return { ok: false, why: 'theme-candy-textures.wxss 不存在（跑 scripts/gen-candy-textures.py）' };
+  var texSrc = fs.readFileSync(texFile, 'utf8');
+  var used = (src.match(/var\(--candy-[a-z-]+\)/g) || []).map(function (v) {
+    return v.slice(6, -1);          // 去掉 var(-- 和 )，只留 candy-xxx
   });
-  var missing = tex.filter(function (t) {
-    return !fs.existsSync(path.join(ROOT, t.replace(/^\//, '')));
+  var missing = used.filter(function (name) {
+    var re = new RegExp('--' + name + ':\\s*url\\("data:image/png;base64,[A-Za-z0-9+/=]+"\\)');
+    return !re.test(texSrc);
   });
-  if (missing.length) return { ok: false, why: '贴图文件缺失：' + missing.join(', ') };
-  return { ok: true, why: '', textures: tex };
+  if (!used.length) return { ok: false, why: 'theme-candy.wxss 没引用任何贴图变量' };
+  if (missing.length) return { ok: false, why: '贴图变量缺定义或不是合法 data URI：' + missing.join(', ') };
+  if (fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')
+      .indexOf('@import "theme-candy-textures.wxss";') < 0) return { ok: false, why: 'app.wxss 没引入贴图文件' };
+  return { ok: true, why: '', textures: used };
 })();
 ok('⑤d 拟物层合规：选择器全在 .skin-candy 内、不写 color/background、app.wxss 已引入',
    candyCheck.ok === true, candyCheck.why);
@@ -363,8 +378,9 @@ ok('⑤d 拟物层合规：选择器全在 .skin-candy 内、不写 color/backgr
      '缺失重试会让标题栏"有时换、有时不换"复发');
 })();
 
-/* ⑤f 拟物层引用的贴图必须真实存在（路径写错在真机上是"没贴图"，不报错） */
-ok('⑤f 拟物层引用的贴图文件都存在', candyCheck.ok === true &&
+/* ⑤f 拟物层的贴图必须以 base64 内嵌（WXSS 不认本地图片文件）且有定义 */
+ok('⑤f 贴图以 base64 内嵌且变量齐全（WXSS 的 url() 不认本地文件）',
+   candyCheck.ok === true &&
    candyCheck.textures && candyCheck.textures.length >= 3,
    candyCheck.textures ? '贴图数 ' + candyCheck.textures.length : candyCheck.why);
 
