@@ -386,5 +386,5 @@
     </view>
   </block>
 
-  <footer-nav active="class" />
+  <footer-nav active="settings" />
 </view>

@@ -26,6 +26,7 @@ var ROOT = path.join(__dirname, '..', 'miniprogram');
 
 /* theme.js 提前加载：①e 判定皮肤清单时就要用 */
 var theme = require(path.join(ROOT, 'utils', 'theme.js'));
+var checkin = require(path.join(ROOT, 'utils', 'checkin.js'));
 
 /* ---- 桩：theme.js 用到 wx.getStorageSync / setStorageSync ---- */
 var store = {};
@@ -111,6 +112,13 @@ ok('② 业务 wxss 里不再有 token 原色值', Object.keys(left).length === 
 ok('②b app.wxss 引入了 theme.wxss（且是第一行 @import）',
    /^@import "theme\.wxss";/m.test(fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')));
 
+// 皮肤类只能挂在 .page 内层节点上，page 元素本身吃不到 ——
+// 所以 .page 必须自己带背景色，否则浅色皮肤下内容不满屏时会露出深色底
+var appCss = fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8');
+ok('③d .page 自带背景色（浅色皮肤不露深色底）',
+   appCss.indexOf('.page { background: var(--bg);') >= 0 &&
+   appCss.indexOf('min-height: 100vh') >= 0);
+
 /* ---------- ③ 每个页面都接入 ---------- */
 var badJs = [], badWxml = [], badCls = [];
 PAGES.forEach(function (p) {
@@ -162,6 +170,103 @@ ok('⑤b 皮肤清单与解锁分层与规范一致（蔷薇因与樱粉雷同�
    })());
 ok('⑤c 浅色皮肤的 id 均为合法类名字符（skin-xxx 能挂上根节点）',
    theme.SKINS.every(function (x) { return /^[a-z][a-z0-9]*$/.test(x.id); }));
+
+/* ---------- ⑥ 设置页与底部导航 ---------- */
+// 用桩跑真实的 Page 定义，验证解锁与换肤行为（而不是只看文件里有没有字）
+var appJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
+ok('⑥a app.json 已注册设置页', appJson.pages.indexOf('pages/settings/settings') >= 0);
+
+var navSrc = fs.readFileSync(path.join(ROOT, 'components', 'footer-nav', 'index.js'), 'utf8');
+var navPaths = (navSrc.match(/path: '([^']+)'/g) || []).map(function (x) {
+  return x.match(/'([^']+)'/)[1];
+});
+ok('⑥b 底栏缩到三个：今日 / 背词 / 设置',
+   navPaths.length === 3 && navPaths.join(',') ===
+   '/pages/index/index,/pkg-media/pages/drill/drill,/pages/settings/settings',
+   navPaths.join(','));
+var badNav = navPaths.filter(function (p2) {
+  return !fs.existsSync(path.join(ROOT, p2.replace(/^\//, '') + '.js'));
+});
+ok('⑥c 底栏每个 tab 的路径都指向真实页面', badNav.length === 0, badNav.join(', '));
+
+// 桩：Page / wx
+var toasts = [];
+var navStack = [];
+global.wx.showToast = function (o) { toasts.push(o.title); };
+global.wx.navigateTo = function (o) { navStack.push(o.url); };
+global.wx.redirectTo = function (o) { navStack.push(o.url); };
+var page = null;
+global.Page = function (o) {
+  page = o;
+  o.data = o.data || {};
+  o.setData = function (patch) {            // 极简 setData：直接合并到 data
+    for (var k in patch) {
+      if (Object.prototype.hasOwnProperty.call(patch, k)) o.data[k] = patch[k];
+    }
+  };
+};
+
+var settings = require(path.join(ROOT, 'pages', 'settings', 'settings.js'));
+ok('⑥d 设置页能定义出来', !!page && typeof page.pick === 'function');
+
+store.activity_log = {};                       // 一次任务都没完成
+page.setData({ skins: [], cur: theme.skinId(), skin: theme.cls() });
+page.refresh();
+var list = page.data.skins;
+ok('⑥e 皮肤列表把五套都列出来', list.length === theme.SKINS.length);
+ok('⑥f 免费的两套开放，其余锁着',
+   (function () {
+     var m = {};
+     list.forEach(function (x) { m[x.id] = x.open; });
+     return m.night && m.sakura && !m.honey && !m.mint && !m.sky;
+   })());
+ok('⑥g 锁着的会算出还差几次',
+   (function () {
+     var h = list.filter(function (x) { return x.id === 'honey'; })[0];
+     return h.left === 5;
+   })());
+
+toasts.length = 0;
+page.pick({ currentTarget: { dataset: { id: 'honey' } } });
+ok('⑥h 点锁着的皮肤：不换肤，告诉用户还差几次',
+   store[theme.KEY] !== 'honey' && toasts.join('|').indexOf('还差 5 次') >= 0,
+   toasts.join('|'));
+
+toasts.length = 0;
+page.pick({ currentTarget: { dataset: { id: 'sakura' } } });
+ok('⑥i 点免费皮肤：立即换肤并给出反馈',
+   store[theme.KEY] === 'sakura' && toasts.join('|').indexOf('樱粉') >= 0);
+
+page.pick({ currentTarget: { dataset: { id: 'sky' } } });
+ok('⑥j 付费皮肤：不解锁，明确提示未开放而非沉默',
+   store[theme.KEY] === 'sakura' && toasts.join('|').indexOf('付费皮肤暂未开放') >= 0);
+
+// 做完 5 次任务后，蜜橘应当开放
+store.activity_log = {};
+for (var i = 0; i < 5; i++) store.activity_log['2026-10-0' + (i + 1)] = checkin.need();
+page.refresh();
+ok('⑥k 完成 5 次任务后蜜橘开放、薄荷仍锁着',
+   (function () {
+     var m = {};
+     page.data.skins.forEach(function (x) { m[x.id] = x.open; });
+     return m.honey === true && m.mint === false;
+   })());
+
+toasts.length = 0;
+page.pick({ currentTarget: { dataset: { id: 'honey' } } });
+ok('⑥l 解锁后能真的换上', store[theme.KEY] === 'honey');
+
+// 入口行跳的是真实存在的页面
+var setWxml = fs.readFileSync(path.join(ROOT, 'pages', 'settings', 'settings.wxml'), 'utf8');
+var jump = [];
+var re = /data-path="([^"]+)"/g;
+var mm;
+while ((mm = re.exec(setWxml)) !== null) jump.push(mm[1]);
+var badJump = jump.filter(function (p2) {
+  return !fs.existsSync(path.join(ROOT, p2.replace(/^\//, '') + '.js'));
+});
+ok('⑥m 设置页的入口都指向真实页面', jump.length === 2 && badJump.length === 0,
+   jump.join(',') + ' 坏：' + badJump.join(','));
 
 console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
   (fail ? '，' + fail + ' 项 ✗' : ''));

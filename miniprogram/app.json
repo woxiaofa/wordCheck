@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/stats/stats",
+    "pages/settings/settings",
     "pages/class/class",
     "pages/report/report",
     "pages/test-card/test-card"

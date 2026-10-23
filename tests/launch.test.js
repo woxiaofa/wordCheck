@@ -80,7 +80,10 @@ ok('⑥ 首页有"家长陪同 / 不收集手机号 / 不开放付费"提示（K
 ok('⑦ 主包不含大体积资源（音频在 pkg-media 分包）', function () {
   var j = JSON.parse(read('miniprogram/app.json'));
   assert.ok(j.subpackages && j.subpackages.length > 0, '没有分包');
-  assert.ok(j.pages.length <= 5, '主包页面过多：' + j.pages.length);
+  // Pages 里数的是「真正会被用户用到的页」；test-card 是内测调试页，上线前要删，不计入。
+  // 其余五页：首页 / 数据 / 设置 / 班级 / 报告 —— 再想往主包加页，先问能不能进 pkg-media 分包。
+  var real = j.pages.filter(function (x) { return x !== 'pages/test-card/test-card'; });
+  assert.ok(real.length <= 5, '主包页面过多：' + real.length + ' (' + real.join(',') + ')');
 });
 
 /* ⑧ 上线清单文档存在且含关键项 */

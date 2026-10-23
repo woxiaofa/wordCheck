@@ -143,5 +143,5 @@
     </view>
   </view>
 
-  <footer-nav active="stats" />
+  <footer-nav active="settings" />
 </view>

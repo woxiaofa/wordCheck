@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "设置",
+  "usingComponents": {
+    "footer-nav": "/components/footer-nav/index"
+  }
+}

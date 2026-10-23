@@ -14,6 +14,9 @@ page {
 /* 通用容器。
    底部 padding = footer-nav(fixed) 的高度 + 安全区，否则最后一屏的按钮会被 tabBar 盖住。 */
 .page { padding: 24rpx 24rpx calc(170rpx + env(safe-area-inset-bottom)); }
+/* 背景提在这里而不是只靠 page{}：皮肤类挂在 .page 上，而 page 元素拿不到那个类，
+   浅色皮肤下内容不够满时会露出深色底。min-height 保证最后一屏也铺满。 */
+.page { background: var(--bg); min-height: 100vh; }
 .card {
   background: var(--surface);
   border: 1rpx solid var(--line);

@@ -1,0 +1,59 @@
+<view class="page {{skin}}">
+  <!-- 界面皮肤：迷你预览直接用 token 真值渲染，所见即所得 -->
+  <view class="card">
+    <view class="t1">界面皮肤</view>
+    <view class="muted mt-s">白天用浅色不刺眼；完成任务还能接着解锁</view>
+
+    <scroll-view scroll-x class="skins mt">
+      <view
+        wx:for="{{skins}}"
+        wx:key="id"
+        class="skin {{item.id === cur ? 'on' : ''}} {{item.open ? '' : 'locked'}}"
+        data-id="{{item.id}}"
+        bindtap="pick"
+      >
+        <view class="mini" style="background:{{item.t.bg}};border-color:{{item.t.line}}">
+          <view class="mini-bar" style="background:{{item.t.surface2}}"></view>
+          <view class="mini-card" style="background:{{item.t.surface}};border-color:{{item.t.line}}">
+            <view class="mini-line w70" style="background:{{item.t.text}}"></view>
+            <view class="mini-line w45" style="background:{{item.t.muted}}"></view>
+            <view class="mini-btn" style="background:{{item.t.accent}}"></view>
+          </view>
+        </view>
+        <view class="skin-name">{{item.name}}</view>
+        <view class="skin-tag" wx:if="{{item.id === cur}}">使用中</view>
+        <view class="skin-tag" wx:elif="{{item.open}}">轻触启用</view>
+        <view class="skin-tag" wx:elif="{{item.type === 'paid'}}">暂未开放</view>
+        <view class="skin-tag" wx:else>还差 {{item.left}} 次</view>
+        <view class="skin-desc">{{item.desc}}</view>
+      </view>
+    </scroll-view>
+
+    <view class="unlock-line mt-s">
+      已完成 <text class="num">{{doneDays}}</text> 次任务（每天背够
+      <text class="num">{{doneNeed}}</text> 个词算一次）
+    </view>
+    <view class="muted hint">换肤只在本贮存下去；其他页面下次打开就跟着变。</view>
+  </view>
+
+  <!-- 低频入口：数据、班级 -->
+  <view class="card">
+    <view class="t1">学习与班级</view>
+    <view class="row-item" data-path="/pages/stats/stats" bindtap="go">
+      <view class="ri-main">
+        <view class="ri-t">数据</view>
+        <view class="ri-d">背了多少、哪些词总错、最近七天的情况</view>
+      </view>
+      <view class="ri-arrow">›</view>
+    </view>
+    <view class="row-item" data-path="/pages/class/class" bindtap="go">
+      <view class="ri-main">
+        <view class="ri-t">班级</view>
+        <view class="ri-d">派作业、看学员进度、导出完成情况</view>
+      </view>
+      <view class="ri-arrow">›</view>
+    </view>
+  </view>
+
+  <footer-nav active="settings" />
+</view>
