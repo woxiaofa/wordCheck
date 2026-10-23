@@ -335,15 +335,38 @@ var candyCheck = (function () {
   }).filter(function (sel) { return sel && !sel.split(',').every(function (s) {
      return s.trim().indexOf('.skin-candy') === 0; }); });
   if (badSel.length) return { ok: false, why: '选择器越界：' + badSel.join(' | ') };
-  // 造型层不许改配色（border-color 属于描边造型，放行；color:/background: 一律不许）
-  var m = src.match(/(^|[^-\w])(color|background)\s*:/);
+  // 造型层不许改配色：color / background / background-color 一律不许
+  // （border-color 属于描边造型，放行；background-image 就是贴图本身，必须允许）
+  var m = src.match(/(^|[^-\w])(color|background|background-color)\s*:/);
   if (m) return { ok: false, why: '造型层出现了 ' + m[2] + ': 声明 —— 配色只能走 token' };
   if (fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')
       .indexOf('@import "theme-candy.wxss";') < 0) return { ok: false, why: 'app.wxss 没引入' };
-  return { ok: true, why: '' };
+  var tex = (src.match(/url\("([^"]+)"\)/g) || []).map(function (u) {
+    return u.match(/"([^"]+)"/)[1];
+  });
+  var missing = tex.filter(function (t) {
+    return !fs.existsSync(path.join(ROOT, t.replace(/^\//, '')));
+  });
+  if (missing.length) return { ok: false, why: '贴图文件缺失：' + missing.join(', ') };
+  return { ok: true, why: '', textures: tex };
 })();
 ok('⑤d 拟物层合规：选择器全在 .skin-candy 内、不写 color/background、app.wxss 已引入',
    candyCheck.ok === true, candyCheck.why);
+
+/* ⑤e 导航栏换色必须带重试：系统导航栏不是 DOM，页面未 ready/转场中的那枪会被静默丢弃 */
+(function () {
+  var themeSrc = fs.readFileSync(path.join(ROOT, 'utils', 'theme.js'), 'utf8');
+  var fn = themeSrc.slice(themeSrc.indexOf('function applyNav'));
+  ok('⑤e applyNav 带失败重试（三次机会：0/80/260ms），且延到下一帧再发',
+     /NAV_RETRY_MS\s*=\s*\[\s*0\s*,\s*80\s*,\s*260\s*\]/.test(themeSrc) &&
+     /nextTick/.test(fn) && /setTimeout\(shoot/.test(fn),
+     '缺失重试会让标题栏"有时换、有时不换"复发');
+})();
+
+/* ⑤f 拟物层引用的贴图必须真实存在（路径写错在真机上是"没贴图"，不报错） */
+ok('⑤f 拟物层引用的贴图文件都存在', candyCheck.ok === true &&
+   candyCheck.textures && candyCheck.textures.length >= 3,
+   candyCheck.textures ? '贴图数 ' + candyCheck.textures.length : candyCheck.why);
 
 /* ---------- ⑥ 设置页与底部导航 ---------- */
 // 用桩跑真实的 Page 定义，验证解锁与换肤行为（而不是只看文件里有没有字）
@@ -441,6 +464,15 @@ var badJump = jump.filter(function (p2) {
 });
 ok('⑥m 设置页的入口都指向真实页面', jump.length === 2 && badJump.length === 0,
    jump.join(',') + ' 坏：' + badJump.join(','));
+
+/* ⑥n 反馈入口必须是「小程序客服」：open-type="contact" 才有客服会话，
+   写成普通 button 会静默失效（点了没反应，且没有任何报错） */
+var settingsWxml = fs.readFileSync(
+  path.join(ROOT, 'pages', 'settings', 'settings.wxml'), 'utf8');
+ok('⑥n 设置页有「给开发者留言」的客服入口',
+   /<button[\s\S]{0,200}open-type="contact"[\s\S]{0,200}>/.test(settingsWxml) &&
+   settingsWxml.indexOf('给开发者留言') >= 0,
+   '缺少 open-type="contact" 或按钮文案');
 
 console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
   (fail ? '，' + fail + ' 项 ✗' : ''));

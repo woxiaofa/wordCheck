@@ -1,29 +1,42 @@
 /**
- * 糖果拟物层（皮肤 candy 专用，1.3.0 轻拟物第一步）
+ * 糖果拟物层（皮肤 candy 专用，1.3.0 轻拟物）
  *
- * 为什么单独一个文件：颜色 token 管「什么色」，管不了「立体感」——
- * 投影、内高光、大圆角是造型，token 表达不了，硬塞进 50 个 token 会把
- * 每套皮肤都拖上这份复杂度。所以造型只在 .skin-candy 作用域里生效。
+ * 为什么单独一个文件：颜色 token 管「什么色」，管不了「造型」——
+ * 投影、内高光、大圆角、贴图是造型，塞进 token 表会把六套皮肤都拖上这份复杂度。
+ * 所以造型只在 .skin-candy 作用域里生效，其他皮肤零影响。
  *
- * 两条硬规则（tests/theme.test.js ⑤d 守护）：
- *   1. 每一条选择器都必须以 .skin-candy 开头 —— 其他皮肤零影响；
- *   2. 本文件禁止出现 color: / background: 声明 —— 配色只认 token，
- *      造型层偷偷改配色等于绕开对比度校验。
+ * 质感配方（对参考图的近似）：
+ *   卡片 = 大圆角 + 白描边 + 粉色投影（光源左上）+ 顶亮底暗的贴图；
+ *   按钮 = 同光源的「凸起软糖」：彩色投影 + 顶亮底暗；
+ *   底栏 = 悬浮胶囊（样式在组件自己的 wxss，页面层进不去）。
+ * 贴图由 scripts/gen-candy-textures.py 生成，三张合计约 14KB
+ * ——不做全图切图（每套 +2~3MB 不划算）。
  *
- * 质感配方（对参考图的 CSS 近似）：
- *   卡片 = 大圆角 + 柔和粉色投影（光源在上方）+ 顶部内高光 + 底部内收暗边，
- *   按钮 = 同光源的「凸起软糖」：下方彩色投影 + 顶亮底暗两道内阴影。
- *   底栏的悬浮胶囊在 components/footer-nav/index.wxss（组件样式隔离，进不来这里）。
+ * 三条硬规则（tests/theme.test.js ⑤d 守护）：
+ *   1. 每条选择器都必须以 .skin-candy 开头；
+ *   2. 只准写 background-image（贴图/高光），不许写 color/background/background-color
+ *      ——配色只认 token，造型层偷偷改配色等于绕开对比度校验；
+ *   3. 引用的贴图文件必须真实存在（⑤f 守护）。
  */
+
+/* --- 页面底：粉底 + 细颗粒，避免大片纯色发死 --- */
+.skin-candy.page {
+  background-image: url("/assets/candy/candy-bg-grain.png");
+  background-repeat: repeat;
+  background-size: 96rpx 96rpx;
+}
 
 /* --- 卡片：悬浮的软糖托盘 --- */
 .skin-candy .card {
   border-radius: 40rpx;
   border-color: rgba(255, 255, 255, .9);
+  background-image: url("/assets/candy/candy-card-gloss.png");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   box-shadow:
-    0 14rpx 32rpx rgba(206, 96, 134, .28),
-    inset 0 3rpx 8rpx rgba(255, 255, 255, .95),
-    inset 0 -12rpx 24rpx rgba(224, 140, 168, .15);
+    0 6rpx 14rpx rgba(206, 96, 134, .16),
+    0 18rpx 38rpx rgba(206, 96, 134, .22),
+    inset 0 -12rpx 24rpx rgba(224, 140, 168, .12);
 }
 
 /* --- KPI 小卡：浅一档的凹槽感 --- */
@@ -32,18 +45,24 @@
   border-radius: 32rpx;
   box-shadow:
     inset 0 2rpx 6rpx rgba(255, 255, 255, .9),
-    inset 0 -8rpx 16rpx rgba(224, 140, 168, .13),
+    inset 0 -8rpx 16rpx rgba(224, 140, 168, .14),
     0 8rpx 18rpx rgba(206, 96, 134, .16);
 }
 
-/* --- 主按钮：凸起的软糖 --- */
+/* --- 主按钮：凸起的软糖（光泽贴图叠在渐变之上） --- */
 .skin-candy .btn {
+  background-image:
+    url("/assets/candy/candy-btn-gloss.png"),
+    linear-gradient(135deg, var(--accent), #7c5cff);
+  background-repeat: no-repeat;
+  background-size: 100% 100%, 100% 100%;
   box-shadow:
-    0 12rpx 26rpx rgba(184, 32, 78, .36),
-    inset 0 4rpx 10rpx rgba(255, 255, 255, .35),
-    inset 0 -6rpx 14rpx rgba(120, 8, 44, .22);
+    0 12rpx 26rpx rgba(184, 32, 78, .34),
+    inset 0 -6rpx 14rpx rgba(120, 8, 44, .20);
 }
 .skin-candy .btn.ghost {
+  background-image: url("/assets/candy/candy-card-gloss.png");
+  background-size: 100% 100%;
   box-shadow:
     inset 0 2rpx 6rpx rgba(255, 255, 255, .9),
     0 8rpx 18rpx rgba(206, 96, 134, .16);
@@ -51,13 +70,16 @@
 
 /* --- 日报/周报/月报 tab：选中的那颗鼓起来 --- */
 .skin-candy .rpt-tab.on {
+  border-radius: 999rpx;
   box-shadow:
-    0 8rpx 18rpx rgba(184, 32, 78, .28),
-    inset 0 2rpx 6rpx rgba(255, 255, 255, .4);
+    0 8rpx 18rpx rgba(184, 32, 78, .26),
+    inset 0 2rpx 6rpx rgba(255, 255, 255, .45);
 }
 
 /* --- 热力图格子：小方糖 --- */
 .skin-candy .heat-cell {
   border-radius: 10rpx;
-  box-shadow: inset 0 2rpx 4rpx rgba(255, 255, 255, .55);
+  box-shadow:
+    inset 0 2rpx 4rpx rgba(255, 255, 255, .55),
+    inset 0 -2rpx 4rpx rgba(206, 96, 134, .10);
 }

@@ -227,7 +227,7 @@ function set(id) {
 /**
  * 导航栏配色：系统导航栏（页面头）不认识 CSS 变量，只能用 wx.setNavigationBarColor 动态设。
  * 深色皮肤 → 深底白字；浅色皮肤 → 皮肤底色 + 黑字。
- * 页面在 onShow 时调 applyNav()；带 footer-nav 的页面由组件的 pageLifetimes.show 统一处理。
+ * 每个页面在自己的 onShow 里调一次 applyNav()。
  */
 function navBar() {
   var t = byId(skinId()).tokens;
@@ -238,16 +238,40 @@ function navBar() {
   };
 }
 
-/** 各页面 onShow 里调一行即可 */
+/**
+ * 各页面 onShow 里调一行即可。
+ *
+ * 为什么这里要「下一帧 + 失败重试」：系统导航栏不是 DOM，setNavigationBarColor
+ * 在页面还没 ready、或正在 redirectTo 转场时会被**静默丢弃**——不报错、不生效，
+ * 表现就是"有时候跟着换、有时候不换"（2026-10-23 用户实锤）。
+ * 所以：① 推迟到下一帧再发；② 失败后按 80ms / 260ms 递增重试，最多三枪；
+ * ③ 三枪都不行就认了（个别页面无系统导航栏，属正常）。
+ */
+var NAV_RETRY_MS = [0, 80, 260];
+
 function applyNav() {
   var nb = navBar();
-  try {
-    wx.setNavigationBarColor({
-      frontColor: nb.frontColor,
-      backgroundColor: nb.backgroundColor,
-      fail: function () { }            // 页面没开自定义导航时静默
-    });
-  } catch (e) { }
+  var attempt = 0;
+
+  function shoot() {
+    try {
+      wx.setNavigationBarColor({
+        frontColor: nb.frontColor,
+        backgroundColor: nb.backgroundColor,
+        animation: { duration: 0, timingFunc: 'easeIn' },
+        fail: function () {
+          attempt++;
+          if (attempt < NAV_RETRY_MS.length) {
+            setTimeout(shoot, NAV_RETRY_MS[attempt]);
+          }
+        }
+      });
+    } catch (e) { /* 环境不支持就静默 */ }
+  }
+
+  // 延到下一帧：同一次 tick 里页面通常还没 ready，这时发的那枪多半是空枪
+  if (typeof wx.nextTick === 'function') wx.nextTick(shoot);
+  else setTimeout(shoot, 0);
 }
 
 /** 是否已解锁：type=free 恒 true；tasks 看完成次数；paid 暂一律 false（预留） */

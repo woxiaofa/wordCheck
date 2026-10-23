@@ -95,6 +95,24 @@ Page({
     var flushed = cloud.flushPending().catch(function () {});
     Promise.race([flushed, new Promise(function (r) { setTimeout(r, 1200); })])
       .then(function () { self.loadClassAssignment(); self.loadMySummary(); });
+    this.maybeCleanupTasks();
+  },
+
+  /**
+   * 每天自动清一次自己的任务脏数据。
+   * 存量脏数据是历史版本 add() 写出来的，光改客户端清不掉，
+   * 只能靠一次云端扫描；挂在这里是为了"用户自己打开就用上了"，
+   * 不用开发者去控制台手动跑。失败静默——它只是打扫，不是主流程。
+   */
+  maybeCleanupTasks: function () {
+    try {
+      var flag = 'task_cleanup_at';
+      var today = time.getLocalDate();
+      if (wx.getStorageSync(flag) === today) return;
+      cloud.api.cleanupTasks().then(function () {
+        try { wx.setStorageSync(flag, today); } catch (e) { }
+      }).catch(function () { });
+    } catch (e) { }
   },
 
   /** 我的学习简报：今天学了多久、几个词、抽查掌握与不会各有几个 */

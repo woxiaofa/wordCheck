@@ -17,6 +17,7 @@ const db = cloud.database();
 const _ = db.command;
 
 const { getLocalDate } = require('./time');
+const { repairUserTasks } = require('./cleanup');
 const { wordsForStudent } = require('./personal');
 const { queryStates, STATE_COLL } = require('./state-store');
 
@@ -38,10 +39,22 @@ exports.main = async (event) => {
   if (!OPENID) return fail('NO_IDENTITY', '无法识别用户身份');
 
   switch (event.action) {
-    case 'today': return onToday(OPENID, event);
-    default:      return fail('BAD_ACTION', '未知 action: ' + event.action);
+    case 'today':   return onToday(OPENID, event);
+    case 'cleanup': return onCleanup(OPENID, event);
+    default:        return fail('BAD_ACTION', '未知 action: ' + event.action);
   }
 };
+
+/**
+ * 清理自己的任务脏数据（同一天多份快照、task_date 缺失的旧文档）
+ * 幂等：跑第二次 removed = 0。控制台手测用 {"action":"cleanup"}。
+ */
+async function onCleanup(openid) {
+  const user = await getUser(openid);
+  if (!user) return fail('NO_USER', '用户不存在，请先调用 user.login');
+  var r = await repairUserTasks(db, user._id);
+  return ok(r);
+}
 
 async function onToday(openid) {
   const user = await getUser(openid);
@@ -129,10 +142,10 @@ async function onToday(openid) {
     // （如今天日期的旧文档占键）就继续往下走业务键回放兜底。
     const msg = (e && (e.errMsg || e.message)) || '';
     if (/E11000|duplicate|502001/i.test(msg)) {
-      await db.collection(COLL.tasks)
-        .where({ user_id: user._id, task_date: _.eq(null) })
-        .remove()
-        .catch(() => null);
+      // 自愈：不只是删空日期脏文档 —— 老版本 add() 留下的「同一天多份、_id 各不相同」
+      // 也会占着唯一索引，只清 null 是清不干净的。统一走 repairUserTasks，
+      // 按 (user_id, task_date) 分组只留胜者，然后重试一次。
+      await repairUserTasks(db, user._id);
       try {
         await db.collection(COLL.tasks).doc(taskId).set({ data: saveDoc });
         const words = await fetchWords(newIds.concat(dueIds));

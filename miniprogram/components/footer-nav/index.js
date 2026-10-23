@@ -33,6 +33,20 @@ Component({
     skin: theme.cls()
   },
 
+  lifetimes: {
+    attached: function () { this.setData({ skin: theme.cls() }); }
+  },
+
+  /* 页面级生命周期：页面自己的 onShow 那一枪可能被系统吞掉
+     （导航栏还没 ready / 正在转场），这里再补一枪兜底。
+     setNavigationBarColor 设成相同的值没有副作用，重复调用安全。 */
+  pageLifetimes: {
+    show: function () {
+      theme.applyNav();
+      this.setData({ skin: theme.cls() });
+    }
+  },
+
   methods: {
     onGo: function (e) {
       var path = e.currentTarget.dataset.path;

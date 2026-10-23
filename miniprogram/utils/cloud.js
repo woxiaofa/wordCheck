@@ -207,6 +207,15 @@ var api = {
   },
 
   /**
+   * 清理自己的 daily_tasks 脏数据（历史版本 add() 留下的重复/缺 task_date 文档）。
+   * 它们占着 (user_id, task_date) 唯一索引，会让当天快照写不进去 —— 家长看到就是空的。
+   * 幂等，失败不影响使用（返回 reject，调用方自行忽略）。
+   */
+  cleanupTasks: function () {
+    return call('task', 'cleanup', {});
+  },
+
+  /**
    * 提交一次复习反馈（必须带幂等 ID）
    * 失败不丢：压进补传队列，下次启动/回前台自动重放。
    * 调用方仍会收到 reject（页面上该提示提示），但数据不会永久丢失。
