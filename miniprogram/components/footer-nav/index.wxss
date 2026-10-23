@@ -26,3 +26,15 @@
 
 /* 占位，避免内容被固定导航遮住 */
 .nav-placeholder { height: 130rpx; }
+
+/* 糖果拟物：底栏从贴边长条变成悬浮软糖胶囊（皮肤类由组件 js 自己算，见 index.js） */
+.nav.skin-candy {
+  left: 20rpx;
+  right: 20rpx;
+  bottom: 16rpx;
+  border-top: none;
+  border-radius: 44rpx;
+  box-shadow:
+    0 16rpx 36rpx rgba(203, 92, 130, .35),
+    inset 0 3rpx 8rpx rgba(255, 255, 255, .9);
+}

@@ -1,6 +1,6 @@
 <!-- 底部导航：没做成 tabBar 是因为 tabBar 的图标是必需资源，
      而本仓库刻意不引入二进制图标文件；换成自绘组件后也便于做未读/待办角标 -->
-<view class="nav">
+<view class="nav {{skin}}">
   <view
     wx:for="{{items}}"
     wx:key="path"

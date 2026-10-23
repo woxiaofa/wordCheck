@@ -185,6 +185,60 @@ page {
   --accent-soft: #1c5bb8;
 }
 
+/* 糖果（candy） · 拟物立体 · 软糖卡片质感 */
+.skin-candy {
+  --bg: #fcdde8;
+  --bg2: #f9d0de;
+  --panel: #fffdfd;
+  --surface: #fffdfd;
+  --surface2: #fcecf2;
+  --surface3: #f7dbe6;
+  --fill: #fdf1f5;
+  --fill2: #fcecf2;
+  --fill3: #f9e2ea;
+  --line: #e9b3c7;
+  --line2: #e3a8bf;
+  --line3: #efc1d1;
+  --line4: #e5a9c0;
+  --line5: #df9eb7;
+  --line6: #f4cfdb;
+  --text: #43202e;
+  --text2: #5c3140;
+  --text3: #78505e;
+  --muted: #96606e;
+  --muted2: #9c6a77;
+  --muted3: #936271;
+  --muted4: #a37481;
+  --muted5: #9a6674;
+  --accent: #b8204e;
+  --active: #f6c3d4;
+  --press: #f4cddc;
+  --ok-text: #146a40;
+  --warn-text: #7a4f00;
+  --bad-text: #b02340;
+  --ok-dim: #4a6b58;
+  --gold-dim: #7a5300;
+  --ok-bg: #e2f4ea;
+  --ok-soft: #146a40;
+  --ok-line: #b9e0cc;
+  --bad-bg: #fdeaee;
+  --bad-soft: #b02340;
+  --bad-soft2: #b02340;
+  --gold-bg: #fbf1da;
+  --gold-bg2: #f8ecd2;
+  --gold-line: #d9c391;
+  --gold-line2: #e2cda6;
+  --gold-text: #8a6116;
+  --gold-soft: #8a6116;
+  --honor-a: #fdf3dd;
+  --honor-b: #f6e8c6;
+  --honor-soft: #8a6116;
+  --purple-bg: #efeafc;
+  --purple-soft: #6a4bd8;
+  --accent-bg: #fce4ed;
+  --accent-soft: #b8204e;
+}
+
 /* 蜜橘（honey） · 完成 5 次任务解锁 */
 .skin-honey {
   --bg: #fffaf1;

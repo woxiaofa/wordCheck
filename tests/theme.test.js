@@ -314,14 +314,36 @@ ok('⑤b 皮肤清单与解锁分层与规范一致（蔷薇因与樱粉雷同�
    (function () {
      var u = {};
      theme.SKINS.forEach(function (x) { u[x.id] = x.unlock; });
-     return theme.SKINS.length === 5 &&
+     return theme.SKINS.length === 6 &&
        u.night.type === 'free' && u.sakura.type === 'free' &&
+       u.candy.type === 'free' &&
        u.honey.type === 'tasks' && u.honey.need === 5 &&
        u.mint.type === 'tasks' && u.mint.need === 7 &&
        u.sky.type === 'paid';
    })());
 ok('⑤c 浅色皮肤的 id 均为合法类名字符（skin-xxx 能挂上根节点）',
    theme.SKINS.every(function (x) { return /^[a-z][a-z0-9]*$/.test(x.id); }));
+
+/* ⑤d 拟物层：theme-candy.wxss 只许影响 candy 自己，且不许碰配色 */
+var candyCheck = (function () {
+  var f = path.join(ROOT, 'theme-candy.wxss');
+  if (!fs.existsSync(f)) return { ok: false, why: 'theme-candy.wxss 不存在' };
+  var src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // 每一条规则的每个选择器都必须以 .skin-candy 开头
+  var badSel = src.split('}').map(function (chunk) {
+    return chunk.split('{')[0].trim();
+  }).filter(function (sel) { return sel && !sel.split(',').every(function (s) {
+     return s.trim().indexOf('.skin-candy') === 0; }); });
+  if (badSel.length) return { ok: false, why: '选择器越界：' + badSel.join(' | ') };
+  // 造型层不许改配色（border-color 属于描边造型，放行；color:/background: 一律不许）
+  var m = src.match(/(^|[^-\w])(color|background)\s*:/);
+  if (m) return { ok: false, why: '造型层出现了 ' + m[2] + ': 声明 —— 配色只能走 token' };
+  if (fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')
+      .indexOf('@import "theme-candy.wxss";') < 0) return { ok: false, why: 'app.wxss 没引入' };
+  return { ok: true, why: '' };
+})();
+ok('⑤d 拟物层合规：选择器全在 .skin-candy 内、不写 color/background、app.wxss 已引入',
+   candyCheck.ok === true, candyCheck.why);
 
 /* ---------- ⑥ 设置页与底部导航 ---------- */
 // 用桩跑真实的 Page 定义，验证解锁与换肤行为（而不是只看文件里有没有字）

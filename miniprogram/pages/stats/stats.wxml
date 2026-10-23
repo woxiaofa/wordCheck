@@ -52,10 +52,10 @@
     </view>
     <view wx:else class="rpt-bars">
       <view
-        wx:for="{{rpt.series}}"
+        wx:for="{{rpt.bars}}"
         wx:key="date"
-        class="rpt-bar"
-        data-date="{{item.date}}"
+        class="rpt-bar {{rpt.days > 14 ? 'wk' : ''}}"
+        data-date="{{item.label}}"
         data-total="{{item.total}}"
         bindtap="onBarTap"
       >

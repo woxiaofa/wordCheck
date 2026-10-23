@@ -7,6 +7,8 @@
  */
 
 var assert = require('assert');
+var fs = require('fs');
+var path = require('path');
 
 var storage = {};
 global.wx = {
@@ -153,17 +155,39 @@ ok('⑧ 老明细会被丢弃，storage 不会无限膨胀', function () {
   assert.ok(raw[today], '今天的明细必须还在');
 });
 
-ok('⑨ 月报：30 根趋势条，区间文案带起止日期', function () {
+ok('⑨ 月报：逐日明细 30 条不变，展示条按周聚合成 5 根', function () {
   reset();
   var today = time.getLocalDate();
   var m = {};
   m[today] = day(today, 12, 9);
   seed(m);
   var r = report.build(30, defOf());
-  assert.strictEqual(r.series.length, 30);
+  assert.strictEqual(r.series.length, 30, 'series 仍是逐日明细（活跃天数/最佳一天的口径靠它）');
+  assert.strictEqual(r.bars.length, 5, '30 天聚成 5 桶，否则 30 根条挤一行字全糊');
   assert.strictEqual(r.days, 30);
   assert.ok(r.rangeLabel.indexOf('月报') === 0, '区间文案应以月报开头：' + r.rangeLabel);
   assert.ok(r.rangeLabel.indexOf('–') > 0, '月报应给出起止日期：' + r.rangeLabel);
+  var sum = r.bars.reduce(function (a, b) { return a + b.total; }, 0);
+  assert.strictEqual(sum, r.total, '聚合后总题数必须守恒');
+  r.bars.forEach(function (b) {
+    assert.ok(b.label.indexOf('–') > 0, '桶条标签要带起止日期：' + b.label);
+  });
+});
+
+ok('⑩ 周报不被聚合：展示条仍逐日 7 根', function () {
+  reset();
+  var r = report.build(7, defOf());
+  assert.strictEqual(r.bars.length, 7);
+  assert.strictEqual(r.bars, r.series, '周报直接复用逐日 series，不额外建桶');
+});
+
+ok('⑪ 数据页渲染的是聚合后的 bars，不是 30 根逐日 series', function () {
+  var wxml = fs.readFileSync(
+    path.join(__dirname, '..', 'miniprogram', 'pages', 'stats', 'stats.wxml'), 'utf8');
+  assert.ok(wxml.indexOf('wx:for="{{rpt.bars}}"') >= 0,
+    '趋势条必须遍历 rpt.bars（聚合展示层），遍历 series 会让月报 30 根条挤一行');
+  assert.ok(wxml.indexOf('data-date="{{item.label}}"') >= 0,
+    '点条提示用展示标签（周桶是 10/4–10/9 这种区间，逐日才是 10/18）');
 });
 
 console.log('\n全部通过：' + pass + ' 项 ✓');

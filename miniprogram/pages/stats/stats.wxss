@@ -102,6 +102,9 @@
   margin-top: 28rpx;
 }
 .rpt-bar { flex: 1; }
+/* 月报按周聚合后的桶条：比逐日条宽得多，圆角和字都放大一档 */
+.rpt-bar.wk .rpt-bar-track { border-radius: 14rpx; }
+.rpt-bar.wk .rpt-bar-day { font-size: 20rpx; font-weight: 600; color: var(--text3); }
 .rpt-bar-track {
   height: 180rpx;
   display: flex;

@@ -127,6 +127,33 @@ function build(days, defOf) {
     s.height = s.total ? Math.max(12, Math.round(s.total / maxTotal * 100)) : 0;
   });
 
+  // 展示用趋势条（wxml 只认 bars，不认 series）：
+  // 月报 30 根逐日条挤一行，每根只剩十几 rpx 宽、日期标签互相压字，家长根本读不了。
+  // 超过 14 天的区间按 5 桶聚合（30 天 → 每桶 6 天），周报 7 根放得下、保持逐日。
+  // series 保留逐日明细，活跃天数 / 最佳一天的口径不变。
+  var bars = series;
+  if (days > 14) {
+    var size = Math.ceil(days / 5);
+    bars = [];
+    var maxBucket = 0;
+    for (var b = 0; b < series.length; b += size) {
+      var chunk = series.slice(b, b + size);
+      var bt = 0, bk = 0;
+      chunk.forEach(function (s) { bt += s.total; bk += s.known; });
+      if (bt > maxBucket) maxBucket = bt;
+      bars.push({
+        date: chunk[0].date,
+        label: shortLabel(chunk[0].date) + '–' + shortLabel(chunk[chunk.length - 1].date),
+        total: bt,
+        known: bk,
+        height: 0
+      });
+    }
+    bars.forEach(function (s) {
+      s.height = s.total ? Math.max(12, Math.round(s.total / maxBucket * 100)) : 0;
+    });
+  }
+
   // 错词榜：只统计真的答错/模糊过的词
   var wrongs = Object.keys(cur.words)
     .filter(function (w) { return cur.words[w].wrong > 0; })
@@ -160,6 +187,7 @@ function build(days, defOf) {
     activeDays: activeDays,
     bestDay: best && best.total ? best : null,
     series: series,
+    bars: bars,
     maxTotal: maxTotal,
     topWrong: wrongs,
     headline: headline(days, cur, curRate, delta, activeDays, best),

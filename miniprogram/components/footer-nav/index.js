@@ -12,6 +12,8 @@
  * 连同新增的皮肤一起收进「设置」页。高频动作（今日 / 背词）留在手指够得着的地方。
  */
 
+var theme = require('../../utils/theme');
+
 var ITEMS = [
   { key: 'index', label: '今日', icon: '◎', path: '/pages/index/index' },
   { key: 'study', label: '背词', icon: '▶', path: '/pkg-media/pages/drill/drill' },
@@ -25,7 +27,10 @@ Component({
   },
 
   data: {
-    items: ITEMS
+    items: ITEMS,
+    /* 皮肤类挂在自己根节点上：页面 wxss 隔离不到组件内部，
+       拟物皮肤（.skin-candy）的立体底栏只能由组件自己的 wxss 出，类名从这来 */
+    skin: theme.cls()
   },
 
   methods: {

@@ -11,15 +11,18 @@
  *      所以拆成两态 —— 实心填充写死色值（上面压白字，跨皮肤都成立），
  *      文字态走 ok-text / warn-text / bad-text 三个 token（夜色取原值，浅色取加深值）。
  *   4. 解锁留三层：free 默认开放 / tasks 完成 N 次任务 / paid 预留（个人主体暂不可支付）。
+ *
+ * 拟物皮肤（candy，2026-10-23）：颜色 token 只管「什么色」；「立体感」（投影、内高光、
+ * 大圆角）是造型不是颜色，token 表达不了 —— 单独写在 theme-candy.wxss，
+ * 所有选择器必须以 .skin-candy 开头（tests/theme.test.js ⑤d 守护），别的皮肤零影响。
  */
 
 var KEY = 'word_skin_id';
 
 /**
  * 皮肤清单。
- * 为什么只有五套：蔷薇（rose）曾是第二套粉色，与樱粉并排几乎分辨不出，
- * 占一个里程碑又不产生获得感，故移除。浅色之间必须拉得开家族差异
- * （粉/橘/绿/蓝），宁可少一套也不要两套看着一样。
+ * 蔷薇（rose）曾是第二套粉色，与樱粉并排几乎分辨不出，故移除。
+ * 浅色之间必须拉得开家族差异（粉/拟物粉/橘/绿/蓝），宁可少一套也不要两套看着一样。
  * tokens 未列出的键会继承 skin-night（默认）的值，新增皮肤只需写差异部分。
  * 浅色皮肤的取值不是拍脑袋来的：每个「文字/底色」组合都跑过 WCAG 对比度校验，
  * 见 scripts/check-contrast.js 与 tests/theme.test.js（不达标会被测试拦下）。
@@ -77,6 +80,33 @@ var SKINS = [
       purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
       accentBg: '#e3effc', accentSoft: '#1c5bb8',
       press: '#f2dee6',
+    }
+  },
+  {
+    id: 'candy',
+    name: '糖果',
+    desc: '拟物立体 · 软糖卡片质感',
+    unlock: { type: 'free' },   // 先免费让大家用起来；拟物层稳定后可转付费主打（个人主体暂无支付通道）
+    tokens: {
+      bg: '#fcdde8', bg2: '#f9d0de',
+      surface: '#fffdfd', surface2: '#fcecf2', surface3: '#f7dbe6',
+      fill: '#fdf1f5', fill2: '#fcecf2', fill3: '#f9e2ea',
+      line: '#e9b3c7', line2: '#e3a8bf', line3: '#efc1d1',
+      line4: '#e5a9c0', line5: '#df9eb7', line6: '#f4cfdb',
+      text: '#43202e', text2: '#5c3140', text3: '#78505e',
+      muted: '#96606e', muted2: '#9c6a77', muted3: '#936271',
+      muted4: '#a37481', muted5: '#9a6674',
+      accent: '#b8204e', active: '#f6c3d4',
+      okText: '#146a40', warnText: '#7a4f00', badText: '#b02340',
+      okDim: '#4a6b58', goldDim: '#7a5300',
+      panel: '#fffdfd',
+      okBg: '#e2f4ea', okSoft: '#146a40', okLine: '#b9e0cc',
+      badBg: '#fdeaee', badSoft: '#b02340', badSoft2: '#b02340',
+      goldBg: '#fbf1da', goldBg2: '#f8ecd2', goldLine: '#d9c391', goldLine2: '#e2cda6',
+      goldText: '#8a6116', goldSoft: '#8a6116', honorA: '#fdf3dd', honorB: '#f6e8c6', honorSoft: '#8a6116',
+      purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
+      accentBg: '#fce4ed', accentSoft: '#b8204e',
+      press: '#f4cddc'
     }
   },
   {

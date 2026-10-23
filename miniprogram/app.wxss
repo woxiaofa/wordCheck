@@ -1,5 +1,7 @@
 /* 主题 token（皮肤 1.2.0）——必须最先引入，后面所有 var(--x) 才有值 */
 @import "theme.wxss";
+/* 糖果拟物层：只作用在 .skin-candy 上，其他皮肤读不到这些规则 */
+@import "theme-candy.wxss";
 
 /* 全局样式 —— 深色底、卡片式，与已确认的 H5 Demo 保持一致的视觉语言 */
 
