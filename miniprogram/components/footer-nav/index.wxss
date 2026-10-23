@@ -6,7 +6,7 @@
   z-index: 100;
   display: flex;
   background: rgba(20, 28, 38, .97);
-  border-top: 1rpx solid #2b3949;
+  border-top: 1rpx solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .nav-item {
@@ -16,9 +16,9 @@
   align-items: center;
   justify-content: center;
   padding: 14rpx 0 10rpx;
-  color: #8fa3b7;
+  color: var(--muted);
 }
-.nav-item.on { color: #3ea6ff; }
+.nav-item.on { color: var(--accent); }
 .nav-ico { font-size: 34rpx; line-height: 1.1; }
 .nav-label { font-size: 22rpx; margin-top: 4rpx; }
 

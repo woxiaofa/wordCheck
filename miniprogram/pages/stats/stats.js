@@ -6,6 +6,7 @@
  *   掌握率   = 档位 ≥5 的词数 / 已学词数（间隔已拉到 15 天以上）
  */
 
+var theme = require('../../utils/theme');
 var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
 var time = require('../../utils/time');
@@ -28,6 +29,7 @@ var RANGES = [
 Page({
   behaviors: [layout.behavior()],
   data: {
+    skin: theme.cls(),
     mastery: 0,
     streak: 0,
     learned: 0,

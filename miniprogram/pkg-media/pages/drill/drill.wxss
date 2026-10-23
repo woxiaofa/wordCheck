@@ -1,7 +1,7 @@
 /* 快刷页样式：一屏一件事——看清词、选意思、看结果 */
 
 .drill .bar { margin-bottom: 12rpx; }
-.tag-line { font-size: 26rpx; color: #8fa3b7; }
+.tag-line { font-size: 26rpx; color: var(--muted); }
 
 /* 题目卡：一屏一题 —— 词在上方大字展示，选项贴底（拇指够得着） */
 .qcard {
@@ -15,20 +15,20 @@
 .qword-row { display: flex; align-items: center; justify-content: center; }
 .qword {
   font-size: 100rpx; font-weight: 800; letter-spacing: 2rpx;
-  color: #e8eef5; word-break: break-all; text-align: center;
+  color: var(--text); word-break: break-all; text-align: center;
 }
 .speaker { font-size: 44rpx; margin-left: 16rpx; opacity: .75; }
 /* 拼写/听写题没有大字单词，顶部提示用小一号 */
-.qword-hint { font-size: 48rpx; letter-spacing: 0; color: #8fa3b7; }
-.qph { text-align: center; color: #8fa3b7; font-size: 28rpx; margin-top: 8rpx; }
+.qword-hint { font-size: 48rpx; letter-spacing: 0; color: var(--muted); }
+.qph { text-align: center; color: var(--muted); font-size: 28rpx; margin-top: 8rpx; }
 .qstem { text-align: center; font-size: 34rpx; margin-top: 20rpx; }
 
 /* 情景填句：给中文 + 场景，把句子里的词挖空（句子级考查，对应真听写） */
 .cloze {
   margin-top: 18rpx;
   padding: 24rpx 22rpx;
-  background: #16202c;
-  border: 2rpx solid #2b3949;
+  background: var(--fill);
+  border: 2rpx solid var(--line);
   border-radius: 16rpx;
   text-align: center;
 }
@@ -38,7 +38,7 @@
   margin-top: 16rpx;
   font-size: 34rpx;
   line-height: 1.7;
-  color: #e8f0f8;
+  color: var(--text2);
   font-weight: 600;
   word-break: break-word;
 }
@@ -47,8 +47,8 @@
   min-width: 120rpx;
   margin: 0 6rpx;
   padding: 0 10rpx;
-  border-bottom: 4rpx solid #6b7a8c;
-  color: #6b7a8c;
+  border-bottom: 4rpx solid var(--muted5);
+  color: var(--muted5);
 }
 .cloze-blank.filled { border-bottom-color: #2fd07a; color: #2fd07a; }
 
@@ -59,8 +59,8 @@
 .opt {
   margin-top: 20rpx;
   padding: 30rpx 26rpx;
-  background: #1e2a38;
-  border: 2rpx solid #2b3949;
+  background: var(--surface2);
+  border: 2rpx solid var(--line);
   border-radius: 20rpx;
   font-size: 32rpx;
   line-height: 1.5;
@@ -78,8 +78,8 @@
   display: flex; align-items: center; justify-content: center;
   flex-wrap: wrap;
   padding: 8rpx 12rpx;
-  color: #3ea6ff;
-  background: #16202c; border-radius: 16rpx; border: 2rpx dashed #2b3949;
+  color: var(--accent);
+  background: var(--fill); border-radius: 16rpx; border: 2rpx dashed var(--line);
 }
 .typed .tl {
   font-size: 56rpx; font-weight: 700;
@@ -88,10 +88,10 @@
 /* 短语里的空格/连字符（2026-10-10 收录短语）：空格敲出来是看不见的，
    给个明确的宽度让它"占住位置"；连字符颜色淡一点，和字母区分 */
 .typed .tl-space { min-width: 40rpx; padding: 0; }
-.typed .tl-hyphen { color: #8fa3b7; }
-.typed-full { border-style: solid; color: #e8eef5; }
-.typed-full .tl { color: #e8eef5; }
-.typed-full .tl-hyphen { color: #8fa3b7; }
+.typed .tl-hyphen { color: var(--muted); }
+.typed-full { border-style: solid; color: var(--text); }
+.typed-full .tl { color: var(--text); }
+.typed-full .tl-hyphen { color: var(--muted); }
 
 /* 插入光标：一条竖线，标出"下一个字母从哪里插进去" */
 .caret {
@@ -99,7 +99,7 @@
   width: 6rpx; height: 56rpx;
   margin: 0 4rpx;
   border-radius: 3rpx;
-  background: #3ea6ff;
+  background: var(--accent);
   animation: caret-blink 1s step-end infinite;
 }
 @keyframes caret-blink { 50% { opacity: 0; } }
@@ -178,14 +178,14 @@
 }
 .ddef {
   margin-top: 20rpx; text-align: center;
-  font-size: 44rpx; font-weight: 600; color: #3ea6ff;
+  font-size: 44rpx; font-weight: 600; color: var(--accent);
 }
-.dex { margin-top: 24rpx; padding: 22rpx; background: #16202c; border-radius: 16rpx; }
+.dex { margin-top: 24rpx; padding: 22rpx; background: var(--fill); border-radius: 16rpx; }
 .dex-en { font-size: 30rpx; line-height: 1.6; }
-.dex-cn { margin-top: 6rpx; font-size: 26rpx; color: #8fa3b7; line-height: 1.6; }
+.dex-cn { margin-top: 6rpx; font-size: 26rpx; color: var(--muted); line-height: 1.6; }
 .dyour {
   margin-top: 20rpx; padding: 18rpx 22rpx;
-  background: #16202c; border-radius: 16rpx;
+  background: var(--fill); border-radius: 16rpx;
   display: flex; flex-direction: column; gap: 8rpx;
 }
 /* 详情页两个练习按钮并排：念一遍 / 抄一遍 —— 耳朵和手都要走一遍 */
@@ -195,35 +195,35 @@
 /* 抄写区：照着词拼一遍，可以抄好几遍 */
 .copy-box {
   margin-top: 24rpx; padding: 22rpx;
-  background: #16202c; border-radius: 16rpx;
+  background: var(--fill); border-radius: 16rpx;
   /* 2026-10-10 用户反馈：去掉左侧橙色竖条 —— 抄写区里装了全宽键盘后，
      这条边框跟着盒子一起被拉到整个键盘的高度，看着像一根突兀的长棍 */
 }
-.copy-title { font-size: 26rpx; color: #cfe0f0; margin-bottom: 8rpx; }
+.copy-title { font-size: 26rpx; color: var(--text3); margin-bottom: 8rpx; }
 /* 抄写时的悬浮词条：钉在屏幕顶部，页面再长也不会划走（position:fixed） */
 .copy-pin {
   position: fixed; left: 0; right: 0; top: 0; z-index: 50;
   display: flex; align-items: center;
   padding: 18rpx 24rpx;
-  background: #101a24;
-  border-bottom: 1rpx solid #2b3949;
+  background: var(--bg2);
+  border-bottom: 1rpx solid var(--line);
   box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, .35);
 }
 .pin-word {
   flex: 1; min-width: 0;
   display: flex; align-items: baseline; flex-wrap: wrap;
 }
-.pin-text { font-size: 44rpx; font-weight: 700; color: #3ea6ff; letter-spacing: 2rpx; }
-.pin-ph { margin-left: 14rpx; font-size: 24rpx; color: #8fa3b7; }
+.pin-text { font-size: 44rpx; font-weight: 700; color: var(--accent); letter-spacing: 2rpx; }
+.pin-ph { margin-left: 14rpx; font-size: 24rpx; color: var(--muted); }
 .pin-mask { font-size: 40rpx; font-weight: 700; color: #5b7387; letter-spacing: 10rpx; }
-.pin-tip { margin-left: 14rpx; font-size: 22rpx; color: #8fa3b7; }
+.pin-tip { margin-left: 14rpx; font-size: 22rpx; color: var(--muted); }
 .pin-toggle {
   flex-shrink: 0;
   padding: 12rpx 20rpx; margin-left: 16rpx;
-  font-size: 25rpx; color: #cfe0f0;
-  background: #243040; border: 1rpx solid #2b3949; border-radius: 999rpx;
+  font-size: 25rpx; color: var(--text3);
+  background: var(--surface3); border: 1rpx solid var(--line); border-radius: 999rpx;
 }
-.pin-toggle:active { background: #3a4a5e; }
+.pin-toggle:active { background: var(--active); }
 /* 悬浮条占位：不给页面让出高度，顶部的进度条会被盖住 */
 .drill.pinned { padding-top: 120rpx; }
 
@@ -266,7 +266,7 @@
 /* 完成态 */
 .done-emoji { font-size: 88rpx; }
 .done-title { font-size: 40rpx; font-weight: 700; margin-top: 8rpx; }
-.done-sub { margin-top: 10rpx; font-size: 28rpx; color: #8fa3b7; }
+.done-sub { margin-top: 10rpx; font-size: 28rpx; color: var(--muted); }
 .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16rpx; }
 
 /* 错题本 */
@@ -276,10 +276,10 @@
 .wb-item {
   width: 100%;
   display: flex; align-items: baseline;
-  padding: 12rpx 0; border-bottom: 1rpx dashed #2b3949;
+  padding: 12rpx 0; border-bottom: 1rpx dashed var(--line);
 }
 .wb-w { font-size: 30rpx; font-weight: 600; width: 240rpx; }
-.wb-d { font-size: 26rpx; color: #8fa3b7; flex: 1; }
+.wb-d { font-size: 26rpx; color: var(--muted); flex: 1; }
 
 /* 「不会」诚实按钮：次要但不隐藏 —— 不会就该有地方说，而不是逼着瞎蒙 */
 .honest {
@@ -287,9 +287,9 @@
   height: 72rpx;
   line-height: 72rpx;
   font-size: 26rpx;
-  color: #8fa3b7;
+  color: var(--muted);
   background: transparent;
-  border: 2rpx dashed #3a4a5e;
+  border: 2rpx dashed var(--active);
   border-radius: 16rpx;
 }
 .honest::after { border: none; }
@@ -299,12 +299,12 @@
 /* 详情页跟读引导：只看不念记不住，这里明确鼓励多听几遍；整块可点（大喇叭） */
 .read-guide {
   margin-top: 24rpx; padding: 20rpx 22rpx;
-  background: #16202c; border-radius: 16rpx;
-  border-left: 6rpx solid #3ea6ff;
+  background: var(--fill); border-radius: 16rpx;
+  border-left: 6rpx solid var(--accent);
 }
 .read-guide:active { background: #1b2836; }
-.rg-text { font-size: 28rpx; color: #cfe0f0; line-height: 1.6; }
-.rg-count { margin-top: 8rpx; font-size: 22rpx; color: #3ea6ff; }
+.rg-text { font-size: 28rpx; color: var(--text3); line-height: 1.6; }
+.rg-count { margin-top: 8rpx; font-size: 22rpx; color: var(--accent); }
 
 /* 荣誉 / 排名 */
 .honor {
@@ -329,7 +329,7 @@
 /* 昵称 / 头像（榜单展示用，用户自愿填） */
 .profile-card {
   margin-top: 24rpx; padding: 20rpx;
-  background: #16202c; border-radius: 16rpx; text-align: left;
+  background: var(--fill); border-radius: 16rpx; text-align: left;
 }
 .prow { display: flex; align-items: center; margin-top: 16rpx; }
 /* 头像按钮：宽高必须 !important —— 微信给原生 button 注入的
@@ -339,12 +339,12 @@
   width: 96rpx !important; height: 96rpx !important;
   min-width: 0 !important; padding: 0 !important; margin: 0 !important;
   border-radius: 50%; overflow: hidden;
-  background: #243040; border: 2rpx solid #3a4a5e;
+  background: var(--surface3); border: 2rpx solid var(--active);
   display: flex; align-items: center; justify-content: center;
 }
 .avatar-btn::after { border: none; }
 .avatar-img { width: 96rpx; height: 96rpx; }
-.avatar-ph { font-size: 40rpx; color: #8fa3b7; }
+.avatar-ph { font-size: 40rpx; color: var(--muted); }
 
 /* 宽屏：rpx 放大后收回 px */
 .wide .honest { margin-top: 12px; height: 38px; line-height: 38px; font-size: 13px; }

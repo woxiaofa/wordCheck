@@ -12,6 +12,7 @@
  * 而不是泄露别人的学习数据 —— 页面只需把 FORBIDDEN 翻成人话。
  */
 
+var theme = require('../../utils/theme');
 var cloud = require('../../utils/cloud');
 var time = require('../../utils/time');
 var wrongLib = require('../../utils/wrong');
@@ -20,6 +21,7 @@ var links = require('../../utils/links');
 
 Page({
   data: {
+    skin: theme.cls(),
     sid: '',
     loading: true,
     error: '',

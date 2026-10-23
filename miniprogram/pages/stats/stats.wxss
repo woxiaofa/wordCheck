@@ -21,22 +21,22 @@
   text-align: center;
   padding: 16rpx 0;
   font-size: 28rpx;
-  color: #8fa3b7;
-  background: #18222e;
-  border: 1rpx solid #2b3949;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1rpx solid var(--line);
   border-radius: 999rpx;
 }
 .rpt-tab.on {
-  color: #e8eef5;
+  color: var(--text);
   background: rgba(62, 166, 255, .16);
-  border-color: #3ea6ff;
+  border-color: var(--accent);
   font-weight: 600;
 }
 
 .rpt-kpis {
   display: flex;
   margin-top: 24rpx;
-  border-top: 1rpx solid #2b3949;
+  border-top: 1rpx solid var(--line);
   padding-top: 24rpx;
 }
 .rpt-kpi {
@@ -51,12 +51,12 @@
 .rpt-kpi .l {
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #8fa3b7;
+  color: var(--muted);
 }
 .rpt-kpi .d {
   margin-top: 6rpx;
   font-size: 20rpx;
-  color: #8fa3b7;
+  color: var(--muted);
 }
 .rpt-kpi .d.up { color: #2fd07a; }
 .rpt-kpi .d.down { color: #ff8a9b; }
@@ -68,7 +68,7 @@
   height: 26rpx;
   border-radius: 999rpx;
   overflow: hidden;
-  background: #1e2a38;
+  background: var(--surface2);
 }
 .rpt-split-bar .seg { height: 100%; }
 .seg.known { background: #2fd07a; }
@@ -79,7 +79,7 @@
   justify-content: space-between;
   margin-top: 12rpx;
   font-size: 22rpx;
-  color: #8fa3b7;
+  color: var(--muted);
 }
 .legend-item { display: flex; align-items: center; }
 .dot {
@@ -105,37 +105,37 @@
   height: 180rpx;
   display: flex;
   align-items: flex-end;
-  background: #18222e;
+  background: var(--surface);
   border-radius: 10rpx;
   overflow: hidden;
 }
 .rpt-bar-fill {
   width: 100%;
-  background: linear-gradient(180deg, #3ea6ff, #1d4f74);
+  background: linear-gradient(180deg, var(--accent), #1d4f74);
   border-radius: 10rpx;
 }
-.rpt-bar-fill.empty { background: #1e2a38; }
+.rpt-bar-fill.empty { background: var(--surface2); }
 .rpt-bar-day {
   display: block;
   margin-top: 8rpx;
   text-align: center;
   font-size: 18rpx;
-  color: #8fa3b7;
+  color: var(--muted);
 }
 
 .rpt-note {
   margin-top: 24rpx;
   padding: 20rpx 22rpx;
   border-radius: 16rpx;
-  background: #18222e;
-  border: 1rpx solid #2b3949;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
   font-size: 26rpx;
   line-height: 1.6;
 }
 .rpt-subtitle {
   font-size: 26rpx;
   font-weight: 600;
-  color: #e8eef5;
+  color: var(--text);
 }
 .rpt-wrong { margin-top: 28rpx; }
 .rpt-wrong-line {
@@ -143,14 +143,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 14rpx 0;
-  border-bottom: 1rpx solid #2b3949;
+  border-bottom: 1rpx solid var(--line);
 }
 .rpt-wrong-line:last-child { border-bottom: none; }
 .rpt-wrong-mid { display: flex; flex-direction: column; }
 .rpt-parent {
   margin-top: 24rpx;
   padding-top: 20rpx;
-  border-top: 1rpx solid #2b3949;
+  border-top: 1rpx solid var(--line);
 }
 
 /* 30 天热力图：10 列 × 3 行 */
@@ -163,5 +163,5 @@
 .heat-cell {
   height: 48rpx;
   border-radius: 8rpx;
-  border: 1rpx solid #2b3949;
+  border: 1rpx solid var(--line);
 }

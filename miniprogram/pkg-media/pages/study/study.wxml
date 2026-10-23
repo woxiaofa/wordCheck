@@ -1,5 +1,5 @@
 <!-- 学习页：一屏一张卡，其余交给手势 -->
-<view class="page page-study {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+<view class="page page-study {{layoutWide ? 'wide' : ''}} {{skin}}" style="{{layoutStyle}}">
   <view class="bar row-between">
     <text class="tag-line">{{stageText}}</text>
     <!-- 学完最后一个词后 index 会 +1 越界，钳到 queue.length，避免出现 12/11 -->

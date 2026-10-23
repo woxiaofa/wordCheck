@@ -1,6 +1,6 @@
 <view wx:if="{{landscape}}" class="rotate-tip">横屏下内容放得太大，建议竖屏使用更舒服</view>
 <!-- 今日任务：一眼回答三个问题——做多少、都是什么词、现在点哪里 -->
-<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+<view class="page {{layoutWide ? 'wide' : ''}} {{skin}}" style="{{layoutStyle}}">
 
   <!-- 首次使用：一句话价值 + 一个动作。非阻断、可关闭、永不再现（新手引导第 1 段） -->
   <view class="card intro" wx:if="{{intro}}">

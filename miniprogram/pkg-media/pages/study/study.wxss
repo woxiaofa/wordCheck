@@ -2,7 +2,7 @@
 .page-study { padding: 16rpx 24rpx calc(170rpx + env(safe-area-inset-bottom)); }
 
 .bar { margin-bottom: 12rpx; }
-.tag-line { font-size: 26rpx; color: #8fa3b7; }
+.tag-line { font-size: 26rpx; color: var(--muted); }
 
 /* 班级作业模式：顶部一条轻量进度（不打断"一屏一卡"的沉浸） */
 .assign-bar {
@@ -16,7 +16,7 @@
   border: 1rpx solid rgba(124, 92, 255, .35);
 }
 .assign-name { font-size: 24rpx; color: #b9a8ff; }
-.assign-num { font-size: 24rpx; color: #e8eef5; font-weight: 600; }
+.assign-num { font-size: 24rpx; color: var(--text); font-weight: 600; }
 .assign-num.done { color: #2fd07a; }
 
 /* 卡片区：上下留白，让卡片看上去像"一屏一卡"。
@@ -29,7 +29,7 @@
 .foot-note {
   margin-top: 24rpx;
   text-align: center;
-  color: #8fa3b7;
+  color: var(--muted);
   font-size: 24rpx;
   line-height: 1.6;
 }
@@ -38,4 +38,4 @@
 .empty { padding: 40rpx 40rpx 0; text-align: center; }
 .empty-emoji { font-size: 96rpx; }
 .empty-title { margin-top: 20rpx; font-size: 36rpx; font-weight: 700; }
-.empty-sub { margin-top: 12rpx; font-size: 26rpx; color: #8fa3b7; }
+.empty-sub { margin-top: 12rpx; font-size: 26rpx; color: var(--muted); }

@@ -9,6 +9,7 @@
  * 参见 docs/新手引导设计.md 第 1 段。
  */
 
+var theme = require('../../utils/theme');
 var assignParam = require('../../utils/assign');
 var WORDS = require('../../data/words');
 var srs = require('../../utils/srs');
@@ -34,6 +35,7 @@ var SECONDS_PER_WORD = 15;
 Page({
   behaviors: [layout.behavior()],
   data: {
+    skin: theme.cls(),
     landscape: false,        // iPad 横屏提示条（utils/fit）
     totalCount: 0,
     dueCount: 0,

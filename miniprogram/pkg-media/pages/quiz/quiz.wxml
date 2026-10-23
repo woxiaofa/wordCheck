@@ -1,4 +1,4 @@
-<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+<view class="page {{layoutWide ? 'wide' : ''}} {{skin}}" style="{{layoutStyle}}">
 
   <!-- ============ 开始前 ============ -->
   <block wx:if="{{state === 'intro'}}">

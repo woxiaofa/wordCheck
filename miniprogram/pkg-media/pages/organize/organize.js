@@ -9,6 +9,7 @@
  * 另外**随时能停下**：每次改动 400ms 后写草稿，退出/切后台立刻 flush，
  * 下次从草稿箱进来接着改 —— 这才是"离线整理"的意思。
  */
+var theme = require('../../../utils/theme');
 var books = require('../../../utils/books');
 var drafts = require('../../../utils/drafts');
 var importer = require('../../../utils/wordimport');
@@ -228,6 +229,7 @@ function plainWords(list) {
 
 Page({
   data: {
+    skin: theme.cls(),
     id: '',
     img: '',
     imgBroken: false,

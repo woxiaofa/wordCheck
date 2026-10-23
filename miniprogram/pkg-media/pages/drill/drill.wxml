@@ -7,7 +7,7 @@
     完成：时长 + 错题本 + 荣誉/排名 + 分享 + 继续学习 / 下一个任务
   答题中与答错看答案后，喇叭都无限次可点 —— 记单词不看读音频次等于只记一半。
 -->
-<view class="page drill {{layoutWide ? 'wide' : ''}} {{detail.writing ? 'pinned' : ''}}" style="{{layoutStyle}}">
+<view class="page drill {{layoutWide ? 'wide' : ''}} {{detail.writing ? 'pinned' : ''}} {{skin}}" style="{{layoutStyle}}">
 
   <!-- 抄写时把单词钉在顶部：页面长了也不会划走，边抄边看得见。
        点「隐藏默写」遮成圆点，凭记忆拼；想不起来再点「显示」。 -->

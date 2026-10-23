@@ -9,6 +9,7 @@
  *   同时流程不打断（看完自动进下一题），报告与错词回流都照旧。
  */
 
+var theme = require('../../../utils/theme');
 var api = require('../../../utils/cloud').api;
 var srs = require('../../../utils/srs');
 var quizLib = require('../../../utils/quiz');
@@ -30,6 +31,7 @@ var FEEDBACK_MS = 1800;
 Page({
   behaviors: [layout.behavior()],
   data: {
+    skin: theme.cls(),
     state: 'intro',          // intro | run | result
     questions: [],
     index: 0,

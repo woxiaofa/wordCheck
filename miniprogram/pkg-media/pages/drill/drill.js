@@ -25,6 +25,7 @@
  *   拼写本来就要花时间，写这一步放宽到 10 秒提示 / 25 秒判不会
  */
 
+var theme = require('../../../utils/theme');
 var api = require('../../../utils/cloud').api;
 var srs = require('../../../utils/srs');
 var quizLib = require('../../../utils/quiz');
@@ -93,6 +94,7 @@ Page({
   behaviors: [layout.behavior()],
 
   data: {
+    skin: theme.cls(),
     state: 'loading',        // loading | run | detail | done | empty
     phase: 'recog',          // recog（认）| spell（写）| loop（巩固）
     round: 1,

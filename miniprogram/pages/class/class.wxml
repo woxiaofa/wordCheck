@@ -1,6 +1,6 @@
 <!-- 班级页：一页三态——未加入（二选一入口）/ 教练端 / 学生端。
      数据全部来自 class 云函数；云不可用时整页降级为提示，本地功能不受影响。 -->
-<view class="page {{layoutWide ? 'wide' : ''}}" style="{{layoutStyle}}">
+<view class="page {{layoutWide ? 'wide' : ''}} {{skin}}" style="{{layoutStyle}}">
 
   <!-- ===== 加载中 ===== -->
   <view wx:if="{{loading}}" class="card center muted">正在载入班级…</view>

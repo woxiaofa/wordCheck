@@ -11,6 +11,7 @@
  *      本地镜像只作为缓存和离线补传，不能作为真相来源。
  */
 
+var theme = require('../../../utils/theme');
 var api = require('../../../utils/cloud').api;
 var humanError = require('../../../utils/cloud').humanError;
 var srs = require('../../../utils/srs');
@@ -33,6 +34,7 @@ var FEEDBACK_LABELS = { known: '想得很快', vague: '想起来了，但费劲'
 Page({
   behaviors: [layout.behavior()],
   data: {
+    skin: theme.cls(),
     queue: [],
     index: 0,
     word: null,

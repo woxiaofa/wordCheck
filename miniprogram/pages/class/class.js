@@ -8,6 +8,7 @@
  * 云失败时整页降级为提示 + 重试，绝不影响本地学习功能。
  */
 
+var theme = require('../../utils/theme');
 var assignParam = require('../../utils/assign');
 var cloud = require('../../utils/cloud');
 var srs = require('../../utils/srs');
@@ -28,6 +29,7 @@ var CREATE_ID_PREFIX = 'class-create:';
 Page({
   behaviors: [layout.behavior()],
   data: {
+    skin: theme.cls(),
     loading: true,
     cloudError: '',
 

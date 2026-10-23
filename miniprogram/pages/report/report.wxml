@@ -1,4 +1,4 @@
-<view class="page report">
+<view class="page report {{skin}}">
   <!-- 加载 / 失败 -->
   <view wx:if="{{loading}}" class="card center">
     <view class="muted" style="padding:80rpx 0">正在生成报告…</view>
