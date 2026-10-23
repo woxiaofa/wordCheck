@@ -124,6 +124,29 @@ ok('④e tasks 皮肤：次数不够锁着，够了开放',
 ok('④f paid 皮肤当前一律不可用（个人主体无支付通道）',
    theme.unlocked({ id: 'y', unlock: { type: 'paid', price: 600 } }, 99) === false);
 
+/* ---------- ⑤ 配色对比度（WCAG）与皮肤清单 ---------- */
+var cp = require('child_process');
+var out = cp.execFileSync('node',
+  [path.join(__dirname, '..', 'scripts', 'check-contrast.js'), '--json'],
+  { encoding: 'utf8' });
+var cr = JSON.parse(out);
+var crBad = cr.filter(function (r) { return !r.pass; });
+ok('⑤a 六套皮肤全部过 WCAG 对比度门槛', crBad.length === 0,
+   crBad.map(function (r) { return r.skin + ' ' + r.name + ' ' + r.ratio + '<' + r.min; }).join('; '));
+ok('⑤b 皮肤清单与解锁分层与规范一致',
+   (function () {
+     var u = {};
+     theme.SKINS.forEach(function (x) { u[x.id] = x.unlock; });
+     return theme.SKINS.length === 6 &&
+       u.night.type === 'free' && u.sakura.type === 'free' &&
+       u.rose.type === 'tasks' && u.rose.need === 3 &&
+       u.honey.type === 'tasks' && u.honey.need === 5 &&
+       u.mint.type === 'tasks' && u.mint.need === 7 &&
+       u.sky.type === 'paid';
+   })());
+ok('⑤c 浅色皮肤的 id 均为合法类名字符（skin-xxx 能挂上根节点）',
+   theme.SKINS.every(function (x) { return /^[a-z][a-z0-9]*$/.test(x.id); }));
+
 console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
   (fail ? '，' + fail + ' 项 ✗' : ''));
 process.exit(fail ? 1 : 0);
