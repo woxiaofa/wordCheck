@@ -90,7 +90,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     this.setData({ today: time.getLocalDate(Date.now()) });
     this.ensureUnits();
     this.rebuildPreview();

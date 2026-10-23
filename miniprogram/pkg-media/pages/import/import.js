@@ -23,7 +23,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     this.setData({ custom: books.customBooks(), draftList: drafts.list() });
   },
 

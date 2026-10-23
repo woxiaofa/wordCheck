@@ -274,6 +274,24 @@ function applyNav() {
   else setTimeout(shoot, 0);
 }
 
+/**
+ * 各页面 onShow 里调一行即可：theme.syncPage(this)
+ *
+ * 做两件事：① 把皮肤类重算一遍写回 data；② 刷系统导航栏配色。
+ *
+ * 为什么必须「重算 skin」（2026-10-23 用户实锤「切回默认就这样了」）：
+ *   skin 写在页面的 data 里，而 data 只在**页面创建时**算一次。换肤后按返回键
+ *   回到页面栈里还活着的旧页面，它不会重新算 —— 于是皮肤已经切回夜色了，
+ *   那一页还穿着樱粉。只刷导航栏（applyNav）治不了这个，头换了、身子没换。
+ *
+ * 为什么顺手刷导航栏：导航栏是系统控件，不在 DOM 里，CSS 变量到不了它，
+ *   且页面没 ready 时发的那枪会被静默丢弃，所以带重试（见 applyNav）。
+ */
+function syncPage(vm) {
+  if (vm && typeof vm.setData === 'function') vm.setData({ skin: cls() });
+  applyNav();
+}
+
 /** 是否已解锁：type=free 恒 true；tasks 看完成次数；paid 暂一律 false（预留） */
 function unlocked(skin, doneCount) {
   if (!skin) return false;
@@ -291,5 +309,6 @@ module.exports = {
   set: set,
   unlocked: unlocked,
   navBar: navBar,
-  applyNav: applyNav
+  applyNav: applyNav,
+  syncPage: syncPage
 };

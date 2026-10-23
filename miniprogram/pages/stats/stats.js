@@ -46,7 +46,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     this.refresh();
   },
 

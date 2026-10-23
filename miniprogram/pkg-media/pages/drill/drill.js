@@ -126,7 +126,7 @@ Page({
   mirror: {},
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
   },
 
   onLoad: function (options) {

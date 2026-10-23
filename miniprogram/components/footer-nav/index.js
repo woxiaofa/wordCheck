@@ -41,10 +41,7 @@ Component({
      （导航栏还没 ready / 正在转场），这里再补一枪兜底。
      setNavigationBarColor 设成相同的值没有副作用，重复调用安全。 */
   pageLifetimes: {
-    show: function () {
-      theme.applyNav();
-      this.setData({ skin: theme.cls() });
-    }
+    show: function () { theme.syncPage(this); }
   },
 
   methods: {

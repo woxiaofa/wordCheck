@@ -99,7 +99,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     // 跨天时重建队列：否则用户晚上打开会看到昨天剩下的卡片
     var today = time.getLocalDate();
     if (this.loadedDate && this.loadedDate !== today) {

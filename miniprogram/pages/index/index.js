@@ -82,7 +82,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();                  // 系统导航栏吃不到 CSS 变量，只能靠 API 换色
+    theme.syncPage(this);                  // 系统导航栏吃不到 CSS 变量，只能靠 API 换色
     this.setData({ landscape: fit.isLandscape() });
     this.refresh();
     this.maybeShowIntro();

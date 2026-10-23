@@ -21,7 +21,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     this.refresh();
   },
 
@@ -55,7 +55,6 @@ Page({
   pick: function (e) {
     var id = e.currentTarget.dataset.id;
     if (!id) return;
-    var self = this;
     var item = null;
     this.data.skins.forEach(function (s) { if (s.id === id) item = s; });
     if (!item) return;
@@ -75,11 +74,20 @@ Page({
       wx.showToast({ title: '这个皮肤不存在', icon: 'none', duration: 2000 });
       return;
     }
-    // 立刻刷导航栏：不等下一次 onShow，否则点了皮肤只有内容变色、头还是旧的
-    theme.applyNav();
+    // 不等下一次 onShow，当场就换：syncPage 一次办两件（skin 类 + 导航栏），
+    // 导航栏那一枪自带重试，转场中也补得上。
+    theme.syncPage(this);
     this.refresh();
     wx.showToast({ title: '已换成「' + item.name + '」', icon: 'none', duration: 1500 });
-    void self;
+    // 整栈重载（2026-10-23 用户拍板）：
+    // syncPage 管的是显示层，但页面里还有一批「创建时算一次」的运行时状态
+    // （抽查页的答案镜像、学习页的当日队列、布局宽屏标记），换肤后它们仍是旧的，
+    // 表现就是「切回默认了，某处还留着粉」。reLaunch 把整栈重建，一处清干净。
+    // 换肤是低频动作，回首页这点代价换「不再有残留」，值。
+    // 延后 600ms：让「已换成…」的 toast 先落地，跳太早等于没提示。
+    setTimeout(function () {
+      wx.reLaunch({ url: '/pages/index/index' });
+    }, 600);
   },
 
   go: function (e) {

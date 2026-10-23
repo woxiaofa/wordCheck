@@ -247,7 +247,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
   },
 
   onLoad: function (q) {

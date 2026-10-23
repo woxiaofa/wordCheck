@@ -42,7 +42,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();                // 导航栏是系统控件，CSS 变量管不到它
+    theme.syncPage(this);                // 导航栏是系统控件，CSS 变量管不到它
   },
 
   onLoad: function (query) {

@@ -65,7 +65,7 @@ Page({
   },
 
   onShow: function () {
-    theme.applyNav();
+    theme.syncPage(this);
     this.mirror = wx.getStorageSync(STORAGE_KEY) || {};
   },
 

@@ -269,16 +269,41 @@ ok('③a 每个页面 data 里都有 skin: theme.cls()', badJs.length === 0, bad
 ok('③b 每个页面根节点都挂了 {{skin}}', badWxml.length === 0, badWxml.join(', '));
 ok('③c 皮肤类挂在 .page 根节点上（继承才能到组件）', badCls.length === 0, badCls.join(', '));
 
-/* ---------- ③e 导航栏配色 ----------
- * 系统导航栏不是 DOM，CSS 变量到不了它 —— 只能靠 wx.setNavigationBarColor 逐页设。
- * 漏一个页面，那页在浅色皮肤下就是「内容白了、标题栏还是黑的」（用户实锤反馈）。 */
-var badNav2 = PAGES.filter(function (p) {
+/* ---------- ③e 页面 onShow 重算皮肤 + 导航栏配色 ----------
+ * 两件事都得在 onShow 里做，缺一件就出 bug：
+ *   ① 导航栏是系统控件，不在 DOM 里，CSS 变量到不了它 —— 只能靠 setNavigationBarColor 逐页设；
+ *      漏一个页面，那页在浅色皮肤下就是「内容白了、标题栏还是黑的」（用户实锤反馈）。
+ *   ② skin 写在 data 里，只在页面**创建时**算一次；换肤后返回栈里活着的旧页面，
+ *      它不会重算 —— 表现是「切回默认就这样了」（2026-10-23 用户实锤）。
+ * 统一走 theme.syncPage(this)，两件事一起办，避免以后有人只补一半。 */
+function onShowBody(p) {
   var src = fs.readFileSync(path.join(ROOT, p + '.js'), 'utf8');
   var inShow = src.slice(src.indexOf('onShow:'));
-  inShow = inShow.slice(0, inShow.indexOf('\n  },') + 1);
-  return inShow.indexOf('theme.applyNav()') < 0;
+  var end = inShow.indexOf('\n  },');
+  return end < 0 ? inShow : inShow.slice(0, end + 1);
+}
+var badNav2 = PAGES.filter(function (p) {
+  return onShowBody(p).indexOf('theme.syncPage(this)') < 0;
 });
-ok('③e 十个页面 onShow 里都刷了导航栏配色', badNav2.length === 0, badNav2.join(', '));
+ok('③e 十个页面 onShow 里都重算了皮肤类 + 导航栏配色',
+   badNav2.length === 0, badNav2.join(', '));
+
+/* ③g syncPage 必须真的把 skin 写回 data（而不只是刷导航栏） */
+var navCalls = 0;
+global.wx.setNavigationBarColor = function () { navCalls++; };
+global.wx.nextTick = function (fn) { fn(); };
+theme.set('sakura');
+var fakeVm = { data: { skin: 'skin-night' }, setData: function (o) { this.data.skin = o.skin; } };
+navCalls = 0;
+theme.syncPage(fakeVm);
+var syncOk = fakeVm.data.skin === 'skin-sakura' && navCalls > 0;
+/* 换个皮肤再来一次：证明是「每次重算」而不是只算一次 */
+theme.set('night');
+navCalls = 0;
+theme.syncPage(fakeVm);
+syncOk = syncOk && fakeVm.data.skin === 'skin-night' && navCalls > 0;
+ok('③g syncPage 每次都把皮肤类重算写回 data（换肤后返回旧页面也能换过来）',
+   syncOk, 'skin=' + fakeVm.data.skin + ' navCalls=' + navCalls);
 
 theme.set('night');
 var nightBar = theme.navBar();
@@ -489,6 +514,31 @@ ok('⑥n 设置页有「给开发者留言」的客服入口',
    /<button[\s\S]{0,200}open-type="contact"[\s\S]{0,200}>/.test(settingsWxml) &&
    settingsWxml.indexOf('给开发者留言') >= 0,
    '缺少 open-type="contact" 或按钮文案');
+
+/* ⑥o 换肤后整栈重载（2026-10-23 用户拍板）
+ * 为什么 syncPage 之外还要 reLaunch：syncPage 管的是「显示层的 skin 类」，
+ * 但页面里还有些「创建时算一次」的运行时状态（抽查页的答案镜像、学习页的当日队列、
+ * 各页算好的布局宽屏标记），换肤后它们仍是旧的。reLaunch 把整栈重建，一次清干净。
+ * 换肤是低频动作，回首页这点代价换「不再出现残留」，值。 */
+var launchStack = [];
+var navDelays = [];
+global.wx.reLaunch = function (o) { launchStack.push(o.url); };
+var realSetTimeout = global.setTimeout;
+global.setTimeout = function (fn, ms) { navDelays.push(ms); fn(); return 0; };  // 让延时回调同步落地
+store.activity_log = {};                    // 回到「一次任务没完成」，只用必解锁的免费皮肤
+page.refresh();
+toasts.length = 0; launchStack.length = 0; navDelays.length = 0;
+page.pick({ currentTarget: { dataset: { id: 'sakura' } } });
+global.setTimeout = realSetTimeout;         // 立刻还原，别污染后续用例
+ok('⑥o 换肤后整栈重载回首页（重建创建期状态，杜绝残留）',
+   store[theme.KEY] === 'sakura' &&
+   launchStack.join('|').indexOf('/pages/index/index') >= 0,
+   'skin=' + store[theme.KEY] + ' reLaunch=' + (launchStack.join('|') || '(没跳)'));
+
+/* ⑥p 跳转不能是 0 延迟：toast 至少 1500ms 才看得清，跳太早等于没提示 */
+ok('⑥p 整栈重载延后 300ms 以上，先让「已换成…」提示落地',
+   navDelays.length > 0 && navDelays[navDelays.length - 1] >= 300,
+   'delays: ' + (navDelays.join(',') || '(没有延时)'));
 
 console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
   (fail ? '，' + fail + ' 项 ✗' : ''));
