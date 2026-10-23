@@ -13,6 +13,9 @@ var KEY = 'word_skin_id';
 
 /**
  * 皮肤清单。
+ * 为什么只有五套：蔷薇（rose）曾是第二套粉色，与樱粉并排几乎分辨不出，
+ * 占一个里程碑又不产生获得感，故移除。浅色之间必须拉得开家族差异
+ * （粉/橘/绿/蓝），宁可少一套也不要两套看着一样。
  * tokens 未列出的键会继承 skin-night（默认）的值，新增皮肤只需写差异部分。
  * 浅色皮肤的取值不是拍脑袋来的：每个「文字/底色」组合都跑过 WCAG 对比度校验，
  * 见 scripts/check-contrast.js 与 tests/theme.test.js（不达标会被测试拦下）。
@@ -50,23 +53,6 @@ var SKINS = [
       muted: '#8f6f7a', muted2: '#997a85', muted3: '#8c6c7d',
       muted4: '#a0848d', muted5: '#a07e88',
       accent: '#cf2b56', active: '#f6c9d7'
-    }
-  },
-  {
-    id: 'rose',
-    name: '蔷薇',
-    desc: '完成 3 次任务解锁',
-    unlock: { type: 'tasks', need: 3 },
-    tokens: {
-      bg: '#fdf5f5', bg2: '#fbeeee',
-      surface: '#ffffff', surface2: '#fdeeee', surface3: '#f8dde0',
-      fill: '#fdf4f4', fill2: '#fceded', fill3: '#fbe5e6',
-      line: '#eec9c9', line2: '#e8bfbf', line3: '#ebc4c4',
-      line4: '#e2b6b6', line5: '#dda9ab', line6: '#f0d2d2',
-      text: '#3d2427', text2: '#4f3537', text3: '#6c5155',
-      muted: '#8e6f72', muted2: '#98797c', muted3: '#8b6c70',
-      muted4: '#9e8184', muted5: '#a78c8f',
-      accent: '#c02a45', active: '#f2c6c9'
     }
   },
   {

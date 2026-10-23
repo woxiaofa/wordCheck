@@ -13,6 +13,7 @@
 
 var fs = require('fs');
 var path = require('path');
+var cp = require('child_process');
 
 var pass = 0;
 var fail = 0;
@@ -22,6 +23,9 @@ function ok(name, cond, extra) {
 }
 
 var ROOT = path.join(__dirname, '..', 'miniprogram');
+
+/* theme.js 提前加载：①e 判定皮肤清单时就要用 */
+var theme = require(path.join(ROOT, 'utils', 'theme.js'));
 
 /* ---- 桩：theme.js 用到 wx.getStorageSync / setStorageSync ---- */
 var store = {};
@@ -74,6 +78,21 @@ var jsMissing = Object.keys(map).filter(function (hex) {
 ok('①c utils/theme.js 的默认皮肤覆盖全部 token', jsMissing.length === 0,
    '缺：' + jsMissing.map(function (h) { return map[h] + '=' + h; }).join(', '));
 
+// 样式层必须与运行时完全一致：theme.wxss 由 gen-theme-wxss.js 生成，改一边不改另一边就红
+try {
+  cp.execFileSync('node', [path.join(__dirname, '..', 'scripts', 'gen-theme-wxss.js'), '--check'],
+    { encoding: 'utf8' });
+  ok('①d theme.wxss 与 utils/theme.js 两边同步（脚本生成，不许手改）', true);
+} catch (e) {
+  ok('①d theme.wxss 与 utils/theme.js 两边同步（脚本生成，不许手改）', false,
+     '请跑 node scripts/gen-theme-wxss.js 重新生成');
+}
+// 每套皮肤在样式层都要有对应类
+var noCls = theme.SKINS.filter(function (x) {
+  return themeWxss.indexOf('.skin-' + x.id + ' {') < 0;
+}).map(function (x) { return x.id; });
+ok('①e 每套皮肤在 theme.wxss 里都有 skin-xxx 类', noCls.length === 0, noCls.join(', '));
+
 /* ---------- ② 业务样式里没有残存硬编码 ---------- */
 var css = walk(ROOT, '.wxss', []).filter(function (f) {
   return path.basename(f) !== 'theme.wxss';
@@ -107,7 +126,6 @@ ok('③b 每个页面根节点都挂了 {{skin}}', badWxml.length === 0, badWxml
 ok('③c 皮肤类挂在 .page 根节点上（继承才能到组件）', badCls.length === 0, badCls.join(', '));
 
 /* ---------- ④ 解锁逻辑 ---------- */
-var theme = require(path.join(ROOT, 'utils', 'theme.js'));
 ok('④a 默认皮肤是夜色', theme.skinId() === 'night' && theme.cls() === 'skin-night');
 ok('④b 换肤到已存在的皮肤能落盘', theme.set('night') === true && store[theme.KEY] === 'night');
 ok('④c 换肤到不存在的皮肤被拒绝，且不会写脏数据',
@@ -125,21 +143,19 @@ ok('④f paid 皮肤当前一律不可用（个人主体无支付通道）',
    theme.unlocked({ id: 'y', unlock: { type: 'paid', price: 600 } }, 99) === false);
 
 /* ---------- ⑤ 配色对比度（WCAG）与皮肤清单 ---------- */
-var cp = require('child_process');
 var out = cp.execFileSync('node',
   [path.join(__dirname, '..', 'scripts', 'check-contrast.js'), '--json'],
   { encoding: 'utf8' });
 var cr = JSON.parse(out);
 var crBad = cr.filter(function (r) { return !r.pass; });
-ok('⑤a 六套皮肤全部过 WCAG 对比度门槛', crBad.length === 0,
+ok('⑤a 全部皮肤都过 WCAG 对比度门槛', crBad.length === 0,
    crBad.map(function (r) { return r.skin + ' ' + r.name + ' ' + r.ratio + '<' + r.min; }).join('; '));
-ok('⑤b 皮肤清单与解锁分层与规范一致',
+ok('⑤b 皮肤清单与解锁分层与规范一致（蔷薇因与樱粉雷同已移除）',
    (function () {
      var u = {};
      theme.SKINS.forEach(function (x) { u[x.id] = x.unlock; });
-     return theme.SKINS.length === 6 &&
+     return theme.SKINS.length === 5 &&
        u.night.type === 'free' && u.sakura.type === 'free' &&
-       u.rose.type === 'tasks' && u.rose.need === 3 &&
        u.honey.type === 'tasks' && u.honey.need === 5 &&
        u.mint.type === 'tasks' && u.mint.need === 7 &&
        u.sky.type === 'paid';

@@ -1,22 +1,24 @@
 /**
  * 主题 token 表（1.2.0）
  *
- * 命名规则：按「用途 + 深浅」分层，不是按色号。
- *   bg      页面底色      bg2       页面底色（略微抬高的那一层，如列表整块背景）
- *   surface 卡片          surface2  卡片里的嵌套块   surface3 按键/键盘面
- *   fill    输入框、行底   fill2/3   同类块的其他深浅
- *   line    描边主线       line2~6   次级分割线（按由深到浅）
- *   text    主文字         text2/3   次级文字
- *   muted   弱化文字       muted2~5  逐级减弱的说明文字
- *   accent  强调色/链接    active    按下的瞬时态
+ * 注意：本文件由 scripts/gen-theme-wxss.js 从 utils/theme.js 生成，
+ *       **不要手改**。要加新皮肤或调色值，改 utils/theme.js 后重新生成。
+ *       tests/theme.test.js 会校验两边一致（改一边不改另一边，测试会红）。
  *
- * 取值说明：skin-night 的每个值都与改造前各页面硬编码的颜色**逐一对齐**，
- * 所以这次变量化在视觉上是零变化的；换肤时只重写这些变量。
+ * token 命名规则：按「用途 + 深浅」分层，不是按色号。
+ *   bg       页面底色      bg2       页面底色（略微抬高的那一层）
+ *   surface  卡片          surface2  卡内嵌套块   surface3 键盘按键面
+ *   fill     输入框、行底   fill2/3   同类块的其他深浅
+ *   line     描边主线       line2~6   次级分割线（由深到浅）
+ *   text     主文字         text2/3   次级文字
+ *   muted    弱化文字       muted2~5  逐级减弱的说明文字
+ *   accent   强调色/链接    active    按下的瞬时态
  *
  * 功能色不在此列（对错必须有固定语义）：ok #2fd07a / bad #ff5c72 /
  * warn #ffb020 / gold #ffd166 / purple #7c5cff，仍直接写在业务样式里。
  */
 
+/* 默认值：任何没挂皮肤类的地方都用夜色，保证老页面不会变白 */
 page {
   --bg: #0f1620;
   --bg2: #101a24;
@@ -44,8 +46,7 @@ page {
   --active: #3a4a5e;
 }
 
-/* 皮肤：挂在页面根节点上，向下继承。
-   新增皮肤只需在这里写差异 token，未列出的键自动沿用 page 里的夜色值。 */
+/* 夜色（night） · 默认深色，晚上背词不刺眼 */
 .skin-night {
   --bg: #0f1620;
   --bg2: #101a24;
@@ -71,4 +72,116 @@ page {
   --muted5: #6b7a8c;
   --accent: #3ea6ff;
   --active: #3a4a5e;
+}
+
+/* 樱粉（sakura） · 免费 · 白天暖调，看着不累 */
+.skin-sakura {
+  --bg: #fff7fa;
+  --bg2: #fdeff3;
+  --surface: #ffffff;
+  --surface2: #fff2f6;
+  --surface3: #ffe3ec;
+  --fill: #fff6f9;
+  --fill2: #ffeff5;
+  --fill3: #ffe8f0;
+  --line: #eebfd2;
+  --line2: #e8b6c9;
+  --line3: #f0c4d5;
+  --line4: #e8b8cb;
+  --line5: #e4adc2;
+  --line6: #f4d2df;
+  --text: #3a2731;
+  --text2: #4c3841;
+  --text3: #6b555f;
+  --muted: #8f6f7a;
+  --muted2: #997a85;
+  --muted3: #8c6c7d;
+  --muted4: #a0848d;
+  --muted5: #a07e88;
+  --accent: #cf2b56;
+  --active: #f6c9d7;
+}
+
+/* 蜜橘（honey） · 完成 5 次任务解锁 */
+.skin-honey {
+  --bg: #fffaf1;
+  --bg2: #fdf4e6;
+  --surface: #ffffff;
+  --surface2: #fff3e1;
+  --surface3: #ffe4c4;
+  --fill: #fff7e9;
+  --fill2: #fff1dd;
+  --fill3: #ffe8cf;
+  --line: #e7cd9c;
+  --line2: #e0c290;
+  --line3: #ecd5ad;
+  --line4: #e3c99d;
+  --line5: #debf8e;
+  --line6: #f1dfba;
+  --text: #3c2a15;
+  --text2: #4d3a21;
+  --text3: #6a553a;
+  --muted: #8d7454;
+  --muted2: #977e5f;
+  --muted3: #8a7155;
+  --muted4: #9d8667;
+  --muted5: #a69072;
+  --accent: #9a5a00;
+  --active: #f5dcb6;
+}
+
+/* 薄荷（mint） · 完成 7 次任务解锁 */
+.skin-mint {
+  --bg: #f3fbf7;
+  --bg2: #e9f6f0;
+  --surface: #ffffff;
+  --surface2: #e9f6f1;
+  --surface3: #d6eee4;
+  --fill: #f0f9f5;
+  --fill2: #e9f6f1;
+  --fill3: #e0f1ea;
+  --line: #b4d9c8;
+  --line2: #a9d1bf;
+  --line3: #badfd0;
+  --line4: #a9d2c1;
+  --line5: #9ec9b7;
+  --line6: #c9e5d9;
+  --text: #1e322c;
+  --text2: #31433d;
+  --text3: #4c6158;
+  --muted: #6f887e;
+  --muted2: #79918a;
+  --muted3: #6d857c;
+  --muted4: #81978e;
+  --muted5: #7e958b;
+  --accent: #0c7355;
+  --active: #c4e4d7;
+}
+
+/* 晴空（sky） · 付费预留（个人主体暂无支付通道） */
+.skin-sky {
+  --bg: #f4faff;
+  --bg2: #e9f2fd;
+  --surface: #ffffff;
+  --surface2: #e9f3fd;
+  --surface3: #d7e8fa;
+  --fill: #f1f8fe;
+  --fill2: #e9f3fd;
+  --fill3: #e0eefa;
+  --line: #b4d2ec;
+  --line2: #a8caE6;
+  --line3: #bad5ee;
+  --line4: #a8c9e6;
+  --line5: #9dc0e0;
+  --line6: #c9def3;
+  --text: #1d2b3a;
+  --text2: #304250;
+  --text3: #4b5d70;
+  --muted: #6d8398;
+  --muted2: #778da0;
+  --muted3: #6b8194;
+  --muted4: #7f93a6;
+  --muted5: #7c90a3;
+  --accent: #1259b8;
+  --active: #c3dcf2;
 }
