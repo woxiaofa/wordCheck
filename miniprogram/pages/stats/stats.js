@@ -17,7 +17,8 @@ var STORAGE_KEY = 'word_state_mirror';
 var ACTIVITY_KEY = 'activity_log';
 var TARGET_PER_DAY = 20;
 var CHECKIN_RATIO = 0.8;
-var HEAT_LEVELS = ['#1e2a38', '#1d4f74', '#2b7fb8', '#3ea6ff', '#7c5cff'];
+// 热力图分档配色改为 CSS 类（heat-0 ~ heat-4，见 stats.wxss）：
+// 颜色写死在 JS 里换肤就管不到了，类名才能吃到皮肤的 CSS 变量。
 
 /** 日报 / 周报 / 月报三档；区间长度就是报告口径 */
 var RANGES = [
@@ -45,6 +46,7 @@ Page({
   },
 
   onShow: function () {
+    theme.applyNav();
     this.refresh();
   },
 
@@ -135,7 +137,7 @@ Page({
       var d = time.shiftLocalDate(today, -back);
       var c = activity[d] || 0;
       var level = c === 0 ? 0 : (c < 15 ? 1 : (c < 25 ? 2 : (c < 40 ? 3 : 4)));
-      out.push({ date: d, count: c, color: HEAT_LEVELS[level] });
+      out.push({ date: d, count: c, level: level });
     }
     return out;
   },

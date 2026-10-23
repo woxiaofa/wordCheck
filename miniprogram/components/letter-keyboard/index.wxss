@@ -5,7 +5,7 @@
    行 2 的阶梯偏移用行 padding 实现（真键盘 home row 也是偏的）；
    行 3 左端 ⇧、右端 ⌫（真键盘同位），不再需要额外的行缩进。 */
 .kb {
-  background: #1a2432;
+  background: var(--panel);
   border-radius: 24rpx 24rpx 0 0;
   padding: 16rpx 10rpx 14rpx;
   margin: 0 -24rpx;

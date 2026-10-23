@@ -90,6 +90,7 @@ Page({
   },
 
   onShow: function () {
+    theme.applyNav();
     this.setData({ today: time.getLocalDate(Date.now()) });
     this.ensureUnits();
     this.rebuildPreview();

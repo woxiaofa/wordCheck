@@ -103,8 +103,7 @@
       <view
         wx:for="{{heat}}"
         wx:key="date"
-        class="heat-cell"
-        style="background:{{item.color}}"
+        class="heat-cell heat-{{item.level}}"
         data-date="{{item.date}}"
         data-count="{{item.count}}"
         bindtap="onHeatTap"

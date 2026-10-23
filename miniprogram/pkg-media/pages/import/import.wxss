@@ -9,7 +9,7 @@
   border: 1rpx solid var(--line);
   border-radius: 8rpx;
   font-size: 24rpx;
-  color: #9fd3ff;
+  color: var(--accent-soft);
 }
 .ta {
   width: 100%;
@@ -38,11 +38,12 @@
   display: flex;
   align-items: baseline;
   padding: 12rpx 0;
-  border-bottom: 1rpx solid rgba(255, 255, 255, .06);
+  /* 原来是 rgba(255,255,255,.06) 的白线：深色下若有若无，浅色下彻底看不见 */
+  border-bottom: 1rpx solid var(--line);
 }
 .pv-w { width: 240rpx; color: var(--text2); font-weight: 600; font-size: 30rpx; }
 .pv-d { flex: 1; color: var(--muted2); font-size: 26rpx; }
-.sk { color: #b37602; }
+.sk { color: var(--gold-dim); }
 .empty { text-align: center; color: var(--muted2); font-size: 26rpx; }
 .row-between { display: flex; align-items: center; justify-content: space-between; }
 .mt { margin-top: 20rpx; }

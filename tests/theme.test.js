@@ -36,7 +36,8 @@ global.wx = {
 };
 
 var PAGES = [
-  'pages/index/index', 'pages/stats/stats', 'pages/class/class', 'pages/report/report',
+  'pages/index/index', 'pages/stats/stats', 'pages/settings/settings',
+  'pages/class/class', 'pages/report/report',
   'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study', 'pkg-media/pages/quiz/quiz',
   'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize'
 ];
@@ -57,27 +58,43 @@ var themeWxss = fs.readFileSync(path.join(ROOT, 'theme.wxss'), 'utf8');
 var scriptSrc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'theme-vars.js'), 'utf8');
 var themeJs = fs.readFileSync(path.join(ROOT, 'utils', 'theme.js'), 'utf8');
 
-var mapBlock = scriptSrc.match(/var MAP = \{([\s\S]*?)\n\};/);
+/*
+ * 解析迁移脚本的两张表。
+ * 踩过的坑：原来用 /\('(#[0-9a-f]{6})':\s*'([a-z0-9]+)'\) —— 值里带连字符的 token
+ * （ok-bg / gold-line2 / accent-soft …）**整条被静默跳过**，于是 ①b/①c/② 实际上只
+ * 验了一半映射。这里改成全局匹配 + 允许连字符，并保证 multicolumn 每行也不漏。
+ */
+function parseMap(name) {
+  var b = scriptSrc.match(new RegExp('var ' + name + ' = \\{([\\s\\S]*?)\\n\\};'));
+  if (!b) throw new Error('theme-vars.js 里找不到 ' + name);
+  var re = /'(#[0-9a-fA-F]{6})':\s*'([a-zA-Z0-9-]+)'/g;
+  var out = {};
+  var m;
+  while ((m = re.exec(b[1])) !== null) out[m[1].toLowerCase()] = m[2];
+  return out;
+}
+var exact = parseMap('EXACT');
+var near = parseMap('NEAR');
 var map = {};
-mapBlock[1].split('\n').forEach(function (line) {
-  var m = line.match(/'(#[0-9a-f]{6})':\s*'([a-z0-9]+)'/);
-  if (m) map[m[1]] = m[2];
-});
-ok('①a 迁移脚本里解析出 token 映射', Object.keys(map).length >= 20,
-   '实际 ' + Object.keys(map).length + ' 条');
+Object.keys(exact).forEach(function (k) { map[k] = exact[k]; });
+Object.keys(near).forEach(function (k) { map[k] = near[k]; });
 
-var missing = Object.keys(map).filter(function (hex) {
-  return themeWxss.indexOf('--' + map[hex] + ': ' + hex) < 0;
+ok('①a 迁移脚本里解析出 token 映射',
+   Object.keys(exact).length >= 20 && Object.keys(near).length >= 10,
+   '精确 ' + Object.keys(exact).length + ' 条 / 近似 ' + Object.keys(near).length + ' 条');
+
+var missing = Object.keys(exact).filter(function (hex) {
+  return themeWxss.indexOf('--' + exact[hex] + ': ' + hex) < 0;
 });
-ok('①b theme.wxss 的默认值与脚本映射逐一对齐', missing.length === 0,
-   '缺：' + missing.map(function (h) { return map[h] + '=' + h; }).join(', '));
+ok('①b theme.wxss 的默认值与脚本「精确」映射逐一对齐', missing.length === 0,
+   '缺：' + missing.map(function (h) { return exact[h] + '=' + h; }).join(', '));
 
 // utils/theme.js 里的默认皮肤也得对齐（换肤运行时用的是它）
-var jsMissing = Object.keys(map).filter(function (hex) {
+var jsMissing = Object.keys(exact).filter(function (hex) {
   return themeJs.indexOf("'" + hex + "'") < 0;
 });
 ok('①c utils/theme.js 的默认皮肤覆盖全部 token', jsMissing.length === 0,
-   '缺：' + jsMissing.map(function (h) { return map[h] + '=' + h; }).join(', '));
+   '缺：' + jsMissing.map(function (h) { return exact[h] + '=' + h; }).join(', '));
 
 // 样式层必须与运行时完全一致：theme.wxss 由 gen-theme-wxss.js 生成，改一边不改另一边就红
 try {
@@ -109,15 +126,129 @@ css.forEach(function (f) {
 ok('② 业务 wxss 里不再有 token 原色值', Object.keys(left).length === 0,
    JSON.stringify(left));
 
+// 每个在业务 wxss 里被引用的 var(--x)，token 表里都得真有 ——
+// 原来出现过 var(--ok) 这种悬空引用（漂移时写了 token 表里没有的名字），
+// 结果那条渐变直接失效，而且肉眼很难发现：颜色不对但不报错。
+var dangling = {};
+css.forEach(function (f) {
+  var re = /var\(\s*--([a-z0-9-]+)/gi;
+  var m;
+  var src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');   // 注释里举例不算
+  while ((m = re.exec(src)) !== null) {
+    if (themeWxss.indexOf('--' + m[1] + ':') < 0) {
+      (dangling[m[1]] = dangling[m[1]] || []).push(path.basename(f));
+    }
+  }
+});
+ok('②f 业务样式没有引用 token 表里不存在的变量', Object.keys(dangling).length === 0,
+   Object.keys(dangling).map(function (k) {
+     return 'var(--' + k + ') @ ' + dangling[k].join(',');
+   }).join('; '));
+
+/* ---------- ②d 不许有不透明的深色当背景 ----------
+ * 这是「深色孤岛」的直接判据：底下 rgb 很暗、又几乎不透明，换到浅色皮肤上就是一块补丁。
+ * 允许的是真蒙层 —— 照片说明条 rgba(15,22,32,.55) / 庆祝全屏罩 rgba(10,16,24,.45)：
+ * 它们本来就该压暗底下的内容，alpha 低到能透出皮肤色。
+ * 判据：不透明深色 = 亮度 ≤ 0.08 的实色，或 rgb 三通道都 ≤ 60 且 alpha ≥ 0.85。 */
+function relLum(hex) {
+  var h = hex.replace('#', '');
+  var a = [0, 2, 4].map(function (i) {
+    var v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+}
+var solidBad = [];
+css.forEach(function (f) {
+  blocks(fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).forEach(function (b) {
+    var m = b.match(/background(?:-color)?:\s*([^;}]+)/);
+    if (!m) return;
+    var v = m[1];
+    if (/var\(--|gradient|url\(|transparent|none|inherit/.test(v)) return;
+    var dark = false;
+    (v.match(/#[0-9a-fA-F]{6}\b/g) || []).forEach(function (h) {
+      if (relLum(h) <= 0.08) dark = true;
+    });
+    var rg = v.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?/);
+    if (rg) {
+      var alpha = rg[4] === undefined ? 1 : parseFloat(rg[4]);
+      if (alpha >= 0.85 && +rg[1] <= 60 && +rg[2] <= 60 && +rg[3] <= 60) dark = true;
+    }
+    if (dark) solidBad.push(path.basename(f) + '  ' + b.replace(/\s+/g, ' ').slice(0, 110));
+  });
+});
+ok('②d 业务样式没有「不透明深色当背景」（浅色皮肤下的深色孤岛）',
+   solidBad.length === 0, solidBad.join('\n      '));
+
 ok('②b app.wxss 引入了 theme.wxss（且是第一行 @import）',
    /^@import "theme\.wxss";/m.test(fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8')));
+
+/* ---------- ②c 功能色不许当文字色 ----------
+ * 这三个是为深色底调的亮色：压在白底上只有 1.9:1，等于看不见。
+ * 当「填充」用（按钮渐变、进度条、热力图）是允许的 —— 上面压白字，跨皮肤都成立；
+ * 当「文字」用必须走 ok-text / warn-text / bad-text，它们夜色取原值、浅色取加深值。 */
+var FUNC_TEXT = ['#2fd07a', '#ffb020', '#ff5c72', '#c0392b', '#b37602', '#a9c8b6'];
+var funcBad = [];
+css.forEach(function (f) {
+  fs.readFileSync(f, 'utf8').split('\n').forEach(function (line, i) {
+    if (/^\s*\/\*/.test(line) || /\*\//.test(line)) return;      // 注释里提到色值不算
+    FUNC_TEXT.forEach(function (hex) {
+      // 命中 "color: #xxx" 但排除 background-color / border-color / border-bottom-color
+      var re = new RegExp('(^|[;{\\s])color:\\s*' + hex + '\\b', 'i');
+      if (re.test(line.replace(/(background-|border-bottom-|border-|caret-|text-decoration-)color:/g, '@@:'))) {
+        funcBad.push(path.basename(f) + ':' + (i + 1) + ' ' + line.trim());
+      }
+    });
+  });
+});
+ok('②c 功能色不许直接当文字色（要过 ok-text / warn-text / bad-text）',
+   funcBad.length === 0, funcBad.join('\n      '));
+
+/* ---------- ②e 白字只能压在深色实底或深色蒙层上 ----------
+ * 实测踩过的坑：白字 + rgba(62,166,255,.16) 的淡蓝半透明底，深色下看着还行，
+ * 一换浅色皮肤那 16% 的蓝几乎铺不满底色，字直接糊掉 —— 用户看到的就是「有些字颜色不对」。
+ * 判据：块里有白字时，背景必须是 token、实色，或足够深的蒙层（rgb 三通道都 ≤ 80）。 */
+function blocks(src) {
+  return (src.match(/[^{}]+\{[^}]*\}/g) || []).map(function (b) {
+    return b.slice(b.indexOf('{'));
+  });
+}
+function isDeepBg(decl) {
+  if (!decl) return false;
+  if (/var\(--/.test(decl)) return true;                       // 交给 token 管，不在此判
+  if (/#[0-9a-fA-F]{3,6}/.test(decl)) return true;             // 实色由 ②c/肉眼把关
+  var m = decl.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!m) return false;
+  return +m[1] <= 80 && +m[2] <= 80 && +m[3] <= 80;            // 深色蒙层
+}
+var whiteBad = [];
+css.forEach(function (f) {
+  blocks(fs.readFileSync(f, 'utf8')).forEach(function (b) {
+    if (!/(^|[;{\s])color:\s*(#ffffff|#fff)\b/i.test(b)) return;
+    if (/(background-|border-)?color:\s*(#ffffff|#fff)/i.test(b) &&
+        /background(-image)?:\s*(var\(--|linear-gradient)/i.test(b)) return;   // 渐变实底 OK
+    if (isDeepBg((b.match(/background(?:-color)?:\s*[^;]+/) || [''])[0])) return;
+    // 有深色文字投影 = 作者已经声明「这行白字压的是蒙层/照片」，背景由父级提供
+    var sh = b.match(/text-shadow:\s*[^;]*rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (sh && +sh[1] <= 80 && +sh[2] <= 80 && +sh[3] <= 80) return;
+    whiteBad.push(path.basename(f) + '  ' + b.replace(/\s+/g, ' ').slice(0, 120));
+  });
+});
+ok('②e 白字没有叠在半透明浅底上（浅色皮肤下会糊成一团）',
+   whiteBad.length === 0, whiteBad.join('\n      '));
 
 // 皮肤类只能挂在 .page 内层节点上，page 元素本身吃不到 ——
 // 所以 .page 必须自己带背景色，否则浅色皮肤下内容不满屏时会露出深色底
 var appCss = fs.readFileSync(path.join(ROOT, 'app.wxss'), 'utf8');
-ok('③d .page 自带背景色（浅色皮肤不露深色底）',
-   appCss.indexOf('.page { background: var(--bg);') >= 0 &&
-   appCss.indexOf('min-height: 100vh') >= 0);
+// 皮肤类挂不到 page 元素上（只能挂内层 .page），所以 .page 必须自己带这三样：
+// 有背景 → 浅色皮肤不露深色底；有文字色 → 浅底不会配深字；min-height → 最后一屏也铺满。
+// 按块解析而不匹配整行，免得有人调了下属性的顺序就误报。
+var pageRule = (appCss.match(/\.page\s*\{[^}]*\}/) || [''])[0];
+ok('③d .page 自带背景色、文字色且铺满整屏',
+   /background:\s*var\(--bg\)/.test(pageRule) &&
+   /[^-]color:\s*var\(--text\)/.test(pageRule) &&
+   /min-height:\s*100vh/.test(pageRule),
+   pageRule.replace(/\s+/g, ' ').slice(0, 120));
 
 /* ---------- ③ 每个页面都接入 ---------- */
 var badJs = [], badWxml = [], badCls = [];
@@ -132,6 +263,27 @@ PAGES.forEach(function (p) {
 ok('③a 每个页面 data 里都有 skin: theme.cls()', badJs.length === 0, badJs.join(', '));
 ok('③b 每个页面根节点都挂了 {{skin}}', badWxml.length === 0, badWxml.join(', '));
 ok('③c 皮肤类挂在 .page 根节点上（继承才能到组件）', badCls.length === 0, badCls.join(', '));
+
+/* ---------- ③e 导航栏配色 ----------
+ * 系统导航栏不是 DOM，CSS 变量到不了它 —— 只能靠 wx.setNavigationBarColor 逐页设。
+ * 漏一个页面，那页在浅色皮肤下就是「内容白了、标题栏还是黑的」（用户实锤反馈）。 */
+var badNav2 = PAGES.filter(function (p) {
+  var src = fs.readFileSync(path.join(ROOT, p + '.js'), 'utf8');
+  var inShow = src.slice(src.indexOf('onShow:'));
+  inShow = inShow.slice(0, inShow.indexOf('\n  },') + 1);
+  return inShow.indexOf('theme.applyNav()') < 0;
+});
+ok('③e 十个页面 onShow 里都刷了导航栏配色', badNav2.length === 0, badNav2.join(', '));
+
+theme.set('night');
+var nightBar = theme.navBar();
+theme.set('sakura');
+var lightBar = theme.navBar();
+theme.set('night');
+ok('③f 深色皮肤是深底白字，浅色皮肤是浅底黑字',
+   nightBar.frontColor === '#ffffff' && nightBar.backgroundColor === '#0f1620' &&
+   lightBar.frontColor === '#000000' && lightBar.backgroundColor === '#fff7fa',
+   JSON.stringify(nightBar) + ' ' + JSON.stringify(lightBar));
 
 /* ---------- ④ 解锁逻辑 ---------- */
 ok('④a 默认皮肤是夜色', theme.skinId() === 'night' && theme.cls() === 'skin-night');

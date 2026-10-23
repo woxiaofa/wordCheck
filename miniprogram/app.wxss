@@ -12,11 +12,16 @@ page {
 }
 
 /* 通用容器。
-   底部 padding = footer-nav(fixed) 的高度 + 安全区，否则最后一屏的按钮会被 tabBar 盖住。 */
-.page { padding: 24rpx 24rpx calc(170rpx + env(safe-area-inset-bottom)); }
-/* 背景提在这里而不是只靠 page{}：皮肤类挂在 .page 上，而 page 元素拿不到那个类，
-   浅色皮肤下内容不够满时会露出深色底。min-height 保证最后一屏也铺满。 */
-.page { background: var(--bg); min-height: 100vh; }
+   底部 padding = footer-nav(fixed) 的高度 + 安全区，否则最后一屏的按钮会被 tabBar 盖住。
+   背景和文字色必须提在这里、不能只靠上面 page{}：皮肤类挂在 .page 上，
+   而 page 元素拿不到那个类 —— 只写 page{} 的话浅色皮肤会「浅底配深字」，整页看不清。
+   min-height 保证内容不满一屏时也铺满底色。 */
+.page {
+  padding: 24rpx 24rpx calc(170rpx + env(safe-area-inset-bottom));
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
 .card {
   background: var(--surface);
   border: 1rpx solid var(--line);
@@ -32,9 +37,10 @@ page {
 .muted { color: var(--muted); font-size: 26rpx; }
 .dim { color: var(--muted); }
 .accent { color: var(--accent); }
-.ok { color: #2fd07a; }
-.warn { color: #ffb020; }
-.bad { color: #ff5c72; }
+/* 这三个是功能色的「文字态」：深底上用亮值，浅色皮肤自动换成加深值（见 theme.js 注释第 3 条） */
+.ok { color: var(--ok-text); }
+.warn { color: var(--warn-text); }
+.bad { color: var(--bad-text); }
 
 /* 布局 */
 .row { display: flex; align-items: center; }

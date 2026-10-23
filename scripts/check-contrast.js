@@ -57,7 +57,15 @@ var RULES = [
   ['主文字 / 输入框', 'text', 'fill', 4.5],
   ['主文字 / 键盘面', 'text', 'surface3', 4.5],
   ['描边主线 vs 卡片', 'line', 'surface', 1.5, 'light'],
-  ['次级分割线 vs 卡片', 'line4', 'surface', 1.5, 'light']
+  ['次级分割线 vs 卡片', 'line4', 'surface', 1.5, 'light'],
+  // 功能色的文字态：同一个绿色当填充时上面压白字，当文字时靠这个 token 兜可读性
+  ['「对」文字 / 页面底', 'okText', 'bg', 4.5],
+  ['「对」文字 / 卡片', 'okText', 'surface', 4.5],
+  ['「警示」文字 / 页面底', 'warnText', 'bg', 4.5],
+  ['「错」文字 / 页面底', 'badText', 'bg', 4.5],
+  ['「错」文字 / 卡片', 'badText', 'surface', 4.5],
+  ['荣誉说明文字 / 荣誉底', 'okDim', 'okBg', 4.5],
+  ['熟词标记 / 卡片', 'goldDim', 'surface', 4.5]
 ];
 
 var results = [];
@@ -79,7 +87,9 @@ theme.SKINS.forEach(function (skin) {
 });
 
 if (process.argv.indexOf('--json') >= 0) {
-  console.log(JSON.stringify(results, null, 2));
+  // 只吐不达标的条目：全量 20 项 × 5 套皮肤已经能把 execFileSync 的默认缓冲撑爆，
+  // 而调用方（tests/theme.test.js）只关心「有没有没过的」
+  console.log(JSON.stringify(results.filter(function (r) { return !r.pass; })));
   process.exit(results.every(function (r) { return r.pass; }) ? 0 : 1);
 }
 

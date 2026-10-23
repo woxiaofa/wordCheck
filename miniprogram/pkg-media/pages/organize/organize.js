@@ -246,6 +246,10 @@ Page({
     ver: ''                // 运行中的版本号（体验版会显示 1.1.29 这种），截图就能核对
   },
 
+  onShow: function () {
+    theme.applyNav();
+  },
+
   onLoad: function (q) {
     var id = (q && q.id) || '';
     this.readVersion();

@@ -62,13 +62,14 @@
   border: 2rpx solid var(--line);
   background: var(--surface);
 }
-.fb-ok { border-color: #2fd07a; background: #16281d; }
-.fb-bad { border-color: #ff5c72; background: #2a1a20; }
+.fb-ok { border-color: var(--ok-text); background: var(--ok-bg); }
+/* 原来是 background:#2a1a20 —— 硬编码的深色小块，换到浅色皮肤下就是一块深色孤岛 */
+.fb-bad { border-color: var(--bad-text); background: var(--bad-bg); }
 .fb-title { font-size: 30rpx; font-weight: 700; }
-.fb-ok .fb-title { color: #2fd07a; }
-.fb-bad .fb-title { color: #ff8a9b; }
+.fb-ok .fb-title { color: var(--ok-text); }
+.fb-bad .fb-title { color: var(--bad-soft2); }
 .fb-line { margin-top: 10rpx; font-size: 28rpx; color: var(--text); }
-.fb-strong { color: #2fd07a; font-weight: 700; }
+.fb-strong { color: var(--ok-text); font-weight: 700; }
 .fb-note { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
 
 /* 拼写占位 */
@@ -84,7 +85,7 @@
   letter-spacing: 4rpx;
 }
 .slot-fill { color: var(--text); }
-.slot-empty { color: #4d6175; }
+.slot-empty { color: var(--muted5); }
 .slots-hint {
   margin-left: 16rpx;
   font-family: -apple-system, sans-serif;
@@ -105,5 +106,5 @@
 .detail-left { display: flex; align-items: center; gap: 12rpx; }
 .detail-word { font-size: 30rpx; font-weight: 600; }
 .detail-right { font-size: 26rpx; }
-.strike { color: #ff8a9b; text-decoration: line-through; }
-.ok { color: #2fd07a; }
+.strike { color: var(--bad-soft2); text-decoration: line-through; }
+.ok { color: var(--ok-text); }

@@ -5,7 +5,9 @@
   bottom: 0;
   z-index: 100;
   display: flex;
-  background: rgba(20, 28, 38, .97);
+  /* 原来写的是 rgba(20,28,38,.97)：浅色皮肤下底栏是块深色的，看着像没换肤成功。
+     底栏要跟着 themes 走，但又要能透出下面的内容，所以取 panel（夜色下与旧值肉眼无差）。 */
+  background: var(--panel);
   border-top: 1rpx solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }

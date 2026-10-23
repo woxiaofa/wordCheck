@@ -17,14 +17,21 @@ var ROOT = path.join(__dirname, '..', 'miniprogram');
 global.wx = { getStorageSync: function () { }, setStorageSync: function () { } };
 var theme = require(path.join(ROOT, 'utils', 'theme.js'));
 
-var ORDER = ['bg', 'bg2', 'surface', 'surface2', 'surface3', 'fill', 'fill2', 'fill3',
+function kebab(k) { return k.replace(/[A-Z]/g, function (m) { return '-' + m.toLowerCase(); }); }
+var ORDER = ['bg', 'bg2', 'panel', 'surface', 'surface2', 'surface3', 'fill', 'fill2', 'fill3',
   'line', 'line2', 'line3', 'line4', 'line5', 'line6',
   'text', 'text2', 'text3', 'muted', 'muted2', 'muted3', 'muted4', 'muted5',
-  'accent', 'active'];
+  'accent', 'active', 'press',
+  'okText', 'warnText', 'badText', 'okDim', 'goldDim',
+  'okBg', 'okSoft', 'okLine', 'badBg', 'badSoft', 'badSoft2',
+  'goldBg', 'goldBg2', 'goldLine', 'goldLine2', 'goldText', 'goldSoft',
+  'honorA', 'honorB', 'honorSoft', 'purpleBg', 'purpleSoft',
+  'accentBg', 'accentSoft'];   // 与 tokens 键同名（驼峰），输出时转 kebab
 
 function block(tokens, indent) {
   return ORDER.map(function (k) {
-    return indent + '--' + k + ': ' + tokens[k] + ';';
+    if (tokens[k] === undefined) throw new Error('皮肤 tokens 缺少 ' + k);
+    return indent + '--' + kebab(k) + ': ' + tokens[k] + ';';
   }).join('\n');
 }
 
@@ -46,9 +53,14 @@ var out = [
   ' *   text     主文字         text2/3   次级文字',
   ' *   muted    弱化文字       muted2~5  逐级减弱的说明文字',
   ' *   accent   强调色/链接    active    按下的瞬时态',
+  ' *   okText/warnText/badText  功能色的**文字态**（填充态不在此列，见下）',
+  ' *   okDim/goldDim            功能色里更小更弱的那一档说明文字',
   ' *',
-  ' * 功能色不在此列（对错必须有固定语义）：ok #2fd07a / bad #ff5c72 /',
-  ' * warn #ffb020 / gold #ffd166 / purple #7c5cff，仍直接写在业务样式里。',
+  ' * 哪些颜色故意不进这张表：',
+  ' *   ① 功能色当填充用（按钮渐变、进度条、热力图色阶）—— 上面压白字，跨皮肤都成立；',
+  ' *      且数据色阶跟着皮肤变，会让人以为换肤后是两组数据，所以直接写在业务样式里。',
+  ' *      唯一受管的是「白字不许叠在半透明浅底上」，见 tests/theme.test.js ②e。',
+  ' *   ② 自成一体的系统提示（iPad 横屏提示：金底 + 深棕字）—— 它不该跟着皮肤走。',
   ' */',
   '',
   '/* 默认值：任何没挂皮肤类的地方都用夜色，保证老页面不会变白 */',

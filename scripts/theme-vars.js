@@ -18,8 +18,11 @@ var path = require('path');
 
 var ROOT = path.join(__dirname, '..', 'miniprogram');
 
-/** 原色值 → token（取值严格相等，不允许就近合并） */
-var MAP = {
+/**
+ * 原色值 → token，取值**严格相等**：每个色值都必须能在夜色皮肤里找到同值的 token。
+ * 这是「换肤前视觉零变化」的根据 —— 有差都得扔进 NEAR，别混在这里充数。
+ */
+var EXACT = {
   '#0f1620': 'bg',
   '#101a24': 'bg2',
   '#18222e': 'surface',
@@ -43,11 +46,67 @@ var MAP = {
   '#7f93a8': 'muted4',
   '#6b7a8c': 'muted5',
   '#3ea6ff': 'accent',
-  '#3a4a5e': 'active'
+  '#3a4a5e': 'active',
+  '#131c27': 'panel',
+  '#173626': 'ok-bg',
+  '#7fd6a0': 'ok-soft',
+  '#24563a': 'ok-line',
+  '#3a1f2a': 'bad-bg',
+  '#ffb0b0': 'bad-soft',
+  '#ff8a9b': 'bad-soft2',
+  '#3a3117': 'gold-bg',
+  '#2e2416': 'gold-bg2',
+  '#7a6320': 'gold-line',
+  '#5a4520': 'gold-line2',
+  '#ffd88a': 'gold-soft',
+  '#ffd166': 'gold-text',
+  '#3a2f10': 'honor-a',
+  '#2a2a1c': 'honor-b',
+  '#c9b98a': 'honor-soft',
+  '#2b2438': 'purple-bg',
+  '#cdbcff': 'purple-soft',
+  '#17324a': 'accent-bg',
+  '#dce8f4': 'accent-soft',
+  '#24344a': 'press'
 };
+
+/**
+ * 一次性近似色归族：这些是历史上各页面手写出来的「差不多一样」的色值，
+ * 逐个建 token 会把 token 表撑成一堆没人记得住的近似兄弟，故就近归到最贴近的那个。
+ * 与 token 原值有极小色差（肉眼难辨），属有意合并 ——
+ * 所以它们**不参与** ①b/①c 的「原值 == token 值」校验，但仍然参与 ② 的残留检查。
+ */
+var NEAR = {
+  // —— 第三轮 ——
+  '#16301f': 'ok-bg', '#3a2028': 'bad-bg', '#ff8a9c': 'bad-soft2',
+  '#1a2432': 'panel', '#1b2735': 'panel', '#1b2836': 'panel',
+  '#1c2733': 'panel', '#1e2a37': 'panel',
+  '#1f304a': 'surface2', '#24313f': 'surface2', '#24374a': 'surface2', '#2a3a52': 'line',
+  '#3f4d5d': 'muted5', '#4a5a6b': 'muted5', '#4d6175': 'muted5', '#55677c': 'muted5',
+  '#5b6b7d': 'muted5', '#5b7387': 'muted4', '#66788c': 'muted4', '#6b8095': 'muted4',
+  '#8a97a5': 'muted3', '#c8d4e0': 'text3',
+  '#ff8a8a': 'bad-soft2', '#ff9a9a': 'bad-soft2', '#ff7b7b': 'bad-soft2',
+  '#ffb4bf': 'bad-soft', '#ff8a95': 'bad-soft2', '#ffb0c0': 'bad-soft',
+  '#7cc4ff': 'accent-soft', '#7fc0ff': 'accent-soft', '#9fd3ff': 'accent-soft',
+  '#9fc3e8': 'accent-soft', '#409eff': 'accent',
+  '#b9a8ff': 'purple-soft',
+  // 注意：这里不许出现 'ok' / 'bad' / 'warn' —— token 表里没这个 key，
+  // 曾经误把它们写进来，结果生成了 var(--ok) 这种悬空引用（渐变直接失效）。
+  '#34a86a': 'ok-soft', '#1fa860': 'ok-soft', '#4cd08a': 'ok-soft',
+  '#e8a33d': 'gold-soft', '#ffc861': 'gold-soft', '#574a1e': 'gold-bg',
+  '#14261c': 'ok-bg', '#16281d': 'ok-bg', '#241f14': 'gold-bg2',
+  '#2b2416': 'gold-bg2', '#3a1f24': 'bad-bg'
+};
+
+/** 实际执行替换用的是两张表的并集（近似表同样要被替换掉，只是不参与「取值相等」校验） */
+var MAP = {};
+[EXACT, NEAR].forEach(function (t) {
+  Object.keys(t).forEach(function (k) { MAP[k] = t[k]; });
+});
 
 var PAGES = [
   ['pages/index', 'pages/index/index'],
+  ['pages/settings', 'pages/settings/settings'],
   ['pages/stats', 'pages/stats/stats'],
   ['pages/class', 'pages/class/class'],
   ['pages/report', 'pages/report/report'],

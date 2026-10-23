@@ -21,6 +21,7 @@ Page({
   },
 
   onShow: function () {
+    theme.applyNav();
     this.refresh();
   },
 
@@ -74,6 +75,8 @@ Page({
       wx.showToast({ title: '这个皮肤不存在', icon: 'none', duration: 2000 });
       return;
     }
+    // 立刻刷导航栏：不等下一次 onShow，否则点了皮肤只有内容变色、头还是旧的
+    theme.applyNav();
     this.refresh();
     wx.showToast({ title: '已换成「' + item.name + '」', icon: 'none', duration: 1500 });
     void self;

@@ -17,9 +17,9 @@
   padding: 8rpx 18rpx; border-radius: 999rpx;
   font-size: 23rpx;
 }
-.rh-status.t-gray { color: var(--muted3); background: #1c2733; }
-.rh-status.t-amber { color: #ffd88a; background: #2b2416; }
-.rh-status.t-green { color: #7fd6a0; background: #16301f; }
+.rh-status.t-gray { color: var(--muted3); background: var(--panel); }
+.rh-status.t-amber { color: var(--gold-soft); background: var(--gold-bg2); }
+.rh-status.t-green { color: var(--ok-soft); background: var(--ok-bg); }
 
 /* 三个核心数字 */
 .kpi-row2 { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
@@ -38,14 +38,14 @@
 .sum-text { font-size: 28rpx; line-height: 1.7; color: var(--text); }
 .honor-box {
   margin-top: 18rpx; padding: 18rpx 20rpx;
-  background: #16301f; border: 1rpx solid #24563a; border-radius: 14rpx;
+  background: var(--ok-bg); border: 1rpx solid var(--ok-line); border-radius: 14rpx;
 }
-.honor-badge { font-size: 30rpx; font-weight: 600; color: #7fd6a0; }
-.honor-detail { margin-top: 8rpx; font-size: 24rpx; color: #a9c8b6; }
+.honor-badge { font-size: 30rpx; font-weight: 600; color: var(--ok-soft); }
+.honor-detail { margin-top: 8rpx; font-size: 24rpx; color: var(--ok-dim); }
 .loop-tip {
   margin-top: 18rpx; padding: 16rpx 20rpx;
-  background: #2b2416; border-radius: 14rpx;
-  color: #ffd88a; font-size: 24rpx;
+  background: var(--gold-bg2); border-radius: 14rpx;
+  color: var(--gold-soft); font-size: 24rpx;
 }
 
 /* 作业完成度 */
@@ -53,11 +53,11 @@
 .ra-name { font-size: 26rpx; display: flex; align-items: center; flex-wrap: wrap; }
 .tag-mini {
   margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: 999rpx;
-  font-size: 20rpx; color: #cdbcff; background: #2b2438;
+  font-size: 20rpx; color: var(--purple-soft); background: var(--purple-bg);
 }
 .bar { margin-top: 10rpx; height: 12rpx; border-radius: 999rpx; background: var(--line3); overflow: hidden; }
 .bar-in { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg, var(--accent), #7c5cff); }
-.bar-in.ok { background: linear-gradient(90deg, #2fd07a, #34a86a); }
+.bar-in.ok { background: linear-gradient(90deg, #2fd07a, var(--ok-soft)); }
 
 /* 错因 chip（与班级页同款：禁换行，防止释义撑成大气泡） */
 .chip-line { display: flex; flex-wrap: wrap; align-items: center; margin-top: 12rpx; }
@@ -78,19 +78,19 @@
 }
 .wt-chip .wt-word { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
 .wt-trans { margin-left: 6rpx; font-size: 20rpx; color: var(--muted4); }
-.wt-cnt { margin-left: 6rpx; font-size: 20rpx; color: #ffb020; }
-.wt-chip.alt { background: #2b2438; color: #cdbcff; }
-.wt-chip.danger { background: #3a2028; color: #ffb0b0; }
+.wt-cnt { margin-left: 6rpx; font-size: 20rpx; color: var(--warn-text); }
+.wt-chip.alt { background: var(--purple-bg); color: var(--purple-soft); }
+.wt-chip.danger { background: var(--bad-bg); color: var(--bad-soft); }
 
 /* 最近评分 */
-.rlog { display: flex; align-items: flex-start; gap: 14rpx; padding: 14rpx 0; border-bottom: 1rpx solid #1e2a37; }
+.rlog { display: flex; align-items: flex-start; gap: 14rpx; padding: 14rpx 0; border-bottom: 1rpx solid var(--panel); }
 .rlog:last-child { border-bottom: 0; }
 .log-mark { font-size: 26rpx; }
-.log-mark.ok { color: #7fd6a0; }
-.log-mark.bad { color: #ff5c72; }
+.log-mark.ok { color: var(--ok-soft); }
+.log-mark.bad { color: var(--bad-text); }
 .rlog-mid { flex: 1; min-width: 0; }
 .rlog-word { font-size: 26rpx; }
-.rlog-typed { margin-top: 4rpx; font-size: 22rpx; color: #ffb0b0; }
+.rlog-typed { margin-top: 4rpx; font-size: 22rpx; color: var(--bad-soft); }
 
 /* 外发区 */
 .acts .btn { margin-top: 16rpx; }

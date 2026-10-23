@@ -11,9 +11,9 @@
   margin-top: 14rpx;
   padding: 16rpx 18rpx;
   background: var(--bg2);
-  border: 2rpx solid #24313f;
+  border: 2rpx solid var(--surface2);
   border-radius: 12rpx;
-  color: #ffb4bf;
+  color: var(--bad-soft);
   font-size: 22rpx;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -79,7 +79,7 @@
 .plan-head { display: flex; align-items: center; gap: 10rpx; }
 .plan-dot {
   width: 12rpx; height: 12rpx; border-radius: 50%;
-  background: #4a5a6b; flex-shrink: 0;
+  background: var(--muted5); flex-shrink: 0;
 }
 .plan-dot.live { background: #2fd07a; }
 .plan-name { flex: 1; font-size: 26rpx; color: var(--text); }
@@ -90,7 +90,7 @@
   padding: 6rpx 18rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  color: #ff9a9a;
+  color: var(--bad-soft2);
   border: 1rpx solid rgba(255, 92, 114, .4);
 }
 
@@ -101,7 +101,7 @@
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  color: #7fc0ff;
+  color: var(--accent-soft);
   background: rgba(62, 166, 255, .12);
   border: 1rpx solid rgba(62, 166, 255, .4);
 }
@@ -153,10 +153,10 @@
   background: linear-gradient(90deg, #2fd07a, var(--accent));
   transition: width .3s;
 }
-.bad-text { color: #ff5c72; font-size: 24rpx; }
+.bad-text { color: var(--bad-text); font-size: 24rpx; }
 /* 逐学员名单的名字配色：done 绿 / review 黄（词学过但有忘词）/ pending 红 */
-.ok-text { color: #7fd6a0; font-size: 24rpx; }
-.warn-text { color: #ffd88a; font-size: 24rpx; }
+.ok-text { color: var(--ok-soft); font-size: 24rpx; }
+.warn-text { color: var(--gold-soft); font-size: 24rpx; }
 
 /* 学员行 */
 .stu {
@@ -198,9 +198,9 @@
 /* 状态一行：图标 + 简短数据，五档配色（灰待同步/红失联/黄有忘词/绿不错） */
 .stu-status { font-size: 22rpx; margin-top: 4rpx; }
 .stu-status.t-gray { color: var(--muted3); }
-.stu-status.t-red { color: #ff8a8a; }
-.stu-status.t-amber { color: #ffd88a; }
-.stu-status.t-green { color: #7fd6a0; }
+.stu-status.t-red { color: var(--bad-soft2); }
+.stu-status.t-amber { color: var(--gold-soft); }
+.stu-status.t-green { color: var(--ok-soft); }
 
 /* 学员进度报告（展开区） */
 .report {
@@ -227,8 +227,8 @@
   font-size: 26rpx;
 }
 .log-mark { width: 36rpx; text-align: center; font-weight: 700; flex-shrink: 0; }
-.log-mark.ok { color: #2fd07a; }
-.log-mark.bad { color: #ff5c72; }
+.log-mark.ok { color: var(--ok-text); }
+.log-mark.bad { color: var(--bad-text); }
 .log-word { font-weight: 600; }
 .log-trans {
   flex: 1;
@@ -243,7 +243,7 @@
 .per-stu {
   margin-top: 12rpx;
   padding-left: 16rpx;
-  border-left: 4rpx solid #2a3a52;
+  border-left: 4rpx solid var(--line);
 }
 .per-stu-row { padding: 6rpx 0; }
 .per-stu-name { font-size: 26rpx; font-weight: 600; margin-right: 12rpx; }
@@ -257,12 +257,12 @@
   margin-top: 12rpx;
   padding: 14rpx 18rpx;
   border-radius: 14rpx;
-  background: linear-gradient(90deg, #3a2f10, #2a2a1c);
-  border: 2rpx solid #7a6320;
+  background: linear-gradient(90deg, var(--honor-a), var(--honor-b));
+  border: 2rpx solid var(--gold-line);
 }
-.honor-badge { font-size: 30rpx; font-weight: 700; color: #ffd166; }
-.honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
-.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: #ffb0b0; }
+.honor-badge { font-size: 30rpx; font-weight: 700; color: var(--gold-text); }
+.honor-detail { font-size: 22rpx; color: var(--honor-soft); margin-top: 6rpx; }
+.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: var(--bad-soft); }
 
 /* 布置作业的"量"提示：超过建议值时变黄，仍可继续布置（只是提醒，不拦） */
 .count-tip {
@@ -275,9 +275,9 @@
   color: var(--muted);
 }
 .count-tip.warn {
-  background: #2e2416;
-  color: #ffb020;
-  border: 1rpx solid #5a4520;
+  background: var(--gold-bg2);
+  color: var(--warn-text);
+  border: 1rpx solid var(--gold-line2);
 }
 
 /* 老师端"一张表"：谁没交 / 错哪几个词 / 错在哪
@@ -291,20 +291,20 @@
   display: flex;
   align-items: flex-start;
 }
-.pending-line.done { background: #14261c; }
+.pending-line.done { background: var(--ok-bg); }
 /* 忘词待巩固：词学过了但有抽查答忘的 —— 黄色调，提醒而不是催 */
-.pending-line.warn { background: #241f14; }
-.pending-tag.warn-tag { color: #ffd88a; background: #3a3117; }
+.pending-line.warn { background: var(--gold-bg2); }
+.pending-tag.warn-tag { color: var(--gold-soft); background: var(--gold-bg); }
 .pending-tag {
   flex-shrink: 0;
   margin-right: 12rpx;
   padding: 4rpx 12rpx;
   border-radius: 999rpx;
   font-size: 22rpx;
-  color: #ffb0b0;
-  background: #3a1f24;
+  color: var(--bad-soft);
+  background: var(--bad-bg);
 }
-.pending-tag.ok { color: #7fd6a0; background: #173626; }
+.pending-tag.ok { color: var(--ok-soft); background: var(--ok-bg); }
 .pending-names { flex: 1; font-size: 24rpx; color: var(--text3); line-height: 1.6; }
 
 .wrong-box {
@@ -320,7 +320,7 @@
   align-items: center;
   margin-top: 8rpx;
 }
-.wrong-line .muted { flex-shrink: 0; margin-right: 12rpx; font-size: 22rpx; color: #6b8095; }
+.wrong-line .muted { flex-shrink: 0; margin-right: 12rpx; font-size: 22rpx; color: var(--muted4); }
 .wt-chip {
   /* view + flex 定高：不再依赖 text 行盒（text 套 text 曾把行盒撑到两倍高） */
   display: flex;
@@ -338,9 +338,9 @@
 }
 .wt-chip .wt-word { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
 .wt-trans { margin-left: 8rpx; font-size: 20rpx; color: var(--muted4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
-.wt-cnt { margin-left: 8rpx; font-size: 20rpx; color: #ffb020; flex-shrink: 0; }
-.wt-chip.alt { background: #2b2438; color: #cdbcff; }
-.wt-chip.danger { background: #3a2028; color: #ffb0b0; }
+.wt-cnt { margin-left: 8rpx; font-size: 20rpx; color: var(--warn-text); flex-shrink: 0; }
+.wt-chip.alt { background: var(--purple-bg); color: var(--purple-soft); }
+.wt-chip.danger { background: var(--bad-bg); color: var(--bad-soft); }
 .wrong-box .why { margin-top: 10rpx; font-size: 20rpx; opacity: .7; }
 .per-stu-row.head { border-bottom: 1rpx solid var(--line2); padding-bottom: 8rpx; }
 .per-stu-row.head .muted { font-size: 20rpx; }
@@ -350,7 +350,7 @@
   margin-top: 16rpx;
   padding: 16rpx 20rpx;
   background: var(--fill2);
-  border: 1rpx solid #24374a;
+  border: 1rpx solid var(--surface2);
   border-radius: 12rpx;
 }
 .preview-head {
@@ -360,23 +360,23 @@
   font-size: 26rpx;
   font-weight: 600;
 }
-.preview-edited { font-size: 22rpx; color: #e8a33d; font-weight: 400; }
+.preview-edited { font-size: 22rpx; color: var(--gold-soft); font-weight: 400; }
 .preview-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
 .preview-chip {
   background: var(--surface2);
   border: 1rpx solid var(--line5);
-  color: #dce8f4;
+  color: var(--accent-soft);
   border-radius: 24rpx;
   padding: 6rpx 20rpx;
   font-size: 24rpx;
 }
-.chip-x { color: #c0392b; margin-left: 6rpx; }
-.preview-empty { font-size: 24rpx; color: #c0392b; }
+.chip-x { color: var(--bad-text); margin-left: 6rpx; }
+.preview-empty { font-size: 24rpx; color: var(--bad-text); }
 .preview-search {
   margin-top: 14rpx;
   background: var(--surface2);
   border: 1rpx solid var(--line5);
-  color: #dce8f4;
+  color: var(--accent-soft);
   border-radius: 10rpx;
   padding: 10rpx 20rpx;
   font-size: 26rpx;
@@ -389,9 +389,9 @@
 }
 .search-hit {
   background: rgba(62, 166, 255, .18);
-  color: #7cc4ff;
+  color: var(--accent-soft);
   border-radius: 20rpx;
   padding: 6rpx 18rpx;
   font-size: 24rpx;
 }
-.preview-note { margin-top: 12rpx; font-size: 20rpx; color: #8a97a5; }
+.preview-note { margin-top: 12rpx; font-size: 20rpx; color: var(--muted3); }

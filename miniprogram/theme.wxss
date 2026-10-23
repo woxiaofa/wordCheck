@@ -13,15 +13,21 @@
  *   text     主文字         text2/3   次级文字
  *   muted    弱化文字       muted2~5  逐级减弱的说明文字
  *   accent   强调色/链接    active    按下的瞬时态
+ *   okText/warnText/badText  功能色的**文字态**（填充态不在此列，见下）
+ *   okDim/goldDim            功能色里更小更弱的那一档说明文字
  *
- * 功能色不在此列（对错必须有固定语义）：ok #2fd07a / bad #ff5c72 /
- * warn #ffb020 / gold #ffd166 / purple #7c5cff，仍直接写在业务样式里。
+ * 哪些颜色故意不进这张表：
+ *   ① 功能色当填充用（按钮渐变、进度条、热力图色阶）—— 上面压白字，跨皮肤都成立；
+ *      且数据色阶跟着皮肤变，会让人以为换肤后是两组数据，所以直接写在业务样式里。
+ *      唯一受管的是「白字不许叠在半透明浅底上」，见 tests/theme.test.js ②e。
+ *   ② 自成一体的系统提示（iPad 横屏提示：金底 + 深棕字）—— 它不该跟着皮肤走。
  */
 
 /* 默认值：任何没挂皮肤类的地方都用夜色，保证老页面不会变白 */
 page {
   --bg: #0f1620;
   --bg2: #101a24;
+  --panel: #131c27;
   --surface: #18222e;
   --surface2: #1e2a38;
   --surface3: #243040;
@@ -44,12 +50,38 @@ page {
   --muted5: #6b7a8c;
   --accent: #3ea6ff;
   --active: #3a4a5e;
+  --press: #24344a;
+  --ok-text: #2fd07a;
+  --warn-text: #ffb020;
+  --bad-text: #ff5c72;
+  --ok-dim: #a9c8b6;
+  --gold-dim: #bd7d08;
+  --ok-bg: #173626;
+  --ok-soft: #7fd6a0;
+  --ok-line: #24563a;
+  --bad-bg: #3a1f2a;
+  --bad-soft: #ffb0b0;
+  --bad-soft2: #ff8a9b;
+  --gold-bg: #3a3117;
+  --gold-bg2: #2e2416;
+  --gold-line: #7a6320;
+  --gold-line2: #5a4520;
+  --gold-text: #ffd166;
+  --gold-soft: #ffd88a;
+  --honor-a: #3a2f10;
+  --honor-b: #2a2a1c;
+  --honor-soft: #c9b98a;
+  --purple-bg: #2b2438;
+  --purple-soft: #cdbcff;
+  --accent-bg: #17324a;
+  --accent-soft: #dce8f4;
 }
 
 /* 夜色（night） · 默认深色，晚上背词不刺眼 */
 .skin-night {
   --bg: #0f1620;
   --bg2: #101a24;
+  --panel: #131c27;
   --surface: #18222e;
   --surface2: #1e2a38;
   --surface3: #243040;
@@ -72,12 +104,38 @@ page {
   --muted5: #6b7a8c;
   --accent: #3ea6ff;
   --active: #3a4a5e;
+  --press: #24344a;
+  --ok-text: #2fd07a;
+  --warn-text: #ffb020;
+  --bad-text: #ff5c72;
+  --ok-dim: #a9c8b6;
+  --gold-dim: #bd7d08;
+  --ok-bg: #173626;
+  --ok-soft: #7fd6a0;
+  --ok-line: #24563a;
+  --bad-bg: #3a1f2a;
+  --bad-soft: #ffb0b0;
+  --bad-soft2: #ff8a9b;
+  --gold-bg: #3a3117;
+  --gold-bg2: #2e2416;
+  --gold-line: #7a6320;
+  --gold-line2: #5a4520;
+  --gold-text: #ffd166;
+  --gold-soft: #ffd88a;
+  --honor-a: #3a2f10;
+  --honor-b: #2a2a1c;
+  --honor-soft: #c9b98a;
+  --purple-bg: #2b2438;
+  --purple-soft: #cdbcff;
+  --accent-bg: #17324a;
+  --accent-soft: #dce8f4;
 }
 
 /* 樱粉（sakura） · 免费 · 白天暖调，看着不累 */
 .skin-sakura {
   --bg: #fff7fa;
   --bg2: #fdeff3;
+  --panel: #ffffff;
   --surface: #ffffff;
   --surface2: #fff2f6;
   --surface3: #ffe3ec;
@@ -100,12 +158,38 @@ page {
   --muted5: #a07e88;
   --accent: #cf2b56;
   --active: #f6c9d7;
+  --press: #f2dee6;
+  --ok-text: #177a4b;
+  --warn-text: #8a5a00;
+  --bad-text: #c22a45;
+  --ok-dim: #4a6b58;
+  --gold-dim: #7a5300;
+  --ok-bg: #e2f4ea;
+  --ok-soft: #177a4b;
+  --ok-line: #b9e0cc;
+  --bad-bg: #fdeaee;
+  --bad-soft: #c22a45;
+  --bad-soft2: #c22a45;
+  --gold-bg: #fbf1da;
+  --gold-bg2: #f8ecd2;
+  --gold-line: #d9c391;
+  --gold-line2: #e2cda6;
+  --gold-text: #8a6116;
+  --gold-soft: #8a6116;
+  --honor-a: #fdf3dd;
+  --honor-b: #f6e8c6;
+  --honor-soft: #8a6116;
+  --purple-bg: #efeafc;
+  --purple-soft: #6a4bd8;
+  --accent-bg: #e3effc;
+  --accent-soft: #1c5bb8;
 }
 
 /* 蜜橘（honey） · 完成 5 次任务解锁 */
 .skin-honey {
   --bg: #fffaf1;
   --bg2: #fdf4e6;
+  --panel: #ffffff;
   --surface: #ffffff;
   --surface2: #fff3e1;
   --surface3: #ffe4c4;
@@ -128,12 +212,38 @@ page {
   --muted5: #a69072;
   --accent: #9a5a00;
   --active: #f5dcb6;
+  --press: #f2dee6;
+  --ok-text: #177a4b;
+  --warn-text: #8a5a00;
+  --bad-text: #c22a45;
+  --ok-dim: #4a6b58;
+  --gold-dim: #7a5300;
+  --ok-bg: #e2f4ea;
+  --ok-soft: #177a4b;
+  --ok-line: #b9e0cc;
+  --bad-bg: #fdeaee;
+  --bad-soft: #c22a45;
+  --bad-soft2: #c22a45;
+  --gold-bg: #fbf1da;
+  --gold-bg2: #f8ecd2;
+  --gold-line: #d9c391;
+  --gold-line2: #e2cda6;
+  --gold-text: #8a6116;
+  --gold-soft: #8a6116;
+  --honor-a: #fdf3dd;
+  --honor-b: #f6e8c6;
+  --honor-soft: #8a6116;
+  --purple-bg: #efeafc;
+  --purple-soft: #6a4bd8;
+  --accent-bg: #e3effc;
+  --accent-soft: #1c5bb8;
 }
 
 /* 薄荷（mint） · 完成 7 次任务解锁 */
 .skin-mint {
   --bg: #f3fbf7;
   --bg2: #e9f6f0;
+  --panel: #ffffff;
   --surface: #ffffff;
   --surface2: #e9f6f1;
   --surface3: #d6eee4;
@@ -156,12 +266,38 @@ page {
   --muted5: #7e958b;
   --accent: #0c7355;
   --active: #c4e4d7;
+  --press: #f2dee6;
+  --ok-text: #177a4b;
+  --warn-text: #8a5a00;
+  --bad-text: #c22a45;
+  --ok-dim: #4a6b58;
+  --gold-dim: #7a5300;
+  --ok-bg: #e2f4ea;
+  --ok-soft: #177a4b;
+  --ok-line: #b9e0cc;
+  --bad-bg: #fdeaee;
+  --bad-soft: #c22a45;
+  --bad-soft2: #c22a45;
+  --gold-bg: #fbf1da;
+  --gold-bg2: #f8ecd2;
+  --gold-line: #d9c391;
+  --gold-line2: #e2cda6;
+  --gold-text: #8a6116;
+  --gold-soft: #8a6116;
+  --honor-a: #fdf3dd;
+  --honor-b: #f6e8c6;
+  --honor-soft: #8a6116;
+  --purple-bg: #efeafc;
+  --purple-soft: #6a4bd8;
+  --accent-bg: #e3effc;
+  --accent-soft: #1c5bb8;
 }
 
 /* 晴空（sky） · 付费预留（个人主体暂无支付通道） */
 .skin-sky {
   --bg: #f4faff;
   --bg2: #e9f2fd;
+  --panel: #ffffff;
   --surface: #ffffff;
   --surface2: #e9f3fd;
   --surface3: #d7e8fa;
@@ -169,7 +305,7 @@ page {
   --fill2: #e9f3fd;
   --fill3: #e0eefa;
   --line: #b4d2ec;
-  --line2: #a8caE6;
+  --line2: #a8cae6;
   --line3: #bad5ee;
   --line4: #a8c9e6;
   --line5: #9dc0e0;
@@ -184,4 +320,29 @@ page {
   --muted5: #7c90a3;
   --accent: #1259b8;
   --active: #c3dcf2;
+  --press: #dde9f5;
+  --ok-text: #177a4b;
+  --warn-text: #8a5a00;
+  --bad-text: #c22a45;
+  --ok-dim: #4a6b58;
+  --gold-dim: #7a5300;
+  --ok-bg: #e2f4ea;
+  --ok-soft: #177a4b;
+  --ok-line: #b9e0cc;
+  --bad-bg: #fdeaee;
+  --bad-soft: #c22a45;
+  --bad-soft2: #c22a45;
+  --gold-bg: #fbf1da;
+  --gold-bg2: #f8ecd2;
+  --gold-line: #d9c391;
+  --gold-line2: #e2cda6;
+  --gold-text: #8a6116;
+  --gold-soft: #8a6116;
+  --honor-a: #fdf3dd;
+  --honor-b: #f6e8c6;
+  --honor-soft: #8a6116;
+  --purple-bg: #efeafc;
+  --purple-soft: #6a4bd8;
+  --accent-bg: #e3effc;
+  --accent-soft: #1c5bb8;
 }

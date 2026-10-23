@@ -8,14 +8,17 @@
   padding: 12rpx 28rpx;
   font-size: 26rpx;
   color: var(--muted);
-  background: #131c27;
+  background: var(--panel);
   border: 1rpx solid var(--line);
   border-radius: 999rpx;
 }
+/* 选中态：原来白字叠在 rgba(62,166,255,.16) 上 —— 深色下看着还行，
+   浅色皮肤下 16% 的蓝几乎铺不满粉底，白字直接糊掉。改用强调色那一组 token，
+   夜色是蓝底浅蓝字（与旧观感一致），浅色是淡蓝底深蓝字。 */
 .book-chip.on {
-  color: #ffffff;
+  color: var(--accent-soft);
   font-weight: 600;
-  background: rgba(62, 166, 255, .16);
+  background: var(--accent-bg);
   border-color: var(--accent);
 }
 
@@ -29,7 +32,7 @@
 .task-list {
   margin: 0 0 28rpx;
   padding: 20rpx 24rpx;
-  background: #131c27;
+  background: var(--panel);
   border-radius: 20rpx;
   text-align: left;
 }
@@ -58,7 +61,7 @@
 .step-no {
   min-width: 44rpx; height: 44rpx; line-height: 44rpx; margin-top: 4rpx;
   border-radius: 50%; text-align: center;
-  background: #1f304a; color: var(--accent); font-size: 26rpx; font-weight: 700;
+  background: var(--surface2); color: var(--accent); font-size: 26rpx; font-weight: 700;
 }
 .step-body { display: flex; flex-direction: column; }
 .step-t { font-size: 28rpx; font-weight: 600; }
@@ -67,7 +70,7 @@
 /* ---- 原理展开区 ---- */
 .howto-more {
   margin-top: 16rpx; padding: 20rpx 24rpx;
-  background: #131c27; border-radius: 16rpx;
+  background: var(--panel); border-radius: 16rpx;
   font-size: 24rpx; color: var(--muted); line-height: 1.7;
 }
 
@@ -88,10 +91,10 @@
 .log-fb { color: var(--muted); margin-right: 12rpx; }
 .log-cloud {
   padding: 4rpx 14rpx; border-radius: 999rpx;
-  font-size: 22rpx; color: var(--muted); background: #131c27;
+  font-size: 22rpx; color: var(--muted); background: var(--panel);
 }
-.log-cloud.ok { color: #4cd08a; background: rgba(76, 208, 138, .14); }
-.log-cloud.fail { color: #ff7b7b; background: rgba(255, 123, 123, .14); }
+.log-cloud.ok { color: var(--ok-soft); background: rgba(76, 208, 138, .14); }
+.log-cloud.fail { color: var(--bad-soft2); background: rgba(255, 123, 123, .14); }
 
 /* 掌握率口径说明：学过词但 0% 掌握时出现，防止被当成数字 bug */
 .kpi-note {
@@ -105,21 +108,21 @@
   margin-top: 12rpx;
   padding: 14rpx 18rpx;
   border-radius: 14rpx;
-  background: linear-gradient(90deg, #3a2f10, #2a2a1c);
-  border: 2rpx solid #7a6320;
+  background: linear-gradient(90deg, var(--honor-a), var(--honor-b));
+  border: 2rpx solid var(--gold-line);
 }
-.honor-badge { font-size: 30rpx; font-weight: 700; color: #ffd166; }
-.honor-detail { font-size: 22rpx; color: #c9b98a; margin-top: 6rpx; }
-.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: #ffb0b0; }
+.honor-badge { font-size: 30rpx; font-weight: 700; color: var(--gold-text); }
+.honor-detail { font-size: 22rpx; color: var(--honor-soft); margin-top: 6rpx; }
+.loop-tip { margin-top: 10rpx; font-size: 22rpx; color: var(--bad-soft); }
 
 /* 离线练习提示：断网时孩子也能接着练，这里只是把"为什么家长那边数字没变"说清 */
 .offline-tip {
   margin-top: 10rpx;
   padding: 10rpx 16rpx;
   border-radius: 10rpx;
-  background: #2e2416;
-  border: 1rpx solid #5a4520;
-  color: #ffb020;
+  background: var(--gold-bg2);
+  border: 1rpx solid var(--gold-line2);
+  color: var(--warn-text);
   font-size: 22rpx;
   line-height: 1.5;
 }

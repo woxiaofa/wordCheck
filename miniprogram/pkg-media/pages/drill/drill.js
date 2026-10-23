@@ -125,6 +125,10 @@ Page({
   /** @type {Object} 本地 SRS 镜像，与学习页/抽查页共用同一个 key */
   mirror: {},
 
+  onShow: function () {
+    theme.applyNav();
+  },
+
   onLoad: function (options) {
     this.mirror = wx.getStorageSync(STORAGE_KEY) || {};
     // iPad 横屏：内容按宽度自适应会放得特别大（2026-10-09 用户反馈），提示竖屏

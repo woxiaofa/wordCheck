@@ -5,7 +5,11 @@
  *   1. 默认「夜色」的 token 取值与原深色硬编码逐一对齐 —— 变量化改造后视觉零变化。
  *   2. 换肤靠「给页面根节点挂 skin-xxx 类」，CSS 变量从根节点往下继承，
  *      包括被 page 引用的自定义组件（小程序自定义组件无样式隔离槽位，继承照常）。
- *   3. 功能色（对/错/警示/金币/主题紫）不参与换肤 —— 语义色跟着皮肤变会让人看不懂对错。
+ *   3. 功能色（对/错/警示/金币）的**色相**不参与换肤 —— 绿=对、红=错跨皮肤必须一致，
+ *      否则用户认不出对错。但同一个绿色当**文字**用时得跟着底色调深浅：
+ *      #2fd07a 压在深底上是清楚的，压到白底只有 1.9:1，等于看不见。
+ *      所以拆成两态 —— 实心填充写死色值（上面压白字，跨皮肤都成立），
+ *      文字态走 ok-text / warn-text / bad-text 三个 token（夜色取原值，浅色取加深值）。
  *   4. 解锁留三层：free 默认开放 / tasks 完成 N 次任务 / paid 预留（个人主体暂不可支付）。
  */
 
@@ -35,7 +39,17 @@ var SKINS = [
       text: '#e8eef5', text2: '#e8f0f8', text3: '#cfe0f0',
       muted: '#8fa3b7', muted2: '#8b9bad', muted3: '#8fa8c0',
       muted4: '#7f93a8', muted5: '#6b7a8c',
-      accent: '#3ea6ff', active: '#3a4a5e'
+      accent: '#3ea6ff', active: '#3a4a5e',
+      okText: '#2fd07a', warnText: '#ffb020', badText: '#ff5c72',
+      okDim: '#a9c8b6', goldDim: '#bd7d08',   // 原 #b37602 在深卡上只有 4.21:1，提亮一档到 4.67
+      panel: '#131c27',
+      okBg: '#173626', okSoft: '#7fd6a0', okLine: '#24563a',
+      badBg: '#3a1f2a', badSoft: '#ffb0b0', badSoft2: '#ff8a9b',
+      goldBg: '#3a3117', goldBg2: '#2e2416', goldLine: '#7a6320', goldLine2: '#5a4520',
+      goldText: '#ffd166', goldSoft: '#ffd88a', honorA: '#3a2f10', honorB: '#2a2a1c', honorSoft: '#c9b98a',
+      purpleBg: '#2b2438', purpleSoft: '#cdbcff',
+      accentBg: '#17324a', accentSoft: '#dce8f4',
+      press: '#24344a',
     }
   },
   {
@@ -52,7 +66,17 @@ var SKINS = [
       text: '#3a2731', text2: '#4c3841', text3: '#6b555f',
       muted: '#8f6f7a', muted2: '#997a85', muted3: '#8c6c7d',
       muted4: '#a0848d', muted5: '#a07e88',
-      accent: '#cf2b56', active: '#f6c9d7'
+      accent: '#cf2b56', active: '#f6c9d7',
+      okText: '#177a4b', warnText: '#8a5a00', badText: '#c22a45',
+      okDim: '#4a6b58', goldDim: '#7a5300',
+      panel: '#ffffff',
+      okBg: '#e2f4ea', okSoft: '#177a4b', okLine: '#b9e0cc',
+      badBg: '#fdeaee', badSoft: '#c22a45', badSoft2: '#c22a45',
+      goldBg: '#fbf1da', goldBg2: '#f8ecd2', goldLine: '#d9c391', goldLine2: '#e2cda6',
+      goldText: '#8a6116', goldSoft: '#8a6116', honorA: '#fdf3dd', honorB: '#f6e8c6', honorSoft: '#8a6116',
+      purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
+      accentBg: '#e3effc', accentSoft: '#1c5bb8',
+      press: '#f2dee6',
     }
   },
   {
@@ -69,7 +93,17 @@ var SKINS = [
       text: '#3c2a15', text2: '#4d3a21', text3: '#6a553a',
       muted: '#8d7454', muted2: '#977e5f', muted3: '#8a7155',
       muted4: '#9d8667', muted5: '#a69072',
-      accent: '#9a5a00', active: '#f5dcb6'
+      accent: '#9a5a00', active: '#f5dcb6',
+      okText: '#177a4b', warnText: '#8a5a00', badText: '#c22a45',
+      okDim: '#4a6b58', goldDim: '#7a5300',
+      panel: '#ffffff',
+      okBg: '#e2f4ea', okSoft: '#177a4b', okLine: '#b9e0cc',
+      badBg: '#fdeaee', badSoft: '#c22a45', badSoft2: '#c22a45',
+      goldBg: '#fbf1da', goldBg2: '#f8ecd2', goldLine: '#d9c391', goldLine2: '#e2cda6',
+      goldText: '#8a6116', goldSoft: '#8a6116', honorA: '#fdf3dd', honorB: '#f6e8c6', honorSoft: '#8a6116',
+      purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
+      accentBg: '#e3effc', accentSoft: '#1c5bb8',
+      press: '#f2dee6',
     }
   },
   {
@@ -86,7 +120,17 @@ var SKINS = [
       text: '#1e322c', text2: '#31433d', text3: '#4c6158',
       muted: '#6f887e', muted2: '#79918a', muted3: '#6d857c',
       muted4: '#81978e', muted5: '#7e958b',
-      accent: '#0c7355', active: '#c4e4d7'
+      accent: '#0c7355', active: '#c4e4d7',
+      okText: '#177a4b', warnText: '#8a5a00', badText: '#c22a45',
+      okDim: '#4a6b58', goldDim: '#7a5300',
+      panel: '#ffffff',
+      okBg: '#e2f4ea', okSoft: '#177a4b', okLine: '#b9e0cc',
+      badBg: '#fdeaee', badSoft: '#c22a45', badSoft2: '#c22a45',
+      goldBg: '#fbf1da', goldBg2: '#f8ecd2', goldLine: '#d9c391', goldLine2: '#e2cda6',
+      goldText: '#8a6116', goldSoft: '#8a6116', honorA: '#fdf3dd', honorB: '#f6e8c6', honorSoft: '#8a6116',
+      purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
+      accentBg: '#e3effc', accentSoft: '#1c5bb8',
+      press: '#f2dee6',
     }
   },
   {
@@ -98,12 +142,22 @@ var SKINS = [
       bg: '#f4faff', bg2: '#e9f2fd',
       surface: '#ffffff', surface2: '#e9f3fd', surface3: '#d7e8fa',
       fill: '#f1f8fe', fill2: '#e9f3fd', fill3: '#e0eefa',
-      line: '#b4d2ec', line2: '#a8caE6', line3: '#bad5ee',
+      line: '#b4d2ec', line2: '#a8cae6', line3: '#bad5ee',
       line4: '#a8c9e6', line5: '#9dc0e0', line6: '#c9def3',
       text: '#1d2b3a', text2: '#304250', text3: '#4b5d70',
       muted: '#6d8398', muted2: '#778da0', muted3: '#6b8194',
       muted4: '#7f93a6', muted5: '#7c90a3',
-      accent: '#1259b8', active: '#c3dcf2'
+      accent: '#1259b8', active: '#c3dcf2',
+      okText: '#177a4b', warnText: '#8a5a00', badText: '#c22a45',
+      okDim: '#4a6b58', goldDim: '#7a5300',
+      panel: '#ffffff',
+      okBg: '#e2f4ea', okSoft: '#177a4b', okLine: '#b9e0cc',
+      badBg: '#fdeaee', badSoft: '#c22a45', badSoft2: '#c22a45',
+      goldBg: '#fbf1da', goldBg2: '#f8ecd2', goldLine: '#d9c391', goldLine2: '#e2cda6',
+      goldText: '#8a6116', goldSoft: '#8a6116', honorA: '#fdf3dd', honorB: '#f6e8c6', honorSoft: '#8a6116',
+      purpleBg: '#efeafc', purpleSoft: '#6a4bd8',
+      accentBg: '#e3effc', accentSoft: '#1c5bb8',
+      press: '#dde9f5'
     }
   }
 ];
@@ -140,6 +194,32 @@ function set(id) {
   return true;
 }
 
+/**
+ * 导航栏配色：系统导航栏（页面头）不认识 CSS 变量，只能用 wx.setNavigationBarColor 动态设。
+ * 深色皮肤 → 深底白字；浅色皮肤 → 皮肤底色 + 黑字。
+ * 页面在 onShow 时调 applyNav()；带 footer-nav 的页面由组件的 pageLifetimes.show 统一处理。
+ */
+function navBar() {
+  var t = byId(skinId()).tokens;
+  var dark = skinId() === 'night';
+  return {
+    frontColor: dark ? '#ffffff' : '#000000',
+    backgroundColor: t.bg
+  };
+}
+
+/** 各页面 onShow 里调一行即可 */
+function applyNav() {
+  var nb = navBar();
+  try {
+    wx.setNavigationBarColor({
+      frontColor: nb.frontColor,
+      backgroundColor: nb.backgroundColor,
+      fail: function () { }            // 页面没开自定义导航时静默
+    });
+  } catch (e) { }
+}
+
 /** 是否已解锁：type=free 恒 true；tasks 看完成次数；paid 暂一律 false（预留） */
 function unlocked(skin, doneCount) {
   if (!skin) return false;
@@ -155,5 +235,7 @@ module.exports = {
   skinId: skinId,
   cls: cls,
   set: set,
-  unlocked: unlocked
+  unlocked: unlocked,
+  navBar: navBar,
+  applyNav: applyNav
 };

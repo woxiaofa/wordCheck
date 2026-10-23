@@ -41,6 +41,10 @@ Page({
     making: false         // 正在生成长图（防重复点）
   },
 
+  onShow: function () {
+    theme.applyNav();                // 导航栏是系统控件，CSS 变量管不到它
+  },
+
   onLoad: function (query) {
     var sid = query.sid || query.id || '';
     if (!sid) {

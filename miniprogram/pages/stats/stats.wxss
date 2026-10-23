@@ -7,8 +7,8 @@
   border-radius: 999rpx;
   padding: 4rpx 16rpx;
 }
-.badge.hi { background: rgba(255, 92, 114, .18); color: #ff8a9b; border: 1rpx solid rgba(255, 92, 114, .4); }
-.badge.lo { background: rgba(255, 176, 32, .16); color: #ffc861; border: 1rpx solid rgba(255, 176, 32, .35); }
+.badge.hi { background: rgba(255, 92, 114, .18); color: var(--bad-soft2); border: 1rpx solid rgba(255, 92, 114, .4); }
+.badge.lo { background: rgba(255, 176, 32, .16); color: var(--gold-soft); border: 1rpx solid rgba(255, 176, 32, .35); }
 
 /* ===== 日报 / 周报 / 月报 ===== */
 .rpt-tabs {
@@ -58,8 +58,8 @@
   font-size: 20rpx;
   color: var(--muted);
 }
-.rpt-kpi .d.up { color: #2fd07a; }
-.rpt-kpi .d.down { color: #ff8a9b; }
+.rpt-kpi .d.up { color: var(--ok-text); }
+.rpt-kpi .d.down { color: var(--bad-soft2); }
 
 /* 日报：今日构成的堆叠条 */
 .rpt-split { margin-top: 28rpx; }
@@ -71,8 +71,9 @@
   background: var(--surface2);
 }
 .rpt-split-bar .seg { height: 100%; }
+/* 功能色当「填充」用就写死：它们是数据块的形体，跟着皮肤变色反而看不出是同一份数据 */
 .seg.known { background: #2fd07a; }
-.seg.vague { background: #ffc861; }
+.seg.vague { background: var(--gold-soft); }
 .seg.forgot { background: #ff5c72; }
 .rpt-legend {
   display: flex;
@@ -90,7 +91,7 @@
   margin-right: 8rpx;
 }
 .dot.known { background: #2fd07a; }
-.dot.vague { background: #ffc861; }
+.dot.vague { background: var(--gold-soft); }
 .dot.forgot { background: #ff5c72; }
 
 /* 周/月报：逐日趋势条 */
@@ -109,9 +110,11 @@
   border-radius: 10rpx;
   overflow: hidden;
 }
+/* 原来下端是写死的 #1d4f74 深蓝：浅色皮肤下 accent 是粉/橘/绿，
+   粉压深蓝看着像配色事故。统一到全站那道「强调色 → 品牌紫」渐变（进度条、确认键同款） */
 .rpt-bar-fill {
   width: 100%;
-  background: linear-gradient(180deg, var(--accent), #1d4f74);
+  background: linear-gradient(180deg, var(--accent), #7c5cff);
   border-radius: 10rpx;
 }
 .rpt-bar-fill.empty { background: var(--surface2); }
@@ -165,3 +168,10 @@
   border-radius: 8rpx;
   border: 1rpx solid var(--line);
 }
+/* 分档配色：0 档 = 空格（跟卡面走），1~4 档是固定的蓝色渐进 ——
+   两套深浅皮肤下都可读，不用进 token 表 */
+.heat-0 { background: var(--surface2); }
+.heat-1 { background: #a8cfe8; }
+.heat-2 { background: #6aa8d8; }
+.heat-3 { background: #2f86c8; }
+.heat-4 { background: #6a4bdb; }
