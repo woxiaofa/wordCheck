@@ -1,0 +1,9 @@
+{
+  "name": "exportall",
+  "version": "1.0.0",
+  "description": "云函数：一键导出全库数据（备份用）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
