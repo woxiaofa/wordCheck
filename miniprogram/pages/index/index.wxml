@@ -233,6 +233,17 @@
     </view>
   </view>
 
+  <!-- 底部反馈入口：首页是最高频的落地页，用着不顺手时能立刻说，不用先去找设置 -->
+  <view class="home-feedback">
+    <view class="muted">用着不顺手、想要什么功能，都可以直接说</view>
+    <button
+      class="btn sm ghost home-feedback-btn"
+      open-type="contact"
+      send-message-title="功课抽查 · 用户反馈"
+      show-message-card="true"
+    >给开发者留言</button>
+  </view>
+
   <!-- 未成年人保护提示（K12 类目审核会看）：不收集手机号、不开放付费、建议家长陪同 -->
   <view class="muted" style="text-align:center;font-size:22rpx;opacity:.6;padding:20rpx 0 8rpx">
     面向小学生英语单词练习，建议在家长陪同下使用 · 不收集手机号、不开放付费

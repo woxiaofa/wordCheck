@@ -136,3 +136,8 @@
   padding: 12rpx 24rpx;
   text-align: center;
 }
+
+/* 底部反馈入口：比设置页那颗更克制，首页内容已经很满，
+   用 ghost 描边小按钮避免抢主操作的注意力 */
+.home-feedback { text-align: center; padding: 4rpx 0 0; }
+.home-feedback-btn { margin-top: 16rpx; }

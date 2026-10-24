@@ -540,6 +540,17 @@ ok('⑥p 整栈重载延后 300ms 以上，先让「已换成…」提示落地'
    navDelays.length > 0 && navDelays[navDelays.length - 1] >= 300,
    'delays: ' + (navDelays.join(',') || '(没有延时)'));
 
+/* ⑥q 首页底部也要有客服入口（与 ⑥n 同类）：
+ * 首页是最高频的落地页，用着不顺手时得能立刻反馈，不必先想起去设置页。
+ * 同样必须是 open-type="contact"，写成普通 button 会静默失效（点了没反应、不报错）。 */
+var indexWxml = fs.readFileSync(path.join(ROOT, 'pages', 'index', 'index.wxml'), 'utf8');
+var homeFbBtn = (indexWxml.match(/<button[^>]*home-feedback-btn[\s\S]*?>/) || [''])[0];
+ok('⑥q 首页底部也有「给开发者留言」的客服入口',
+   /open-type="contact"/.test(homeFbBtn) &&
+   indexWxml.indexOf('给开发者留言') >= 0,
+   '首页缺少 open-type="contact" 或按钮文案（找到：' +
+   (homeFbBtn.replace(/\s+/g, ' ').slice(0, 60) || '没有该按钮') + '）');
+
 console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
   (fail ? '，' + fail + ' 项 ✗' : ''));
 process.exit(fail ? 1 : 0);
