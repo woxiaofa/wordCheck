@@ -141,3 +141,7 @@
    用 ghost 描边小按钮避免抢主操作的注意力 */
 .home-feedback { text-align: center; padding: 4rpx 0 0; }
 .home-feedback-btn { margin-top: 16rpx; }
+
+/* 词库引导：紧跟「添加词库」入口，解释"没有我要的教材怎么办"。
+   行高放宽一点，两行文字在窄屏上不挤在一起 */
+.home-guide { font-size: 22rpx; line-height: 1.7; opacity: .75; padding: 0 20rpx; }
