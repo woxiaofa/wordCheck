@@ -354,7 +354,6 @@ function checkAllWxml() {
  * 这里按包分别统计并各自告警。
  */
 const AUDIO_DIR = path.join(MP, 'pkg-media', 'assets', 'audio');
-const SUBPKG_ROOT = path.join(MP, 'pkg-media');
 const PKG_LIMIT = 2048 * 1024;        // 2MB
 const PKG_WARN = 1500 * 1024;         // 1.5MB：留出余量给代码增长
 const kb = (n) => (n / 1024).toFixed(0) + 'KB';
@@ -372,21 +371,32 @@ function dirSize(dir) {
 }
 
 function checkPackageSize() {
-  if (!exists(SUBPKG_ROOT)) {
-    notes.push('pkg-media 分包不存在（音频与练习页仍在主包）');
-  } else {
-    // 分包：音频 + 三个练习页
-    const sub = dirSize(SUBPKG_ROOT);
-    notes.push('pkg-media 分包体积：' + kb(sub) + '（发音音频 ' + kb(dirSize(AUDIO_DIR)) + '），上限 2MB');
-    if (sub > PKG_LIMIT) {
-      problems.push('pkg-media 分包体积 ' + kb(sub) + ' 超过 2MB 上限：音频降码率或拆分词库');
-    } else if (sub > PKG_WARN) {
-      notes.push('提示：pkg-media 分包已占 ' + kb(sub) + '，继续加音频前先估算体积');
-    }
-  }
+  // 2026-11-08：原先只统计 pkg-media 这一个分包。新增 pkg-oral 后如果还写死，
+  // 新分包就成了检查盲区，而且「主包 = 全部 - pkg-media」会把新分包算进主包。
+  // 改成按 app.json 的 subpackages 逐个统计，声明与磁盘不一致也当场报错。
+  const app = JSON.parse(fs.readFileSync(path.join(MP, 'app.json'), 'utf8'));
+  const subs = app.subpackages || [];
+  let subTotal = 0;
 
-  // 主包：整个 miniprogram 减去分包目录
-  const others = dirSize(MP) - (exists(SUBPKG_ROOT) ? dirSize(SUBPKG_ROOT) : 0);
+  subs.forEach((s) => {
+    const dir = path.join(MP, s.root);
+    if (!exists(dir)) {
+      problems.push('app.json 声明了分包 ' + s.root + '，但目录不存在');
+      return;
+    }
+    const size = dirSize(dir);
+    subTotal += size;
+    const extra = s.root === 'pkg-media' ? '（发音音频 ' + kb(dirSize(AUDIO_DIR)) + '）' : '';
+    notes.push(s.root + ' 分包体积：' + kb(size) + extra + '，上限 2MB');
+    if (size > PKG_LIMIT) {
+      problems.push(s.root + ' 分包体积 ' + kb(size) + ' 超过 2MB 上限：音频降码率或拆分词库');
+    } else if (size > PKG_WARN) {
+      notes.push('提示：' + s.root + ' 分包已占 ' + kb(size) + '，继续加资源前先估算体积');
+    }
+  });
+
+  // 主包：整个 miniprogram 减去全部分包目录
+  const others = dirSize(MP) - subTotal;
   notes.push('主包体积：' + kb(others) + '，上限 2MB');
   if (others > PKG_LIMIT) {
     problems.push('主包体积 ' + kb(others) + ' 超过 2MB 上限');

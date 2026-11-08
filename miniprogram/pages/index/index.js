@@ -304,6 +304,12 @@ Page({
     wx.navigateTo({ url: '/pkg-media/pages/import/import' });
   },
 
+  /** 跟读练习：本机录音、不联网（第 1 期，见 docs/口语作业方案.md）
+   *  独立分包 pkg-oral：pkg-media 已被 454 个音频占满 2MB 红线，不能再塞页面 */
+  goOral: function () {
+    wx.navigateTo({ url: '/pkg-oral/pages/oral/oral' });
+  },
+
   refresh: function () {
     var mirror = wx.getStorageSync(STORAGE_KEY) || {};
     var now = Date.now();

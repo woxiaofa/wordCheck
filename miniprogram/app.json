@@ -17,6 +17,12 @@
         "pages/import/import",
         "pages/organize/organize"
       ]
+    },
+    {
+      "root": "pkg-oral",
+      "pages": [
+        "pages/oral/oral"
+      ]
     }
   ],
   "preloadRule": {

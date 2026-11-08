@@ -42,7 +42,11 @@ const COLLS = [
   'user_word_state_v2',
   'user_word_state',
   'diag_scratch',
-  'wipe_backup'
+  'wipe_backup',
+  // 发音缓存：cloud/functions/tts/index.js:9-13 明确把 base64 存进数据库集合，
+  // 整个链路不需要云存储。它是可再生缓存（优先级最低），但清单不能漏——
+  // 2026-11-08 读源码复核时补上，别去云存储里找并不存在的 tts-cache/。
+  'tts_audio'
 ];
 
 const PAGE = 100;         // 云数据库单次 get 的条数上限

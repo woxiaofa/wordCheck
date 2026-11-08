@@ -39,7 +39,8 @@ var PAGES = [
   'pages/index/index', 'pages/stats/stats', 'pages/settings/settings',
   'pages/class/class', 'pages/report/report',
   'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study', 'pkg-media/pages/quiz/quiz',
-  'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize'
+  'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize',
+  'pkg-oral/pages/oral/oral'
 ];
 
 function walk(dir, ext, out) {
@@ -285,7 +286,7 @@ function onShowBody(p) {
 var badNav2 = PAGES.filter(function (p) {
   return onShowBody(p).indexOf('theme.syncPage(this)') < 0;
 });
-ok('③e 十个页面 onShow 里都重算了皮肤类 + 导航栏配色',
+ok('③e 每个页面 onShow 里都重算了皮肤类 + 导航栏配色',
    badNav2.length === 0, badNav2.join(', '));
 
 /* ③g syncPage 必须真的把 skin 写回 data（而不只是刷导航栏） */

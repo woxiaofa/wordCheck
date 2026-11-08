@@ -1,0 +1,72 @@
+/* 跟读练习页：颜色全走 token —— 换到樱粉/糖果皮肤时不能留深色孤岛 */
+.oral-sub { font-size: 28rpx; color: var(--text); }
+
+.mode-row { display: flex; flex-wrap: wrap; }
+.mode-chip {
+  margin-right: 14rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--line);
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 24rpx;
+}
+.mode-chip.on {
+  background: var(--active);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.inp {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid var(--line);
+  background: var(--fill);
+  color: var(--text);
+  font-size: 28rpx;
+}
+.inp.area { height: 140rpx; line-height: 1.6; }
+.inp.area.small { height: 96rpx; }
+
+.code-box {
+  margin-top: 12rpx;
+  padding: 16rpx;
+  border-radius: 12rpx;
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 24rpx;
+  line-height: 1.6;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.ref-text {
+  margin-top: 12rpx;
+  font-size: 34rpx;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.chips { display: flex; flex-wrap: wrap; margin-top: 16rpx; }
+.word-chip {
+  margin: 0 12rpx 12rpx 0;
+  padding: 8rpx 18rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid var(--line);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-size: 26rpx;
+}
+.word-chip.off {
+  background: var(--fill2);
+  color: var(--muted);
+  opacity: .8;
+}
+
+.rec { padding: 16rpx 0; border-top: 1rpx solid var(--line); }
+.rec-ref { color: var(--text); font-size: 28rpx; }
+.rec-ops { display: flex; flex-wrap: wrap; margin-top: 12rpx; }
+.rec-ops .link { margin-right: 28rpx; font-size: 24rpx; }

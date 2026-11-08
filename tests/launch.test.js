@@ -252,6 +252,83 @@ ok('⑭ showModal 的 confirmText/cancelText 全部 ≤ 4 个字', function () {
   assert.strictEqual(bad.length, 0, '按钮文字超过 4 个字，showModal 会整体 fail：\n    ' + bad.join('\n    '));
 });
 
+/* ---------- ⑮~㉒ 跟读练习（2026-11-08 第 1 期，零 AI / 零后端） ----------
+ * 录音是隐私接口，且页面文案对外承诺「不上传」。这两件事一旦回退，
+ * 开发者工具里常常不报错，线上却是「点了没反应」或被审核判不符，必须机械拦住。 */
+
+ok('⑮ 麦克风授权有唯一入口，且上线清单勾了「麦克风」', function () {
+  var p = read('miniprogram/utils/privacy.js');
+  assert.ok(p.indexOf('function ensureRecord') >= 0, '缺 ensureRecord');
+  assert.ok(p.indexOf("scope: 'scope.record'") >= 0, '没向 wx.authorize 申请麦克风');
+  assert.ok(p.indexOf('wx.openSetting') >= 0, '曾拒绝过授权要能引导去设置页');
+  assert.ok(read('docs/上线检查清单.md').indexOf('麦克风') >= 0, '后台隐私指引没勾麦克风');
+});
+
+ok('⑯ 录音管理器收敛单点：别处不许裸调 wx.getRecorderManager', function () {
+  var bad = [];
+  walk('miniprogram', '.js').forEach(function (f) {
+    if (f === 'miniprogram/utils/oral.js') return;
+    if (read(f).indexOf('wx.getRecorderManager') >= 0) bad.push(f);
+  });
+  assert.strictEqual(bad.length, 0, '别处裸调了录音管理器：' + bad.join(', '));
+});
+
+ok('⑰ 跟读链路承诺「不上传」，代码里就不得有任何联网能力', function () {
+  ['miniprogram/utils/oral.js', 'miniprogram/utils/oral-code.js',
+    'miniprogram/pkg-oral/pages/oral/oral.js'].forEach(function (f) {
+    var s = read(f);
+    ['wx.cloud', 'uploadFile', 'wx.request', 'callFunction'].forEach(function (k) {
+      assert.strictEqual(s.indexOf(k), -1, f + ' 里出现了 ' + k);
+    });
+  });
+});
+
+ok('⑱ 跟读页在独立分包（pkg-media 已被 454 个音频占满 2MB 红线）', function () {
+  var j = JSON.parse(read('miniprogram/app.json'));
+  var roots = (j.subpackages || []).map(function (s) { return s.root; });
+  assert.ok(roots.indexOf('pkg-oral') >= 0, '缺 pkg-oral 分包');
+  assert.ok(j.pages.every(function (p) { return p.indexOf('oral') < 0; }), 'oral 不该进主包');
+});
+
+ok('⑲ onDenied 有麦克风专用文案，且说清录音不出本机', function () {
+  var p = read('miniprogram/utils/privacy.js');
+  assert.ok(p.indexOf('microphone:') >= 0, 'DENY_TEXT 缺 microphone 档');
+  assert.ok(p.indexOf('录音只存在这台手机、不会上传') >= 0);
+});
+
+ok('⑳ 首页未成年人提示补了「录音仅存本机、不上传」', function () {
+  assert.ok(read('miniprogram/pages/index/index.wxml').indexOf('录音仅存本机、不上传') >= 0);
+});
+
+ok('㉑ 跟读页四件套齐全，换肤与反馈入口都在', function () {
+  ['js', 'json', 'wxml', 'wxss'].forEach(function (e) {
+    var f = 'miniprogram/pkg-oral/pages/oral/oral.' + e;
+    assert.ok(fs.existsSync(path.join(ROOT, f)), '缺 ' + f);
+  });
+  var j = read('miniprogram/pkg-oral/pages/oral/oral.js');
+  var w = read('miniprogram/pkg-oral/pages/oral/oral.wxml');
+  assert.ok(j.indexOf('theme.syncPage(this)') >= 0, 'onShow 没重算皮肤');
+  assert.ok(/<view\s+class="page[^"]*\{\{skin\}\}"/.test(w), '根节点没挂皮肤类');
+  assert.ok(w.indexOf('open-type="contact"') >= 0, '缺反馈入口');
+});
+
+/* check 链是硬编码字符串：新增测试文件不会自动被跑到，
+   而 npm test 又比 check 少 9 个测试。这里直接比对目录与链，漏登记当场红。 */
+ok('㉒ 全部在管的 tests/*.test.js 都登记进了 package.json 的 check 链', function () {
+  // seed-then-assign.test.js 是早期试验脚本，未纳入 git、等用户确认后删除，
+  // 不登记也不该擅自纳入。白名单里的文件反过来必须真的没进链，避免两边都占着。
+  var IGNORE = ['seed-then-assign.test.js'];
+  var files = fs.readdirSync(path.join(ROOT, 'tests'))
+    .filter(function (n) { return /\.test\.js$/.test(n) && IGNORE.indexOf(n) < 0; });
+  var chain = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts.check;
+  var missing = files.filter(function (n) { return chain.indexOf('node tests/' + n) < 0; });
+  assert.strictEqual(missing.length, 0, 'check 链漏了：' + missing.join(', '));
+  IGNORE.forEach(function (n) {
+    assert.ok(chain.indexOf('node tests/' + n) < 0,
+      n + ' 是待删的未纳管文件，不该登记进 check 链');
+  });
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
 

@@ -40,18 +40,78 @@ function ensure() {
 
 /**
  * 统一兜底：用户拒绝授权时给一句人话，而不是静默失败。
+ *
+ * scene 分三档（clipboard / microphone / album），因为「点复制没反应」和
+ * 「点录音没反应」要给完全不同的解释。旧调用只传 err，默认仍按剪贴板处理，
+ * 6 处既有调用不必改。
  */
-function onDenied(err) {
-  if (err && err.message === 'PRIVACY_DENIED') {
-    wx.showModal({
-      title: '需要你先同意隐私指引',
-      content: '复制文案要用到剪贴板。点「去设置」→ 隐私 → 打开授权后就能用了。',
-      confirmText: '知道了',
-      showCancel: false
+var DENY_TEXT = {
+  clipboard: '复制文案要用到剪贴板。点「去设置」→ 隐私 → 打开授权后就能用了。',
+  microphone: '跟读录音要用到麦克风，录音只存在这台手机、不会上传。点「去设置」→ 隐私 → 打开授权后就能用了。',
+  album: '保存图片要用到相册。点「去设置」→ 隐私 → 打开授权后就能用了。'
+};
+
+function onDenied(err, scene) {
+  if (!err || err.message !== 'PRIVACY_DENIED') return false;
+  wx.showModal({
+    title: '需要你先同意隐私指引',
+    content: DENY_TEXT[scene] || DENY_TEXT.clipboard,
+    confirmText: '知道了',
+    showCancel: false
+  });
+  return true;
+}
+
+/**
+ * 麦克风授权的唯一入口。
+ * 顺序很重要：先过《隐私保护指引》的官方弹窗，再查 scope.record；
+ * 曾经拒绝过的情况 wx.authorize 不会再弹，只能引导去设置页，否则就是
+ * 「点了录音永远没反应」（拍照记词踩过同款坑）。
+ */
+function ensureRecord() {
+  return ensure().then(function () {
+    return new Promise(function (resolve, reject) {
+      if (!wx.getSetting) { resolve(true); return; }
+      wx.getSetting({
+        success: function (res) {
+          var auth = res && res.authSetting;
+          if (auth && auth['scope.record'] === true) { resolve(true); return; }
+          if (auth && auth['scope.record'] === false) {
+            if (!wx.openSetting) { reject(new Error('MIC_DENIED')); return; }
+            wx.openSetting({
+              success: function (r) {
+                var a = r && r.authSetting;
+                if (a && a['scope.record']) resolve(true);
+                else reject(new Error('MIC_DENIED'));
+              },
+              fail: function () { reject(new Error('MIC_DENIED')); }
+            });
+            return;
+          }
+          if (!wx.authorize) { resolve(true); return; }
+          wx.authorize({
+            scope: 'scope.record',
+            success: function () { resolve(true); },
+            fail: function () { reject(new Error('MIC_DENIED')); }
+          });
+        },
+        // 查询失败不阻断：交给录音管理器自己报错，总比卡住用户好
+        fail: function () { resolve(true); }
+      });
     });
-    return true;
-  }
-  return false;
+  });
+}
+
+/** 读剪贴板也是隐私接口：统一收口，别处不许裸调 */
+function paste(onText) {
+  ensure().then(function () {
+    wx.getClipboardData({
+      success: function (res) { if (onText) onText(String((res && res.data) || '')); },
+      fail: function () { wx.showToast({ title: '没读到剪贴板', icon: 'none' }); }
+    });
+  }).catch(function (err) {
+    if (!onDenied(err, 'clipboard')) wx.showToast({ title: '读取失败', icon: 'none' });
+  });
 }
 
 /**
@@ -71,7 +131,9 @@ function copy(text, onOk) {
 
 module.exports = {
   ensure: ensure,
+  ensureRecord: ensureRecord,
   copy: copy,
+  paste: paste,
   onDenied: onDenied,
   lastRejectAt: function () { return lastRejectAt; }
 };

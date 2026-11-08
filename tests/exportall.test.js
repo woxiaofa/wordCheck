@@ -216,6 +216,21 @@ async function main() {
       });
   }
 
+  /* ⑥ 备份清单不能漏集合：2026-11-08 读 tts/index.js 源码补上的第 18 个。
+       用行为断言（跑一次全量看 counts 的键），而不是去比对源码里的字符串列表。 */
+  {
+    var fc6 = createFakeCloud({ colls: { users: [{ _id: 'u1' }] } });
+    var mod6 = withCloud(fc6.cloud, loadExport);
+    var r6 = await mod6.main({});
+    Module._load = origLoad;
+    ok('⑥ 全量导出覆盖 18 个集合，含 tts_audio 发音缓存', function () {
+      assert.strictEqual(Object.keys(r6.counts).length, 18,
+        '应导出 18 个集合，实际 ' + Object.keys(r6.counts).length);
+      assert.ok(Object.prototype.hasOwnProperty.call(r6.counts, 'tts_audio'),
+        'counts 里缺 tts_audio（tts 云函数把 base64 缓存在这个集合）');
+    });
+  }
+
   console.log('\n全部通过：' + pass + ' 项 ✓');
 }
 
