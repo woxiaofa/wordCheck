@@ -117,7 +117,7 @@
       <text class="muted">{{wrongCount}} 个</text>
     </view>
     <view class="muted mt-s">错词在次日、第 3 天、第 7 天强制复现，且换一种题型再考。</view>
-    <view wx:if="{{!wrongList.length}}" class="muted mt">暂无错词。去抽查几组，错的词会自动进来。</view>
+    <view wx:if="{{!wrongList.length}}" class="muted mt">暂无错词。继续背词，答错的词会自动进来。</view>
     <view wx:for="{{wrongList}}" wx:key="word" class="line">
       <view class="col">
         <text class="wrong-word">{{item.word}}</text>

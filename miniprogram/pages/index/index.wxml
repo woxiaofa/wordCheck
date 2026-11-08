@@ -57,7 +57,6 @@
       <view class="progress-inner" style="width:{{clsAssign.count ? clsAssign.done * 100 / clsAssign.count : 0}}%"></view>
     </view>
     <button class="btn ok mt" bindtap="goClassAssign">继续学</button>
-    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查</button>
     <button wx:if="{{clsAssign.offline}}" class="btn ghost mt-s" bindtap="retryCloud">重新联网同步</button>
   </view>
 
@@ -100,14 +99,12 @@
       <view class="task-item" wx:if="{{!totalCount}}">
         <view class="task-desc">
           <text class="task-name">暂时没有排队的词</text>
-          <text class="task-why">学过的词都排进复习计划了，还没到复习时间。去抽查检验真实掌握程度</text>
+          <text class="task-why">学过的词都排进复习计划了，还没到复习时间。想加练就点上面的按钮再练一轮</text>
         </view>
       </view>
     </view>
 
     <button class="btn" bindtap="goStudy">{{mainBtnText}}</button>
-    <!-- 文案别超过一行：按钮里换行非常难看。"交卷才判分"的说明抽查页开场就有，这里不重复 -->
-    <button class="btn ghost mt-s" bindtap="goQuiz">去抽查 · 检验真实水平</button>
   </view>
 
   <!-- 班级作业（已完成）：降级为普通入口，不打扰 -->

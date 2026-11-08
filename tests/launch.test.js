@@ -329,6 +329,29 @@ ok('㉒ 全部在管的 tests/*.test.js 都登记进了 package.json 的 check �
   });
 });
 
+/* ---------- ㉓㉔ 首页「去抽查」入口已删（2026-11-08 用户拍板） ----------
+ * 主流程 goStudy 与底栏「背词」都进 drill（认→写→巩固，2026-10-07 已合并抽查），
+ * 首页再挂一个「去抽查」等于两条并行练习线。用户原话：「在我们整个流程里都没用」。
+ * 只锁「用户可见的首页入口」，不动 quiz 页本体：utils/quiz.js 仍被 drill 用来出题，
+ * 旧 study 流程与 tests/study-flow.test.js 也仍引用该页。
+ * 不设守护的话，以后有人照旧稿加回按钮，开发者工具不会报任何错。 */
+ok('㉓ 首页不再有「去抽查」按钮 / goQuiz / 跳去 quiz 页的代码', function () {
+  var w = read('miniprogram/pages/index/index.wxml');
+  var j = read('miniprogram/pages/index/index.js');
+  assert.ok(w.indexOf('goQuiz') < 0, '首页 wxml 仍有 goQuiz 绑定');
+  assert.ok(w.indexOf('去抽查') < 0, '首页仍有「去抽查」文案');
+  assert.ok(j.indexOf('goQuiz') < 0, '首页 js 仍留着 goQuiz 方法');
+  assert.ok(j.indexOf('/pkg-media/pages/quiz/quiz') < 0, '首页仍会跳去独立抽查页');
+});
+
+ok('㉔ 面向孩子的文案不再把「去抽查」说成另一项待办', function () {
+  ['miniprogram/pages/index/index.wxml',
+    'miniprogram/pages/index/index.js',
+    'miniprogram/pages/stats/stats.wxml'].forEach(function (f) {
+      assert.ok(read(f).indexOf('去抽查') < 0, f + ' 里仍有「去抽查」口吻');
+    });
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
 

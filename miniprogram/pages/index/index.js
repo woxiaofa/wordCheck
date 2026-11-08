@@ -366,14 +366,14 @@ Page({
     // 之后 SRS 把它们全推到未来，这时不该显示"0 个词 + 开始学习"（用户会以为坏了）
     var allDone = total === 0 && learned > 0;
     // 新流程：主按钮一律进背词（认 → 写 → 巩固一条龙，2026-10-07 合并抽查）。
-    // 今天没有待学的词时背词页会自己给出"今天没有要练的词"，不再需要绕去抽查页。
+    // 今天没有待学的词时背词页会自己给出"今天没有要练的词"，不再需要绕去别的页面。
     var mainBtnText;
     if (allDone) mainBtnText = '去复习一轮';
     else if (!total || taskDone) mainBtnText = '再练一轮';
     else if (done > 0) mainBtnText = '继续背 · 还剩 ' + rest + ' 个';
     else mainBtnText = '开始背单词';
 
-    if (allDone) progressNote = '今天的词都记在计划里了，去抽查检验一下真实水平';
+    if (allDone) progressNote = '今天的词都记在计划里了，想加练就再练一轮';
 
     // 云端统计兜底：清缓存/换设备后本地镜像为空，但云端 stats_cache 是真值。
     // 两个都算然后取大——本地新学的还没上云时本地大，清缓存后云端大。
@@ -430,10 +430,6 @@ Page({
     // 点"开始背单词"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
     wx.redirectTo({ url: '/pkg-media/pages/drill/drill' });
-  },
-
-  goQuiz: function () {
-    wx.redirectTo({ url: '/pkg-media/pages/quiz/quiz' });
   },
 
   /**
