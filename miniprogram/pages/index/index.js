@@ -429,7 +429,9 @@ Page({
   goStudy: function () {
     // 点"开始背单词"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
-    wx.redirectTo({ url: '/pkg-media/pages/drill/drill' });
+    // 2026-11-08 用户拍板：第一轮先开口读，再走原来的认 → 写 → 巩固。
+    // oral=1 是显式开关，drill 的 onLoad({}) 仍是纯背词流程（drill-flow 测试依赖）。
+    wx.redirectTo({ url: '/pkg-media/pages/drill/drill?oral=1' });
   },
 
   /**

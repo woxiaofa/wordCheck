@@ -38,7 +38,7 @@ global.wx = {
 var PAGES = [
   'pages/index/index', 'pages/stats/stats', 'pages/settings/settings',
   'pages/class/class', 'pages/report/report',
-  'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study', 'pkg-media/pages/quiz/quiz',
+  'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study',
   'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize',
   'pkg-oral/pages/oral/oral'
 ];
@@ -416,14 +416,18 @@ var appJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
 ok('⑥a app.json 已注册设置页', appJson.pages.indexOf('pages/settings/settings') >= 0);
 
 var navSrc = fs.readFileSync(path.join(ROOT, 'components', 'footer-nav', 'index.js'), 'utf8');
+// path 允许带 query（背词 tab 用 ?oral=1 开启第 0 步口语关）。
+// 判断「是不是同一个页面」必须剥掉 query，否则带参路径会被误判成另一页；
+// 守护本身不放宽：仍要求三个 tab、仍逐个核对 .js 真实存在。
 var navPaths = (navSrc.match(/path: '([^']+)'/g) || []).map(function (x) {
   return x.match(/'([^']+)'/)[1];
 });
+var navBare = navPaths.map(function (p) { return p.split('?')[0]; });
 ok('⑥b 底栏缩到三个：今日 / 背词 / 设置',
-   navPaths.length === 3 && navPaths.join(',') ===
+   navBare.length === 3 && navBare.join(',') ===
    '/pages/index/index,/pkg-media/pages/drill/drill,/pages/settings/settings',
-   navPaths.join(','));
-var badNav = navPaths.filter(function (p2) {
+   navBare.join(','));
+var badNav = navBare.filter(function (p2) {
   return !fs.existsSync(path.join(ROOT, p2.replace(/^\//, '') + '.js'));
 });
 ok('⑥c 底栏每个 tab 的路径都指向真实页面', badNav.length === 0, badNav.join(', '));

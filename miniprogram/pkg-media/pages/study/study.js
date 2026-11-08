@@ -502,8 +502,8 @@ Page({
     this.buildQueue(true);
   },
 
-  /** 学完一轮后引导去抽查：真正决定复习间隔的是抽查结果，不是自评 */
-  onGoQuiz: function () {
-    wx.redirectTo({ url: '/pkg-media/pages/quiz/quiz' });
+  /** 学完一轮去背词页巩固：独立抽查页已退役，抽查早已合并进背词流程 */
+  onGoDrill: function () {
+    wx.redirectTo({ url: '/pkg-media/pages/drill/drill' });
   }
 });

@@ -1,6 +1,7 @@
 <view wx:if="{{landscape}}" class="rotate-tip">横屏下内容放得太大，建议竖屏使用更舒服</view>
 <!--
   快刷页（背词 + 抽查合并后的主流程）
+    第 0 步「读」：本轮词先开口念一遍（点词听标准音，可选录音回放，可跳过）
     第 1 步「认」：读音 + 单词 + 音标 → 两个中文释义二选一（另有【不会】诚实按钮）
     第 2 步「写」：读音 + 音标 + 中文 → 自绘键盘拼英文（键盘难度由简单到复杂）
     第 3 步「巩固」：没拿下的词换抽查方式反复测到全对
@@ -37,6 +38,27 @@
   </view>
   <!-- 离线提示：这一轮练的是本机留存的词单，记录会在联网后自动补传 -->
   <view wx:if="{{offline}}" class="offline-bar">离线练习 · 记录已存本机，联网后自动传给家长端</view>
+
+  <!-- ============ 第 0 步：先开口读（2026-11-08 用户拍板） ============
+       零 AI：只让孩子听标准音、跟着念、可选录一条回放，不做任何打分。
+       授权被拒或不想读都能直接跳过 —— 这一屏绝不能把孩子卡住。 -->
+  <block wx:if="{{state === 'oral'}}">
+    <view class="card gate-card">
+      <view class="gate-title">🎙 先开口读一遍</view>
+      <view class="muted mt-s">点单词听标准音，跟着念出来。读好了再开始认和写。</view>
+      <view class="gate-words">
+        <view wx:for="{{gateWords}}" wx:key="word"
+              class="gate-chip {{item.hasAudio ? '' : 'off'}}"
+              data-word="{{item.word}}" bindtap="onGateSpeak">{{item.word}}</view>
+      </view>
+      <button class="btn mt" bindtap="onGateRecord">{{gateRecording ? '录好了，停' : '录一遍我读的'}}</button>
+      <button wx:if="{{gateRecordId}}" class="btn ghost sm mt-s" bindtap="onGatePlay">▶ 回放我读的</button>
+      <view class="muted mt-s gate-tip">{{gateTip}}</view>
+      <button class="btn ok mt" bindtap="onGateDone">读好了，开始背</button>
+      <view class="link center mt-s" bindtap="onGateSkip">这次先不读，直接开始</view>
+      <view class="muted center gate-note">录音只存这台手机，不上传；可在跟读页清空</view>
+    </view>
+  </block>
 
   <!-- ============ 答题 ============ -->
   <block wx:if="{{state === 'run' && q}}">

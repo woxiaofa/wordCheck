@@ -13,7 +13,6 @@
       "pages": [
         "pages/drill/drill",
         "pages/study/study",
-        "pages/quiz/quiz",
         "pages/import/import",
         "pages/organize/organize"
       ]

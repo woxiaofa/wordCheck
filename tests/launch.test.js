@@ -103,7 +103,7 @@ ok('⑨ 广告默认全关（AD_UNITS 留空），且做题页不得引用 utils
   // 广告失败必须放行：源码里 done(false) 的分支要足够多
   var guard = (s.match(/done\(false\)/g) || []).length;
   assert.ok(guard >= 4, 'ads.js 的失败放行分支只有 ' + guard + ' 处，广告不能阻断功能');
-  ['pages/test-card/test-card', 'pages/drill/drill', 'pages/quiz/quiz', 'pages/study/study']
+  ['pages/test-card/test-card', 'pages/drill/drill', 'pages/study/study']
     .forEach(function (p) {
       var f = 'miniprogram/' + p + '.js';
       if (fs.existsSync(path.join(ROOT, f))) {

@@ -41,6 +41,10 @@ var layout = require('../../../utils/layout');
 var profile = require('../../../utils/profile');
 var fit = require('../../../utils/fit');
 var asgcache = require('../../../utils/asgcache');
+/* 第 0 步「开口读」：录音能力必须走 utils/oral.js 这个唯一入口，
+   不能自己拿 RecorderManager（launch ⑯ 与 oral-privacy ① 都锁死了这一点）。 */
+var oral = require('../../../utils/oral');
+var privacy = require('../../../utils/privacy');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -95,7 +99,7 @@ Page({
 
   data: {
     skin: theme.cls(),
-    state: 'loading',        // loading | run | detail | done | empty
+    state: 'loading',        // loading | oral（第 0 步开口读）| run | detail | done | empty
     phase: 'recog',          // recog（认）| spell（写）| loop（巩固）
     round: 1,
     words: [],               // 本轮词单（词对象）
@@ -117,6 +121,12 @@ Page({
     elapsedText: '',         // 结果页时长
     result: null,            // 完成态数据
     typeLabel: '',
+    /* 第 0 步「开口读」展示态：不进 phase，认/写/巩固三条链一个字都不改 */
+    gateWords: [],           // [{word, hasAudio}] 本轮词表，点一下听标准音
+    gateRefText: '',         // 一串词，作录音参照文本（只存本机）
+    gateRecording: false,
+    gateRecordId: '',
+    gateTip: '',
     honor: null,             // 完成后的荣誉/排名（云端返回）
     honorPeriods: [],        // 今日/本周/本月最快（云端返回后拼好文案）
     me: { nickname: '', avatar: '' }   // 榜单展示用的昵称/头像（用户自愿填）
@@ -138,6 +148,13 @@ Page({
     this._honest = false;        // 本次作答是不是点了【不会】
     this._carryMs = 0;           // 详情页停留时长，计入学习简报的"学了多久"
     this._detailAt = 0;
+    /* 第 0 步「开口读」只在显式带 ?oral=1 的入口开启（首页「开始背单词」、底栏「背词」）。
+       显式开关而非默认开：① 班级作业 / 教练试做等入口保持原流程；
+       ② drill-flow / offline-assign 的测试桩 onLoad({}) 仍是纯背词，40+ 条流程断言不受影响。
+       「不管之前口语做到哪里了」= 每次进入都从头读，不读历史录音、不续播。 */
+    this._oralGate = !!(options && options.oral === '1');
+    this._oralDone = false;
+    this._pendingWords = null;
 
     // 班级作业：URL 带 ids 时，这一轮只练作业里的词
     if (options && options.ids) {
@@ -151,9 +168,15 @@ Page({
     this.loadWords();
   },
 
-  onUnload: function () { this.clearTimers(); },
+  onUnload: function () {
+    this.clearTimers();
+    if (this._oralGate) oral.cancelRecord();   // 录着就收尾，别把麦克风留在后台
+  },
   onResize: function () { this.setData({ landscape: fit.isLandscape() }); },
-  onHide: function () { this.clearTimers(); },
+  onHide: function () {
+    this.clearTimers();
+    if (this._oralGate) oral.cancelRecord();
+  },
 
   clearTimers: function () {
     if (this._t5) { clearTimeout(this._t5); this._t5 = null; }
@@ -171,7 +194,7 @@ Page({
   loadWords: function () {
     var self = this;
     if (this._assign && this._assign.ids.length) {
-      this.startRound(this.assignmentWords(this._assign.ids), 'recog');
+      this.begin(this.assignmentWords(this._assign.ids));
       return;
     }
 
@@ -181,14 +204,14 @@ Page({
         return typeof w === 'string' ? w : (w.word || w.word_id || w._id);
       }).filter(Boolean);
       if (!texts.length) throw new Error('EMPTY');
-      self.startRound(self.byTexts(texts), 'recog');
+      self.begin(self.byTexts(texts));
     }).catch(function (err) {
       console.warn('[drill] 云端任务取不到：', (err && (err.errMsg || err.message)) || err);
       // 断网时优先接本机留存的作业词单：孩子该练的是老师布置的那批词，
       // 直接退回默认词库等于"联网时一批、断网时另一批"，进度对不上又要解释一遍。
       // 还是没有才退回本地默认任务 —— 任何情况下都得有得练。
       if (self.startCachedAssignment()) return;
-      self.startRound(self.localWords(DEFAULT_WORDS), 'recog');
+      self.begin(self.localWords(DEFAULT_WORDS));
     });
   },
 
@@ -200,7 +223,7 @@ Page({
     if (!words.length) return false;
     this._assign = { ids: cached.ids, name: cached.name };
     this.setData({ assignName: cached.name, offline: true });
-    this.startRound(words, 'recog');
+    this.begin(words);
     return true;
   },
 
@@ -253,6 +276,97 @@ Page({
       if (String(WORDS[i].word).toLowerCase() === t) return WORDS[i];
     }
     return null;
+  },
+
+  /* ---------------- 第 0 步：开口读（2026-11-08 用户拍板） ----------------
+   * 点「开始背单词」→ 先把本轮词开口读一遍 → 再进原来的认 → 写 → 巩固。
+   * 零 AI：只听标准音 + 自己念 + 可选录音回放，不打分、不上传。
+   * 三条硬约束：
+   *   ① 授权被拒 / 不支持录音 / 不想录，都必须能跳过，绝不把孩子卡在这一屏；
+   *   ② 不写 activity_log、不碰 checkin.js —— 口语不是另一项打卡作业；
+   *   ③ 一轮只录 1 条，避免 MAX_RECORDS 把历史录音挤爆。
+   */
+
+  /** 取词完毕的统一入口：要不要先过口语关，在这里一次性决定 */
+  begin: function (words) {
+    words = (words || []).filter(Boolean);
+    if (this._oralGate && !this._oralDone && words.length) {
+      this.showOralGate(words);
+      return;
+    }
+    this.startRound(words, 'recog');
+  },
+
+  showOralGate: function (words) {
+    this._pendingWords = words;
+    var list = words.map(function (w) {
+      var text = w.word || w.word_id || '';
+      return { word: text, hasAudio: oral.hasLocal(text) };
+    }).filter(function (x) { return x.word; });
+    this.setData({
+      state: 'oral',
+      gateWords: list,
+      gateRefText: list.map(function (x) { return x.word; }).join(' '),
+      gateRecording: false,
+      gateRecordId: '',
+      gateTip: '点单词听标准音，跟着念一遍；也可以直接录下来回放给自己听。',
+      stepText: '第 0 步 读 · ' + list.length + ' 个词',
+      progressPct: 0,
+      typeLabel: '开口读'
+    });
+  },
+
+  /** 点词听标准音：只播本地清单命中的词，绝不走 tts 的云端兜底 */
+  onGateSpeak: function (e) {
+    var w = e.currentTarget.dataset.word;
+    if (!oral.speak(w)) wx.showToast({ title: '这个词暂时没有示范音', icon: 'none' });
+  },
+
+  onGateRecord: function () {
+    var self = this;
+    if (oral.getState() === 'RECORDING') {
+      this.setData({ gateRecording: false, gateTip: '正在保存录音…' });
+      oral.stop().catch(function () { self.setData({ gateRecording: false }); });
+      return;
+    }
+    var starting = oral.start({
+      type: 'custom',
+      ref_text: this.data.gateRefText,
+      ref_word: '',
+      code_id: '',
+      source: 'local'
+    });
+    this.setData({ gateRecording: true, gateTip: '正在录…读完点「录好了，停」' });
+    starting.then(function (item) {
+      self.setData({
+        gateRecording: false,
+        gateRecordId: (item && item.id) || '',
+        gateTip: '录好了，可以回放听一遍'
+      });
+      wx.showToast({ title: '已存到本机', icon: 'none' });
+    }).catch(function (err) {
+      if (err && err.message === 'PRIVACY_DENIED') privacy.onDenied(err, 'microphone');
+      self.setData({ gateRecording: false, gateTip: oral.errorText(err) });
+    });
+  },
+
+  onGatePlay: function () {
+    if (!this.data.gateRecordId) return;
+    if (!oral.play(this.data.gateRecordId)) {
+      wx.showToast({ title: '这条录音已经不在了', icon: 'none' });
+    }
+  },
+
+  onGateDone: function () { this.afterOral(); },
+  onGateSkip: function () { this.afterOral(); },
+
+  /** 口语关唯一出口：读了、录了、拒了、跳了，都从这里回到原来的第 1 步 */
+  afterOral: function () {
+    this._oralDone = true;
+    oral.cancelRecord();
+    var words = this._pendingWords || this.data.words || [];
+    this.setData({ gateRecording: false });
+    this.startRound(words, 'recog');
   },
 
   /* ---------------- 轮次 ---------------- */

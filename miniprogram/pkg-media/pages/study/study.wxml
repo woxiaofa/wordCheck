@@ -53,16 +53,15 @@
     <view class="empty-title">{{emptyText}}</view>
     <view class="empty-sub">{{emptySub}}</view>
 
-    <!-- 一轮学完必须去抽查：学习时的点击只是"这次感觉如何"，
-         真正决定间隔长短的是抽查结果。不给这个引导，用户会一直只学不查，
-         那 SRS 记录的只是他的自我感觉。 -->
+    <!-- 一轮学完去背词页巩固：认 → 写 → 巩固早已合并进同一条流程，
+         不再有独立的抽查页。不给这个引导，用户会一直只学不练。 -->
     <view wx:if="{{roundDone}}" style="margin-top:32rpx;padding:28rpx;border:2rpx solid #3ea6ff;border-radius:20rpx;background:#152435">
-      <view style="font-size:30rpx;font-weight:700;color:#3ea6ff">下一关：抽查</view>
+      <view style="font-size:30rpx;font-weight:700;color:#3ea6ff">下一关：背词</view>
       <view style="margin-top:10rpx;font-size:26rpx;color:#cfe0f0;line-height:1.7">
-        抽查里答对的词，才会进入更长的复习间隔（15 天以上）。<br />
-        答错的词会回到滚动复习列表，10 分钟后重新出现。
+        听音选义、听音拼写都会重新考一遍。<br />
+        答错的词留在巩固轮反复练，直到拿下。
       </view>
-      <button class="btn" style="margin-top:22rpx" bindtap="onGoQuiz">开始抽查</button>
+      <button class="btn" style="margin-top:22rpx" bindtap="onGoDrill">去背词</button>
     </view>
 
     <button class="btn ghost mt" bindtap="onRestart">再学一轮</button>

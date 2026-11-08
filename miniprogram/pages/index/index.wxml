@@ -43,7 +43,7 @@
     </view>
     <!-- 跟读练习：录音只落本机，不联网。放在词库卡片里，因为跟读材料就来自这里 -->
     <view class="link center mt-s oral-entry" bindtap="goOral">🎙 开口读 · 跟读练习</view>
-    <view class="muted center home-guide">先听示范音，再录一遍回放给自己或家长听；录音只存这台手机，不上传</view>
+    <view class="muted center home-guide">点「开始背单词」也会先读一遍；想单独练就来这里。录音只存这台手机，不上传</view>
   </view>
 
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->

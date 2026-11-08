@@ -18,7 +18,7 @@ var theme = require('../../utils/theme');
 
 var ITEMS = [
   { key: 'index', label: '今日', icon: '◎', path: '/pages/index/index' },
-  { key: 'study', label: '背词', icon: '▶', path: '/pkg-media/pages/drill/drill' },
+  { key: 'study', label: '背词', icon: '▶', path: '/pkg-media/pages/drill/drill?oral=1' },
   { key: 'settings', label: '设置', icon: '⚙', path: '/pages/settings/settings' }
 ];
 
@@ -52,7 +52,9 @@ Component({
       if (!path) return;
       var pages = getCurrentPages();
       var current = pages.length ? ('/' + pages[pages.length - 1].route) : '';
-      if (current === path) return;          // 已经在目标页，不重复跳
+      // path 允许带 query（如 ?oral=1），而 route 不带 query；比较前先剥掉，
+      // 否则在背词页再点「背词」会判成"不是当前页"→ 无限 redirect 重开一轮。
+      if (current === path.split('?')[0]) return;
       wx.redirectTo({ url: path });          // redirect 而非 navigate，避免页面栈无限增长
     }
   }

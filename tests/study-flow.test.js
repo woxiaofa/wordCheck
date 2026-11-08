@@ -423,7 +423,7 @@ test('走完整轮：结算文案正确，且中途不出现“卡死”', funct
 
 var WORDS = require('../miniprogram/data/words.js');
 
-test('★ 学完一轮必须给出"去抽查"的引导（roundDone = true）', function () {
+test('★ 学完一轮必须给出"去背词巩固"的引导（roundDone = true）', function () {
   var page = startRound([{
     word: 'alpha', phonetic: '/ˈælfə/', pos: 'n.', def_cn: '首个', tags: ['示例'],
     example_en: 'alpha test', example_cn: '首次测试', freq: 1
@@ -446,7 +446,7 @@ test('★ 一进来就没词时不能假装"这一轮学完了"（roundDone = fa
   page.setData({ queue: [], index: 0 });
   page.showEmptyState();
 
-  assert.strictEqual(page.data.roundDone, false, '"没词可学"不该触发抽查引导');
+  assert.strictEqual(page.data.roundDone, false, '"没词可学"不该触发巩固引导');
   assert.ok(page.data.emptyText.indexOf('今天没有') >= 0, '应给出解释性文案而不是空白');
   assert.strictEqual(page.data.canExtra, false, '没有未到期的词时不给"提前巩固"');
 });

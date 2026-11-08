@@ -1,6 +1,0 @@
-{
-  "usingComponents": {
-    "footer-nav": "/components/footer-nav/index",
-    "letter-keyboard": "/components/letter-keyboard/index"
-  }
-}

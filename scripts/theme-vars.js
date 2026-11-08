@@ -112,7 +112,6 @@ var PAGES = [
   ['pages/report', 'pages/report/report'],
   ['pkg-media/pages/drill', 'pkg-media/pages/drill/drill'],
   ['pkg-media/pages/study', 'pkg-media/pages/study/study'],
-  ['pkg-media/pages/quiz', 'pkg-media/pages/quiz/quiz'],
   ['pkg-media/pages/import', 'pkg-media/pages/import/import'],
   ['pkg-media/pages/organize', 'pkg-media/pages/organize/organize']
 ];

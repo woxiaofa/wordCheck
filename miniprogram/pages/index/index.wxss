@@ -146,5 +146,15 @@
    行高放宽一点，两行文字在窄屏上不挤在一起 */
 .home-guide { font-size: 22rpx; line-height: 1.7; opacity: .75; padding: 0 20rpx; }
 
-/* 跟读练习入口：与「添加词库」同级的次级文字链，不抢主操作注意力 */
-.oral-entry { font-size: 26rpx; }
+/* 跟读练习入口：原先只是 26rpx 文字链，混在词库卡片一堆小字里，
+   真机上直接滑过去了（用户实锤「没看到口语相关的」）。改成浅底胶囊，
+   仍然是次级入口，不抢「开始背单词」的注意力。颜色全走 token 以兼容换肤。 */
+.oral-entry {
+  display: inline-block;
+  font-size: 28rpx;
+  padding: 10rpx 28rpx;
+  margin-top: 20rpx;
+  border-radius: 999rpx;
+  background: var(--accent-bg);
+  border: 2rpx solid var(--line);
+}
