@@ -6,8 +6,8 @@
   <view class="card intro" wx:if="{{intro}}">
     <view class="t1">每天 5 分钟，{{target}} 个词</view>
     <view class="muted mt-s">
-      今天该复习什么，系统按遗忘曲线排好了，你只需要开始。
-      先认后写：听读音选出意思，再听音把单词拼出来；卡住的词会带你读音、跟读，直到学会。
+      点下面的「开始背单词」就能完整体验一遍：先听发音、按住跟读单词和句子，
+      再抽查、认和拼，最后口语和书面一起出一张报告。
     </view>
     <button class="btn mt" bindtap="goStudy">开始背单词</button>
     <view class="link center mt-s" bindtap="toggleHowto">先看看它怎么运作</view>
@@ -43,7 +43,7 @@
     </view>
     <!-- 跟读练习：录音只落本机，不联网。放在词库卡片里，因为跟读材料就来自这里 -->
     <view class="link center mt-s oral-entry" bindtap="goOral">🎙 开口读 · 跟读练习</view>
-    <view class="muted center home-guide">点「开始背单词」也会先读一遍；想单独练就来这里。录音只存这台手机，不上传</view>
+    <view class="muted center home-guide">「开始背单词」里已经带上跟读；想单独练就来这里。录音只存这台手机，不上传</view>
   </view>
 
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->

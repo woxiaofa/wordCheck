@@ -1,0 +1,98 @@
+/* 体验主流程：颜色全部走皮肤 token —— 换到樱粉 / 糖果皮肤时不能留深色孤岛 */
+.head .bar {
+  margin-top: 16rpx;
+  height: 10rpx;
+  border-radius: 999rpx;
+  background: var(--fill2);
+  overflow: hidden;
+}
+.head .bar-on {
+  height: 100%;
+  border-radius: 999rpx;
+  background: var(--accent);
+}
+
+.lesson { text-align: center; }
+.chip {
+  display: inline-block;
+  padding: 6rpx 22rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--line);
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 24rpx;
+}
+.big {
+  margin-top: 28rpx;
+  font-size: 72rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  word-break: break-word;
+}
+.sentence {
+  margin-top: 16rpx;
+  font-size: 36rpx;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.hold-btn {
+  margin-top: 28rpx;
+  padding: 30rpx 0;
+  border-radius: 20rpx;
+  border: 2rpx solid var(--accent);
+  background: var(--accent-bg);
+  color: var(--text);
+  font-size: 34rpx;
+  font-weight: 700;
+  text-align: center;
+  user-select: none;
+}
+.hold-btn.on {
+  background: var(--active);
+  border-color: var(--accent);
+}
+
+.opt {
+  margin-top: 16rpx;
+  padding: 22rpx 20rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid var(--line);
+  background: var(--fill);
+  color: var(--text);
+  font-size: 30rpx;
+}
+.opt.right { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok-text); }
+.opt.wrong { background: var(--bad-bg); border-color: var(--bad-soft); color: var(--bad-text); }
+
+.fb {
+  padding: 20rpx;
+  border-radius: 14rpx;
+  background: var(--surface2);
+  border: 1rpx solid var(--line);
+}
+.fb-ok, .fb-perfect { background: var(--ok-bg); border-color: var(--ok-line); }
+.fb-bad { background: var(--bad-bg); border-color: var(--bad-soft); }
+.fb-title { font-size: 32rpx; font-weight: 700; color: var(--text); }
+
+.stat-row { display: flex; margin-top: 24rpx; }
+.stat { flex: 1; text-align: center; }
+.stat-n { font-size: 52rpx; font-weight: 700; color: var(--text); }
+
+.practice-row {
+  margin-top: 18rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: var(--surface2);
+  border: 1rpx solid var(--line);
+}
+.practice-text { font-size: 28rpx; color: var(--text); line-height: 1.5; }
+
+.honest {
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}

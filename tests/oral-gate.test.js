@@ -3,14 +3,15 @@
  *
  *   node tests/oral-gate.test.js
  *
- * 锁的是 2026-11-08 用户拍板的那条流程：
- *   点【开始背单词】→ 第一轮先开口读 → 再按原来的「认（听看选择）→ 写（拼写）→ 巩固」。
- *
- * 重点不是测录音本身（oral-recorder.test.js 已覆盖状态机），而是测**编排**：
- *   ① 带 ?oral=1 才进第 0 步；不带时旧流程一字不变（40+ 条 drill-flow 断言的前提）
- *   ② 读了 / 跳过 / 录音失败，三条路都必须回到原来的第 1 步 recog，绝不卡死
+ * 2026-11-12 更新：用户实锤「现在不太行」，口语从前置闸门改成贯穿全程的题型。
+ * 主入口（首页 / 底栏）已改道 pkg-oral/pages/flow/flow，本文件现在锁的是：
+ *   ① ?oral=1 旧闸门作为**兼容路径**仍在，且不带开关时 drill 一字不变
+ *      （40+ 条 drill-flow 断言的前提，也保证班级作业等入口不受影响）
+ *   ② 读了 / 跳过 / 录音失败，三条路都必须回到 recog，绝不卡死
  *   ③ 口语关不许写 activity_log / checkin —— 它不是另一项打卡作业
- *   ④ 所有「开始背单词」类入口都得带开关，漏一个就是流程不一致
+ *   ④ 新链路的入口与跨页交接：flow → drill?fromFlow=1 → flow?report=1
+ *
+ * 新流程各阶段的行为另见 tests/oral-flow.test.js（页面桩逐条自证）。
  */
 
 var assert = require('assert');
@@ -156,13 +157,16 @@ function tick() { return new Promise(function (r) { setImmediate(r); }); }
     assert.strictEqual(store['activity_log'], undefined, '进认之后仍未答题，也不该计数');
   });
 
-  await ok('⑦ 源码：首页与底栏「背词」都带 ?oral=1，且 onGo 比较前剥 query', function () {
+  await ok('⑦ 源码：主入口已改道体验主流程；?oral=1 只剩兼容开关', function () {
     var idx = read('miniprogram/pages/index/index.js');
     var nav = read('miniprogram/components/footer-nav/index.js');
-    assert.ok(/goStudy:[\s\S]{0,300}drill\/drill\?oral=1/.test(idx), '首页「开始背单词」没带开关');
-    assert.ok(nav.indexOf("path: '/pkg-media/pages/drill/drill?oral=1'") >= 0, '底栏「背词」没带开关');
+    var drill = read('miniprogram/pkg-media/pages/drill/drill.js');
+    assert.ok(/goStudy:[\s\S]{0,500}pkg-oral\/pages\/flow\/flow/.test(idx),
+      '首页「开始背单词」没进体验主流程');
+    assert.ok(nav.indexOf("path: '/pkg-oral/pages/flow/flow'") >= 0, '底栏「背词」没跟上');
     assert.ok(nav.indexOf("path.split('?')[0]") >= 0,
-      'path 带 query 后，onGo 必须剥掉再比 route，否则在背词页点背词会无限 redirect');
+      'path 带 query 后，onGo 必须剥掉再比 route，否则会无限 redirect');
+    assert.ok(drill.indexOf("options.oral === '1'") >= 0, '旧闸门的兼容开关不该被顺手删掉');
   });
 
   await ok('⑧ 源码：drill 的取词分支统一走 begin()，onAgain 不重进口语关', function () {
@@ -190,6 +194,54 @@ function tick() { return new Promise(function (r) { setImmediate(r); }); }
     var gateCss = s.slice(s.indexOf('.gate-card'));
     assert.ok(gateCss.indexOf('var(--') >= 0, '样式要走皮肤 token');
     assert.ok(!/#[0-9a-fA-F]{3,6}/.test(gateCss), '口语关样式不许硬编码颜色（换肤会出现深色孤岛）');
+  });
+
+  await ok('⑩ 从 flow 拉起的书面阶段：交结果、回合并报告，不弹完成页也不上榜', function () {
+    var urls = [];
+    var scored = 0;
+    var origRedirect = global.wx.redirectTo;
+    var origScore = cloud.api.drillScore;
+    global.wx.redirectTo = function (o) { urls.push(o.url); };
+    cloud.api.drillScore = function () { scored++; return syncResolve({ rank: 1 }); };
+    delete store['oral_flow_session'];
+    try {
+      var p = fresh({ fromFlow: '1' });
+      p.startedAt = Date.now() - 30000;
+      p._totalWords = 5;
+      p.data.words = [
+        { word: 'clean' }, { word: 'desk' }, { word: 'tidy' },
+        { word: 'house' }, { word: 'wash' }
+      ];
+      p.data.roundWrong = [];
+      p.data.wrongBook = [];
+      p.finish();
+      assert.notStrictEqual(p.data.state, 'done', '书面阶段不该再弹自己的完成页');
+      assert.strictEqual(scored, 0, '体验流程的口语段没有计时口径，不该污染成绩榜单');
+      assert.deepStrictEqual(urls, ['/pkg-oral/pages/flow/flow?report=1'], '没回合并报告');
+      var s = store['oral_flow_session'];
+      assert.ok(s && s.drill, '书面结果没写进会话');
+      assert.strictEqual(s.drill.total, 5);
+      assert.strictEqual(s.drill.mastered, 5);
+      assert.strictEqual(s.drill.allDone, true);
+    } finally {
+      global.wx.redirectTo = origRedirect;
+      cloud.api.drillScore = origScore;
+    }
+  });
+
+  await ok('⑪ 体验主流程页四件套齐、零联网、写明能力边界', function () {
+    ['js', 'json', 'wxml', 'wxss'].forEach(function (e) {
+      assert.ok(fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/flow/flow.' + e)),
+        '缺 flow.' + e);
+    });
+    var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+    ['wx.cloud', 'uploadFile', 'wx.request', 'callFunction'].forEach(function (k) {
+      assert.strictEqual(j.indexOf(k), -1, 'flow.js 出现了联网能力 ' + k);
+    });
+    assert.ok(j.indexOf('不判断发音准不准') >= 0, '没写明本地完成度的能力边界');
+    var app = JSON.parse(read('miniprogram/app.json'));
+    var oral = (app.subpackages || []).filter(function (x) { return x.root === 'pkg-oral'; })[0];
+    assert.ok(oral && oral.pages.indexOf('pages/flow/flow') >= 0, 'flow 页没登记进分包');
   });
 
   console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +

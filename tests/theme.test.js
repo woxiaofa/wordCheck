@@ -40,7 +40,7 @@ var PAGES = [
   'pages/class/class', 'pages/report/report',
   'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study',
   'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize',
-  'pkg-oral/pages/oral/oral'
+  'pkg-oral/pages/oral/oral', 'pkg-oral/pages/flow/flow'
 ];
 
 function walk(dir, ext, out) {
@@ -425,7 +425,8 @@ var navPaths = (navSrc.match(/path: '([^']+)'/g) || []).map(function (x) {
 var navBare = navPaths.map(function (p) { return p.split('?')[0]; });
 ok('⑥b 底栏缩到三个：今日 / 背词 / 设置',
    navBare.length === 3 && navBare.join(',') ===
-   '/pages/index/index,/pkg-media/pages/drill/drill,/pages/settings/settings',
+   // 2026-11-12 起「背词」进体验主流程（口语贯穿式），书面阶段才由 flow 拉起 drill
+   '/pages/index/index,/pkg-oral/pages/flow/flow,/pages/settings/settings',
    navBare.join(','));
 var badNav = navBare.filter(function (p2) {
   return !fs.existsSync(path.join(ROOT, p2.replace(/^\//, '') + '.js'));

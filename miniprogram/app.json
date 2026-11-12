@@ -20,7 +20,8 @@
     {
       "root": "pkg-oral",
       "pages": [
-        "pages/oral/oral"
+        "pages/oral/oral",
+        "pages/flow/flow"
       ]
     }
   ],

@@ -18,7 +18,7 @@ var theme = require('../../utils/theme');
 
 var ITEMS = [
   { key: 'index', label: '今日', icon: '◎', path: '/pages/index/index' },
-  { key: 'study', label: '背词', icon: '▶', path: '/pkg-media/pages/drill/drill?oral=1' },
+  { key: 'study', label: '背词', icon: '▶', path: '/pkg-oral/pages/flow/flow' },
   { key: 'settings', label: '设置', icon: '⚙', path: '/pages/settings/settings' }
 ];
 

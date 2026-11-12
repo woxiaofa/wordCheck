@@ -1,0 +1,139 @@
+<!-- 体验主流程：带读 → 混排抽查 → 现有背词 → 一张报告 -->
+<view class="page {{skin}}">
+
+  <view class="card head">
+    <view class="t1">{{stepText}}</view>
+    <view class="bar"><view class="bar-on" style="width:{{progressPct}}%"></view></view>
+    <view class="muted sm mt-s">{{tip}}</view>
+  </view>
+
+  <!-- ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读，合格才下一条 -->
+  <block wx:if="{{stage === 'lead' && item}}">
+    <view class="card lesson">
+      <view class="chip">{{item.label}}</view>
+      <view wx:if="{{item.kind === 'word'}}" class="big">{{item.display}}</view>
+      <view wx:elif="{{item.kind === 'sentence'}}" class="sentence">{{item.display}}</view>
+      <block wx:else>
+        <view wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this" class="sentence">{{line}}</view>
+      </block>
+      <view wx:if="{{item.phonetic}}" class="muted sm mt-s">{{item.phonetic}}</view>
+      <view class="muted sm">{{item.cn}}</view>
+      <view class="link mt-s" bindtap="onReplayDemo">▶ 再听一遍</view>
+    </view>
+
+    <view class="card">
+      <view class="hold-btn {{holding ? 'on' : ''}}"
+            bindtouchstart="onHoldStart" bindtouchend="onHoldEnd" bindtouchcancel="onHoldEnd">
+        {{holding ? '松手就好' : '按住跟读'}}
+      </view>
+      <view class="link center mt-s" bindtap="onTapHold">
+        {{holding ? '点这里结束' : '不方便按住？点一下开始，再点结束'}}
+      </view>
+
+      <view wx:if="{{feedback}}" class="fb fb-{{feedback.grade}} mt">
+        <view class="fb-title">{{feedback.verdict}}</view>
+        <view wx:for="{{feedback.issues}}" wx:for-item="iss" wx:key="*this" class="muted sm">{{iss}}</view>
+      </view>
+
+      <button wx:if="{{passed}}" class="btn ok mt" bindtap="onNext">
+        {{idx + 1 >= total ? '带读完，去抽查' : '下一个'}}
+      </button>
+      <view wx:else class="link center mt-s" bindtap="onSkipItem">这条先跳过</view>
+      <view class="honest mt-s">{{honestTip}}</view>
+    </view>
+  </block>
+
+  <!-- ② 混排抽查：口语题不再给示范音，与「认」题混在一起过一遍 -->
+  <block wx:if="{{stage === 'check' && q}}">
+    <view class="card lesson">
+      <view class="chip">{{q.label}} · 抽查</view>
+
+      <block wx:if="{{q.type === 'oral'}}">
+        <view wx:if="{{q.kind === 'word'}}" class="big">{{q.display}}</view>
+        <block wx:elif="{{q.lines.length}}">
+          <view wx:for="{{q.lines}}" wx:for-item="line" wx:key="*this" class="sentence">{{line}}</view>
+        </block>
+        <view wx:else class="sentence">{{q.display}}</view>
+        <view class="muted sm">{{q.cn}}</view>
+        <view class="hold-btn {{qHolding ? 'on' : ''}} mt"
+              bindtouchstart="onQHoldStart" bindtouchend="onQHoldEnd" bindtouchcancel="onQHoldEnd">
+          {{qHolding ? '松手就好' : '按住读出声'}}
+        </view>
+        <view class="link center mt-s" bindtap="onQTapHold">
+          {{qHolding ? '点这里结束' : '不方便按住？点一下开始，再点结束'}}
+        </view>
+      </block>
+
+      <block wx:else>
+        <view class="big">{{q.stem}}</view>
+        <view class="muted sm">选出中文意思</view>
+        <view wx:for="{{q.options}}" wx:for-item="opt" wx:key="*this"
+              class="opt {{qSelected === opt ? (qFeedback.grade === 'ok' ? 'right' : 'wrong') : ''}}"
+              data-value="{{opt}}" bindtap="onQOption">{{opt}}</view>
+      </block>
+
+      <view wx:if="{{qFeedback}}" class="fb fb-{{qFeedback.grade}} mt">
+        <view class="fb-title">{{qFeedback.verdict}}</view>
+        <view wx:for="{{qFeedback.issues}}" wx:for-item="iss" wx:key="*this" class="muted sm">{{iss}}</view>
+      </view>
+
+      <button wx:if="{{qPassed}}" class="btn ok mt" bindtap="onQNext">
+        {{qIdx + 1 >= qTotal ? '这轮抽查完' : '下一题'}}
+      </button>
+      <view wx:else class="link center mt-s" bindtap="onQSkip">这题先跳过</view>
+      <view class="honest mt-s">{{honestTip}}</view>
+    </view>
+  </block>
+
+  <!-- ③ 背词：现有 drill 是另一个分包，加载期间给一屏过渡，别留白屏 -->
+  <block wx:if="{{stage === 'drill'}}">
+    <view class="card lesson">
+      <view class="t1">口语和抽查完成</view>
+      <view class="muted sm mt-s">接着是认 → 写 → 巩固，最后口语和书面一起出报告</view>
+    </view>
+  </block>
+
+  <!-- ④ 报告：口语与书面并到一张纸，待练清单可反复练到全流畅 -->
+  <block wx:if="{{stage === 'report' && report}}">
+    <view class="card">
+      <view class="t1">这一轮的报告</view>
+      <view class="stat-row">
+        <view class="stat">
+          <view class="stat-n">{{report.oral.total}}</view>
+          <view class="muted sm">开口读了</view>
+        </view>
+        <view class="stat">
+          <view class="stat-n">{{report.oral.perfect}}</view>
+          <view class="muted sm">读得流畅</view>
+        </view>
+        <view class="stat">
+          <view class="stat-n">{{report.check.wrong}}</view>
+          <view class="muted sm">抽查没过</view>
+        </view>
+      </view>
+      <view class="muted sm mt-s">
+        书面背词：<text wx:if="{{report.drill}}">{{report.drill.mastered}} / {{report.drill.total}} 个词拿下，用时 {{report.drill.elapsedText}}</text><text wx:else>这轮没走完背词</text>
+      </view>
+      <view wx:if="{{report.oral.forced}}" class="muted sm">有 {{report.oral.forced}} 条读了几次还不太顺，已经列在下面</view>
+      <view wx:if="{{report.allPerfect}}" class="fb fb-ok mt-s">全读流畅、也都对了</view>
+    </view>
+
+    <view wx:if="{{report.practice.length}}" class="card">
+      <view class="t1">还想再练的</view>
+      <view wx:for="{{report.practice}}" wx:for-item="p" wx:key="refText" class="practice-row">
+        <view class="practice-text">{{p.refText}}</view>
+        <view class="muted sm">{{p.reason}}</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <button wx:if="{{report.practice.length}}" class="btn" bindtap="onPractice">只练没读流畅的</button>
+      <button class="btn ghost mt-s" bindtap="onRestartAll">整轮重新来一次</button>
+      <button class="btn ghost mt-s" bindtap="onHome">回首页</button>
+    </view>
+  </block>
+
+  <view class="card mt">
+    <button class="btn ghost sm" open-type="contact">遇到问题？给开发者留言</button>
+  </view>
+</view>

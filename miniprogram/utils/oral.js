@@ -30,6 +30,21 @@ var RECORD_OPTIONS = {
   format: 'mp3'
 };
 
+/**
+ * 「按住跟读」专用参数：PCM 原始帧 + frameSize，才有 onFrameRecorded 回调。
+ * 官方文档明确 frameSize「暂仅支持 mp3、pcm 格式」，mp3 帧拿不到原始波形，
+ * 算不了能量。所以这条通道只用 PCM，且**不落盘、不写索引** —— 它只服务即时反馈，
+ * 不是第 1 期那种可回放的提交物，也不会把 12 条历史录音挤爆。
+ * 4KB 帧 @16k/16bit/mono = 128ms，判定精度够用；15 秒上限防孩子按住忘松手。
+ */
+var HOLD_OPTIONS = {
+  duration: 15000,
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  format: 'PCM',
+  frameSize: 4
+};
+
 var manifest = {};
 try { manifest = require('../data/audio-manifest.js'); } catch (e) { manifest = {}; }
 var byLower = {};
@@ -169,8 +184,41 @@ var stopCb = null;
 var autoTimer = null;
 var pendingMeta = null;
 
+/* 「按住跟读」专用状态：与原 mp3 提交物链路互斥复用同一个录音管理器。
+   holdMode 决定 onStop/onError 往哪个 Promise 回，绝不串台。
+   frames 只在本轮内存里，落盘索引一条都不写。 */
+var holdMode = false;
+var holdCb = null;
+var holdFrames = [];
+var holdStartAt = 0;
+var holdMeta = null;
+
 function clearAutoTimer() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+}
+
+/** PCM 原始帧 → RMS 能量 + 帧时长（16bit / 16kHz / 单声道） */
+function frameEnergy(buf) {
+  try {
+    if (!buf) return null;
+    var n = Math.floor((buf.byteLength || 0) / 2);
+    if (n < 1) return null;
+    var dv = new DataView(buf);
+    var sum = 0;
+    for (var i = 0; i < n; i++) {
+      var v = dv.getInt16(i * 2, true) / 32768;
+      sum += v * v;
+    }
+    return { rms: Math.sqrt(sum / n), ms: Math.round(n / 16) };
+  } catch (e) { return null; }
+}
+
+function resetHold() {
+  holdMode = false;
+  holdCb = null;
+  holdFrames = [];
+  holdStartAt = 0;
+  holdMeta = null;
 }
 
 function rec() {
@@ -179,6 +227,11 @@ function rec() {
   recorder = wx.getRecorderManager();
   if (recorder.onStop) recorder.onStop(function (res) { onStopped(res); });
   if (recorder.onError) recorder.onError(function (err) { onFailed(err); });
+  if (recorder.onFrameRecorded) recorder.onFrameRecorded(function (res) {
+    if (!holdMode || state !== 'RECORDING') return;
+    var e = frameEnergy(res && res.frameBuffer);
+    if (e) holdFrames.push(e);
+  });
   return recorder;
 }
 
@@ -196,6 +249,22 @@ function normalizeMeta(meta) {
 function onStopped(res) {
   clearAutoTimer();
   if (state !== 'RECORDING' && state !== 'SAVING') return;
+
+  /* 按住跟读：只把内存里的能量帧交出去，不落盘、不写索引、不占 12 条名额 */
+  if (holdMode) {
+    var hcb = holdCb;
+    var out = {
+      frames: holdFrames.slice(),
+      durationMs: Math.max(0, (res && res.duration) || (Date.now() - holdStartAt)),
+      refText: holdMeta ? holdMeta.ref_text : '',
+      refWord: holdMeta ? holdMeta.ref_word : ''
+    };
+    state = 'IDLE';
+    resetHold();
+    if (hcb) hcb(null, out);
+    return;
+  }
+
   state = 'SAVING';
   var cb = stopCb;
   stopCb = null;
@@ -245,6 +314,12 @@ function onFailed(err) {
   clearAutoTimer();
   state = 'IDLE';
   pendingMeta = null;
+  if (holdMode) {
+    var hcb = holdCb;
+    resetHold();
+    if (hcb) hcb(new Error(classify(err)), null);
+    return;
+  }
   var cb = stopCb;
   stopCb = null;
   if (cb) cb(null, new Error(classify(err)));
@@ -255,6 +330,12 @@ function rollback(e) {
   clearAutoTimer();
   state = 'IDLE';
   pendingMeta = null;
+  if (holdMode) {
+    var hcb = holdCb;
+    resetHold();
+    if (hcb) hcb(e, null);
+    return;
+  }
   var cb = stopCb;
   stopCb = null;
   if (cb) cb(null, e);
@@ -285,6 +366,33 @@ function start(meta) {
   });
 }
 
+/**
+ * 按住跟读：起录（手指按下）。
+ * 与 start() 共用状态机，所以两条链路天然互斥，不会出现同时占着麦克风。
+ * Promise 在手指松开 stop() 之后 resolve 出 { frames, durationMs, refText, refWord }。
+ */
+function startHold(meta) {
+  return new Promise(function (resolve, reject) {
+    if (state === 'PLAYING') stopPlay();
+    if (state !== 'IDLE') { reject(new Error('BUSY')); return; }
+    state = 'RECORDING';               // 同步占住：授权是异步的，别让重复按下漏进来
+    holdMode = true;
+    holdFrames = [];
+    holdStartAt = Date.now();
+    holdMeta = normalizeMeta(meta);
+    holdCb = function (err, out) { if (err) reject(err); else resolve(out); };
+    privacy.ensureRecord().then(function () {
+      var r = rec();
+      if (!r) { rollback(new Error('NO_RECORDER')); return; }
+      try {
+        r.start(HOLD_OPTIONS);
+      } catch (e) { rollback(e); return; }
+      autoTimer = setTimeout(function () { if (state === 'RECORDING' && holdMode) stop(); },
+        HOLD_OPTIONS.duration + 200);
+    }).catch(function (e) { rollback(e); });
+  });
+}
+
 function stop() {
   if (state !== 'RECORDING') return Promise.reject(new Error('NOT_RECORDING'));
   var r = rec();
@@ -293,6 +401,7 @@ function stop() {
     r.stop();
   } catch (e) {
     state = 'IDLE'; stopCb = null; pendingMeta = null;
+    if (holdMode) resetHold();
     return Promise.reject(e);
   }
   return Promise.resolve(true);
@@ -398,6 +507,8 @@ module.exports = {
   MAX_RECORDS: MAX_RECORDS,
   MAX_MS: MAX_MS,
   RECORD_OPTIONS: RECORD_OPTIONS,
+  HOLD_OPTIONS: HOLD_OPTIONS,
+  startHold: startHold,
   list: list,
   get: get,
   add: add,

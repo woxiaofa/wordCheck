@@ -275,7 +275,10 @@ ok('⑯ 录音管理器收敛单点：别处不许裸调 wx.getRecorderManager',
 
 ok('⑰ 跟读链路承诺「不上传」，代码里就不得有任何联网能力', function () {
   ['miniprogram/utils/oral.js', 'miniprogram/utils/oral-code.js',
-    'miniprogram/pkg-oral/pages/oral/oral.js'].forEach(function (f) {
+    'miniprogram/utils/oral-score.js', 'miniprogram/utils/oral-flow.js',
+    'miniprogram/utils/lesson-audio.js', 'miniprogram/data/oral-lesson.js',
+    'miniprogram/pkg-oral/pages/oral/oral.js',
+    'miniprogram/pkg-oral/pages/flow/flow.js'].forEach(function (f) {
     var s = read(f);
     ['wx.cloud', 'uploadFile', 'wx.request', 'callFunction'].forEach(function (k) {
       assert.strictEqual(s.indexOf(k), -1, f + ' 里出现了 ' + k);
@@ -330,7 +333,8 @@ ok('㉒ 全部在管的 tests/*.test.js 都登记进了 package.json 的 check �
 });
 
 /* ---------- ㉓㉔ 首页「去抽查」入口已删（2026-11-08 用户拍板） ----------
- * 主流程 goStudy 与底栏「背词」都进 drill（认→写→巩固，2026-10-07 已合并抽查），
+ * 主流程 goStudy 与底栏「背词」现在都进 flow（2026-11-12 起），
+ * 书面阶段才由 flow 拉起 drill（认→写→巩固，2026-10-07 已合并抽查），
  * 首页再挂一个「去抽查」等于两条并行练习线。用户原话：「在我们整个流程里都没用」。
  * 只锁「用户可见的首页入口」，不动 quiz 页本体：utils/quiz.js 仍被 drill 用来出题，
  * 旧 study 流程与 tests/study-flow.test.js 也仍引用该页。
@@ -350,6 +354,45 @@ ok('㉔ 面向孩子的文案不再把「去抽查」说成另一项待办', fun
     'miniprogram/pages/stats/stats.wxml'].forEach(function (f) {
       assert.ok(read(f).indexOf('去抽查') < 0, f + ' 里仍有「去抽查」口吻');
     });
+});
+
+/* ---------- ㉕ 体验主流程（2026-11-12 用户拍板「口语贯穿式」） ----------
+ * 旧实现把口语做成「一屏列出 10 个词、录一条整批放行」的前置闸门，用户实锤「现在不太行」。
+ * 新链路：flow（带读→混排抽查）→ drill（现有背词）→ flow?report=1（合并报告）。
+ * 这里只锁「链路没有断」：入口、分包登记、四件套、跨页交接、报告出口。
+ * 各阶段的行为由 tests/oral-flow.test.js 用页面桩逐条自证。 */
+ok('㉕ 「开始背单词」进体验主流程，四阶段闭环与合并报告都在链上', function () {
+  var app = JSON.parse(read('miniprogram/app.json'));
+  var oralPkg = (app.subpackages || []).filter(function (s) { return s.root === 'pkg-oral'; })[0];
+  assert.ok(oralPkg && oralPkg.pages.indexOf('pages/flow/flow') >= 0, 'flow 页没登记进 pkg-oral');
+  assert.ok(app.pages.every(function (p) { return p.indexOf('flow') < 0; }), 'flow 不该进主包');
+
+  ['js', 'json', 'wxml', 'wxss'].forEach(function (e) {
+    var f = 'miniprogram/pkg-oral/pages/flow/flow.' + e;
+    assert.ok(fs.existsSync(path.join(ROOT, f)), '缺 ' + f);
+  });
+
+  var idx = read('miniprogram/pages/index/index.js');
+  assert.ok(/goStudy:[\s\S]{0,500}pkg-oral\/pages\/flow\/flow/.test(idx),
+    '首页「开始背单词」没进体验主流程');
+  var nav = read('miniprogram/components/footer-nav/index.js');
+  assert.ok(nav.indexOf("path: '/pkg-oral/pages/flow/flow'") >= 0, '底栏「背词」没跟上新流程');
+
+  var drill = read('miniprogram/pkg-media/pages/drill/drill.js');
+  assert.ok(drill.indexOf("fromFlow === '1'") >= 0, 'drill 没认出书面阶段');
+  assert.ok(drill.indexOf('flow/flow?report=1') >= 0, '书面阶段结束没回合并报告');
+  assert.ok(drill.indexOf('oralFlow.setDrillResult') >= 0, '书面结果没交给会话');
+
+  var f = read('miniprogram/pkg-oral/pages/flow/flow.js');
+  assert.ok(f.indexOf('oral.startHold') >= 0 && f.indexOf('scorer.score') >= 0,
+    '带读没接按住跟读与评分器');
+  assert.ok(f.indexOf("drill/drill?fromFlow=1") >= 0, '没有接上现有背词');
+  assert.ok(f.indexOf('showReport') >= 0 && f.indexOf('onPractice') >= 0,
+    '缺合并报告或只练没读流畅的入口');
+  var w = read('miniprogram/pkg-oral/pages/flow/flow.wxml');
+  assert.ok(w.indexOf('{{skin}}') >= 0, '根节点没挂皮肤类');
+  assert.ok(w.indexOf('open-type="contact"') >= 0, '缺反馈入口');
+  assert.ok(w.indexOf('honestTip') >= 0, '页面必须写明「不判断发音准不准」');
 });
 
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));

@@ -429,9 +429,11 @@ Page({
   goStudy: function () {
     // 点"开始背单词"即视为看过引导，以后永不再现
     wx.setStorageSync(INTRO_KEY, 1);
-    // 2026-11-08 用户拍板：第一轮先开口读，再走原来的认 → 写 → 巩固。
-    // oral=1 是显式开关，drill 的 onLoad({}) 仍是纯背词流程（drill-flow 测试依赖）。
-    wx.redirectTo({ url: '/pkg-media/pages/drill/drill?oral=1' });
+    // 2026-11-12 用户拍板：口语从「进来先读一遍的前置闸门」改成贯穿全程的题型。
+    // 主入口进体验主流程：带读（词→短句→小段）→ 混排抽查 → 现有背词 → 一张报告。
+    // drill 页不再由首页直接打开，而是被 flow 在书面阶段用 ?fromFlow=1 拉起，
+    // 所以 drill 的 onLoad({}) 仍是纯背词，40+ 条 drill-flow 断言不受影响。
+    wx.redirectTo({ url: '/pkg-oral/pages/flow/flow' });
   },
 
   /**

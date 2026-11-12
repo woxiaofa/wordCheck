@@ -45,6 +45,9 @@ var asgcache = require('../../../utils/asgcache');
    不能自己拿 RecorderManager（launch ⑯ 与 oral-privacy ① 都锁死了这一点）。 */
 var oral = require('../../../utils/oral');
 var privacy = require('../../../utils/privacy');
+/* 2026-11-12：被口语体验主流程（pkg-oral/pages/flow）拉起时，
+   本页只负责「书面」阶段，结果交给 flow 出合并报告，不再显示自己的完成页。 */
+var oralFlow = require('../../../utils/oral-flow');
 
 var STORAGE_KEY = 'word_state_mirror';
 var CACHE_PREFIX = 'word_cache_v1:';
@@ -155,6 +158,11 @@ Page({
     this._oralGate = !!(options && options.oral === '1');
     this._oralDone = false;
     this._pendingWords = null;
+    /* 体验主流程的书面阶段：finish 时不显示本页完成页，也不上报成绩榜单，
+       把结果写进 oral-flow 会话后直接回 flow 出合并报告。
+       与 ?oral=1 互斥：新流程用 fromFlow=1，旧闸门不再由任何入口指向。 */
+    this._fromFlow = !!(options && options.fromFlow === '1');
+    if (this._fromFlow) this._oralGate = false;
 
     // 班级作业：URL 带 ids 时，这一轮只练作业里的词
     if (options && options.ids) {
@@ -864,6 +872,21 @@ Page({
     var ss = totalSec % 60;
     var left = this.data.roundWrong || [];
     var total = this._totalWords || this.data.words.length;
+    var elapsedText = (mm ? mm + ' 分 ' : '') + ss + ' 秒';
+
+    /* 体验主流程的书面阶段结束：只交结果，不出自己的完成页、不上报榜单。
+       榜单的意义是「同一份任务比谁快」，体验流程的口语段没有计时口径，混进去会失真。 */
+    if (this._fromFlow) {
+      oralFlow.setDrillResult({
+        total: total,
+        mastered: Math.max(0, total - left.length),
+        seconds: totalSec,
+        elapsedText: elapsedText,
+        allDone: left.length === 0
+      });
+      wx.redirectTo({ url: '/pkg-oral/pages/flow/flow?report=1' });
+      return;
+    }
 
     this.setData({
       state: 'done',
