@@ -393,6 +393,8 @@ ok('㉕ 「开始背单词」进体验主流程，四阶段闭环与合并报告
   assert.ok(w.indexOf('{{skin}}') >= 0, '根节点没挂皮肤类');
   assert.ok(w.indexOf('open-type="contact"') >= 0, '缺反馈入口');
   assert.ok(w.indexOf('honestTip') >= 0, '页面必须写明「不判断发音准不准」');
+  assert.ok(w.indexOf('先不练了，回首页') >= 0 && w.indexOf("stage !== 'report'") >= 0,
+    'redirectTo 进来的练习页中途必须有退出入口，否则真机没有返回箭头会困住孩子');
 });
 
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));

@@ -5,6 +5,9 @@
     <view class="t1">{{stepText}}</view>
     <view class="bar"><view class="bar-on" style="width:{{progressPct}}%"></view></view>
     <view class="muted sm mt-s">{{tip}}</view>
+    <!-- 本页由首页 redirectTo 进来，页面栈只有一页，真机没有返回箭头。
+         练习中途必须给一个非阻断出口，否则孩子只能走完全程或杀掉小程序。 -->
+    <view wx:if="{{stage !== 'report'}}" class="link center mt-s" bindtap="onHome">先不练了，回首页</view>
   </view>
 
   <!-- ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读，合格才下一条 -->
