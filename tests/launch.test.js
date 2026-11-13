@@ -434,6 +434,38 @@ ok('㉖ 长按修复与既有提示音、体验页 UI 都在链上', function ()
     '录音层缺起录竞态防护');
 });
 
+/* ---------- ㉗ 阶段过渡的等待反馈（2026-11-13 真机反馈） ----------
+ * 用户原话：「口语到背词时间有点长，可以考虑加个 loading 或者进度条」。
+ * 客观事实是这一段没法变「零等待」：pkg-media 是独立分包、drill 还要走一趟云端
+ * 取今日任务。所以这里锁两件事：
+ *   ① 等待期间必须有转圈，不能只有一行静止灰字（看着像卡死，孩子会反复点屏）；
+ *   ② 进入 flow 就预下载 pkg-media，把分包下载时间藏进带读那一分钟里。 */
+ok('㉗ 口语到背词的等待有转圈，且分包提前预下载', function () {
+  var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+  assert.ok(j.indexOf('preloadSubpackage') >= 0 && j.indexOf("name: 'pkg-media'") >= 0,
+    '进入体验流程没有预下载背词分包，跳 drill 时还要现下');
+
+  ['miniprogram/pkg-oral/pages/flow/flow.wxml',
+    'miniprogram/pkg-media/pages/drill/drill.wxml'].forEach(function (f) {
+    var w = read(f);
+    assert.ok(w.indexOf('class="loading-box"') >= 0 &&
+      w.indexOf('<view class="spinner"></view>') >= 0,
+      f + ' 的等待屏只有文字，没有转圈');
+  });
+  // drill 旧实现是「三元表达式输出单行灰字」，回退到那样就等于没有等待反馈
+  var dw = read('miniprogram/pkg-media/pages/drill/drill.wxml');
+  assert.ok(dw.indexOf("state === 'loading' ?") < 0,
+    'drill 的 loading 又退回单行静态文字');
+
+  ['miniprogram/pkg-oral/pages/flow/flow.wxss',
+    'miniprogram/pkg-media/pages/drill/drill.wxss'].forEach(function (f) {
+    var s = read(f);
+    // 匹配到花括号，防止「类名改个后缀」这种改法蒙混过关
+    assert.ok(s.indexOf('.spinner {') >= 0 && s.indexOf('@keyframes spin {') >= 0,
+      f + ' 缺 .spinner 或转圈关键帧（分包样式不跨包共享，两块都要各写一份）');
+  });
+});
+
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
 process.exit(fail ? 1 : 0);
 

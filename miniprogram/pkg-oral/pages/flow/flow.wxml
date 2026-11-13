@@ -93,10 +93,15 @@
     </view>
   </block>
 
-  <!-- ③ 背词：现有 drill 是另一个分包，加载期间给一屏过渡，别留白屏 -->
+  <!-- ③ 背词：现有 drill 是另一个分包，加载期间给一屏过渡，别留白屏。
+       转圈让等待可感知 —— 真机反馈「口语到背词之间等得有点久」，纯文字看着像卡死。 -->
   <block wx:if="{{stage === 'drill'}}">
     <view class="card lesson">
-      <view class="t1">口语和抽查完成</view>
+      <view class="loading-box">
+        <view class="spinner"></view>
+        <view class="loading-title">口语和抽查完成</view>
+        <view class="loading-sub">正在准备这一轮的词，马上开始认词</view>
+      </view>
       <view class="muted sm mt-s">接着是认 → 写 → 巩固，最后口语和书面一起出报告</view>
     </view>
   </block>

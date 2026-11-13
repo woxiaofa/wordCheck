@@ -294,6 +294,21 @@
 }
 .honest::after { border: none; }
 
+/* 取词等待：云端 todayTask 冷启动要一两秒，转圈让等待可感知（2026-11-13 真机反馈） */
+.loading-box { padding: 56rpx 0 24rpx; text-align: center; }
+.spinner {
+  width: 56rpx;
+  height: 56rpx;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 6rpx solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+.loading-title { margin-top: 24rpx; font-size: 32rpx; font-weight: 600; color: var(--text); }
+.loading-sub { margin-top: 10rpx; font-size: 24rpx; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* 键盘难度说明：让家长知道"变简单"是设计，不是坏了 */
 
 /* 详情页跟读引导：只看不念记不住，这里明确鼓励多听几遍；整块可点（大喇叭） */

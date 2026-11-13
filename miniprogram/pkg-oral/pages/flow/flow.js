@@ -106,6 +106,11 @@ Page({
     this._practiceOnly = false;
     this._seed = (Date.now() % 100000) + 1;
     this._clearTimers();
+    // 2026-11-13 真机反馈「口语到背词之间等得有点久」：
+    // 进入本页就把 pkg-media 下好，等孩子读完带读 + 抽查（一分多钟）再跳 drill 时，
+    // 分包早已在本地，省掉那段「点了没反应」的分包下载等待。
+    // 首页的 preloadRule 已覆盖「从首页进来」，但底栏 / 分享直接进 flow 时它不生效，这里补上。
+    this.preloadDrill();
 
     // drill 完成后 redirect 回来，只带一个 report=1：会话从本机 storage 读，
     // 不依赖页面栈、不依赖模块内存，系统回收过也能出报告。
@@ -164,6 +169,14 @@ Page({
       title: r.allPerfect ? '这一轮全读流畅了，报告看看' : '今天的背单词报告，口语和书面都在里面',
       path: '/pages/index/index'
     };
+  },
+
+  /** 预下载背词分包（drill）。失败无所谓：真到跳转时微信还会再下，只是会慢一点。 */
+  preloadDrill: function () {
+    if (typeof wx === 'undefined' || !wx.preloadSubpackage) return;
+    try {
+      wx.preloadSubpackage({ name: 'pkg-media', fail: function () { /* 静默 */ } });
+    } catch (e) { /* 低版本基础库没有这个 API */ }
   },
 
   /* ---------------- 麦克风授权 ---------------- */
@@ -628,8 +641,14 @@ Page({
   /** ③ 直接上现有背词：drill 会在 finish 时把书面结果交回本页的报告 */
   goDrill: function () {
     this._clearTimers();
-    // 先切到过渡态再跳：分包加载有几百毫秒，别让孩子对着上一题的白屏发愣
-    this.setData({ stage: 'drill', stepText: '第 3 步 背词', progressPct: 100 });
+    // 先切到过渡态再跳：分包加载 / drill 取词都要几百毫秒到一两秒，
+    // 这一屏带着转圈，别让孩子对着上一题或白屏发愣。
+    this.setData({
+      stage: 'drill',
+      stepText: '第 3 步 背词',
+      progressPct: 100,
+      tip: '正在准备这一轮的词…'
+    });
     wx.redirectTo({ url: '/pkg-media/pages/drill/drill?fromFlow=1' });
   },
 

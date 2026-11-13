@@ -260,9 +260,17 @@
   <!-- ============ 没有词 ============ -->
   <block wx:if="{{state === 'empty' || state === 'loading'}}">
     <view class="card center">
-      <view class="muted" style="padding:60rpx 0">
-        {{state === 'loading' ? '正在取出今天要练的词…' : '今天没有要练的词了，明天再来 🎉'}}
-      </view>
+      <!-- 取词要走一趟云端（todayTask），冷启动时一两秒是常态。
+           2026-11-13 真机反馈：口语抽查完进来只剩一行静止灰字，像是卡死了。
+           所以这里给转圈 + 两行字，让等待可感知。 -->
+      <block wx:if="{{state === 'loading'}}">
+        <view class="loading-box">
+          <view class="spinner"></view>
+          <view class="loading-title">正在取出今天要练的词…</view>
+          <view class="loading-sub">{{slowLoad ? '网络有点慢，还在取词，别退出' : '马上就好，不用点屏幕'}}</view>
+        </view>
+      </block>
+      <view wx:else class="muted" style="padding:60rpx 0">今天没有要练的词了，明天再来 🎉</view>
       <button class="btn ghost mt" wx:if="{{state === 'empty'}}" bindtap="onHome">回首页</button>
     </view>
   </block>

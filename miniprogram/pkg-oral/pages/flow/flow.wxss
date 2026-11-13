@@ -43,6 +43,23 @@
    按钮贴太近会被误触（真机反馈「按一下、出现按钮、再按才走」的观感来源之一）。 */
 .next-block { margin-top: 56rpx; }
 
+/* 等分包 / 等 drill 取词时的等待屏：转圈 + 两行字。
+   纯文字（旧版只有一句「正在取出今天要练的词…」）在真机上像卡死，
+   孩子会反复点屏幕。 */
+.loading-box { padding: 40rpx 0 8rpx; text-align: center; }
+.spinner {
+  width: 56rpx;
+  height: 56rpx;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 6rpx solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+.loading-title { margin-top: 24rpx; font-size: 32rpx; font-weight: 600; color: var(--text); }
+.loading-sub { margin-top: 10rpx; font-size: 24rpx; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* 反馈块：与 drill 的 .opt.right / .wrong 同款功能色 */
 .fb {
   padding: 20rpx;

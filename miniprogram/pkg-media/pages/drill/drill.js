@@ -58,6 +58,10 @@ var TIMEOUT_MS = 10000;
  *  12 个字母的词太紧（还没敲完就被记"不会"）。按每个字母 2.5 秒给，
  *  再夹在 12~45 秒之间（太短来不及敲，太长失去紧迫感）。 */
 var PER_LETTER_MS = 2500;
+/** 取词（云端 todayTask）超过这个时长还没回来，就把等待文案换成「网络有点慢」。
+ *  2026-11-13 真机反馈「口语到背词等得有点久」：转圈解决了"知不知道在跑"，
+ *  这条解决"跑到哪了"——真慢的时候得让孩子和家长知道是网络，不是死机。 */
+var SLOW_LOAD_MS = 4000;
 var WRITE_BASE_MS = 6000;
 var WRITE_MIN_MS = 12000;
 var WRITE_MAX_MS = 45000;
@@ -124,6 +128,7 @@ Page({
     typeLabel: '',
     honor: null,             // 完成后的荣誉/排名（云端返回）
     honorPeriods: [],        // 今日/本周/本月最快（云端返回后拼好文案）
+    slowLoad: false,         // 取词超过 4 秒还没回来：换成「网络有点慢」的说明
     me: { nickname: '', avatar: '' }   // 榜单展示用的昵称/头像（用户自愿填）
   },
 
@@ -171,6 +176,7 @@ Page({
   clearTimers: function () {
     if (this._t5) { clearTimeout(this._t5); this._t5 = null; }
     if (this._t10) { clearTimeout(this._t10); this._t10 = null; }
+    if (this._slowTimer) { clearTimeout(this._slowTimer); this._slowTimer = null; }
   },
 
   /* ---------------- 取词单 ---------------- */
@@ -183,6 +189,13 @@ Page({
    */
   loadWords: function () {
     var self = this;
+    // 只改等待文案，不改词单来源：取词超过 SLOW_LOAD_MS 才换成「网络有点慢」。
+    if (this._slowTimer) clearTimeout(this._slowTimer);
+    this._slowTimer = setTimeout(function () {
+      self._slowTimer = null;
+      if (self.data.state === 'loading') self.setData({ slowLoad: true });
+    }, SLOW_LOAD_MS);
+
     if (this._assign && this._assign.ids.length) {
       this.begin(this.assignmentWords(this._assign.ids));
       return;
@@ -304,7 +317,8 @@ Page({
       words: words,
       idx: 0,
       round: isLoop ? (this.data.round + 1) : this.data.round,
-      progressPct: 0
+      progressPct: 0,
+      slowLoad: false
     });
     this._qs = qs;
     this.showQuestion();
