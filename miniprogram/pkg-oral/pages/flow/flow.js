@@ -133,6 +133,10 @@ Page({
     if (this.data.qHolding || this.data.qSettling) {
       this.setData({ qHolding: false, qSettling: false, tip: '刚才被打断了，再按住读一遍' });
     }
+    // 自动进条的 1 秒计时器刚被 _clearTimers 清掉了：回来后要自己接上，
+    // 否则页面停在「马上到下一个…」却永远不跳，又是一个死键。
+    if (this.data.passed && this.data.autoNext) this._advance();
+    if (this.data.qPassed) this._advanceQ();
   },
 
   onHide: function () {

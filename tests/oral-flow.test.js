@@ -727,6 +727,18 @@ async function answerQuestion(p, bad) {
     assert.ok(j.indexOf('this._holdGen') >= 0, '缺「迟到判定作废」的代际标记');
   });
 
+  await ok('㉛ 切后台打断自动进条的计时器，回来要自己接上，不许卡在「马上到下一个…」', async function () {
+    var p = fresh();
+    await holdOnce(p, badOut());
+    await holdOnce(p, badOut());
+    await holdOnce(p, goodOut());
+    assert.strictEqual(p.data.autoNext, true);
+    p.onHide();                       // 1 秒计时器被 _clearTimers 清掉
+    p.onShow();
+    assert.ok(flushTimers(1000) > 0, '回来要重新排上自动进条');
+    assert.strictEqual(p.data.idx, 1);
+  });
+
   console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
     (fail ? '，' + fail + ' 项 ✗' : ''));
   process.exit(fail ? 1 : 0);
