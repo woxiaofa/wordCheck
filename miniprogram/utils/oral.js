@@ -192,6 +192,12 @@ var holdCb = null;
 var holdFrames = [];
 var holdStartAt = 0;
 var holdMeta = null;
+/* 真机实测「按一下就闪一下、无法长按」的根因：
+   privacy.ensureRecord() 是异步的（第一次还会弹授权框），抬起手指时
+   recorder.start() 可能根本没跑起来；此时调 stop() 只会让 Promise 永远挂着。
+   这两个标志负责「起录未完成时先排队，等 start 真跑起来再收尾」。 */
+var holdStarted = false;
+var holdPendingStop = false;
 
 function clearAutoTimer() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
@@ -219,6 +225,8 @@ function resetHold() {
   holdFrames = [];
   holdStartAt = 0;
   holdMeta = null;
+  holdStarted = false;
+  holdPendingStop = false;
 }
 
 function rec() {
@@ -377,6 +385,8 @@ function startHold(meta) {
     if (state !== 'IDLE') { reject(new Error('BUSY')); return; }
     state = 'RECORDING';               // 同步占住：授权是异步的，别让重复按下漏进来
     holdMode = true;
+    holdStarted = false;
+    holdPendingStop = false;
     holdFrames = [];
     holdStartAt = Date.now();
     holdMeta = normalizeMeta(meta);
@@ -386,7 +396,14 @@ function startHold(meta) {
       if (!r) { rollback(new Error('NO_RECORDER')); return; }
       try {
         r.start(HOLD_OPTIONS);
+        holdStarted = true;
       } catch (e) { rollback(e); return; }
+      // 授权 / start 期间孩子已经抬手：立刻补一次收尾，别让 Promise 挂死。
+      if (holdPendingStop) {
+        holdPendingStop = false;
+        stop();
+        return;
+      }
       autoTimer = setTimeout(function () { if (state === 'RECORDING' && holdMode) stop(); },
         HOLD_OPTIONS.duration + 200);
     }).catch(function (e) { rollback(e); });
@@ -395,6 +412,13 @@ function startHold(meta) {
 
 function stop() {
   if (state !== 'RECORDING') return Promise.reject(new Error('NOT_RECORDING'));
+  /* 起录还没真正跑起来就抬手：只登记「待停」，等 start 成功后立刻收尾。
+     直接调 recorder.stop() 在部分机型上既不给 onStop 也不给 onError，
+     页面会一直停在 holding 态 —— 真机上就是「按一下闪一下」。 */
+  if (holdMode && !holdStarted) {
+    holdPendingStop = true;
+    return Promise.resolve(true);
+  }
   var r = rec();
   state = 'SAVING';
   try {

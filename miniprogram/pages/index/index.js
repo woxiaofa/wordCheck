@@ -304,11 +304,8 @@ Page({
     wx.navigateTo({ url: '/pkg-media/pages/import/import' });
   },
 
-  /** 跟读练习：本机录音、不联网（第 1 期，见 docs/口语作业方案.md）
-   *  独立分包 pkg-oral：pkg-media 已被 454 个音频占满 2MB 红线，不能再塞页面 */
-  goOral: function () {
-    wx.navigateTo({ url: '/pkg-oral/pages/oral/oral' });
-  },
+  /* 2026-11-13 用户拍板：独立跟读页与首页入口删除。
+     跟读只在「开始背单词」的体验主流程里出现，不再挂第二条练习线。 */
 
   refresh: function () {
     var mirror = wx.getStorageSync(STORAGE_KEY) || {};

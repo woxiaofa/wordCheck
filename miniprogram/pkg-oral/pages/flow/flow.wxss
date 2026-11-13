@@ -1,81 +1,103 @@
-/* 体验主流程：颜色全部走皮肤 token —— 换到樱粉 / 糖果皮肤时不能留深色孤岛 */
-.head .bar {
-  margin-top: 16rpx;
-  height: 10rpx;
-  border-radius: 999rpx;
-  background: var(--fill2);
-  overflow: hidden;
-}
-.head .bar-on {
-  height: 100%;
-  border-radius: 999rpx;
-  background: var(--accent);
-}
-
+/* 体验主流程：视觉与现有 drill 对齐。
+   页面 wxss 不跨分包共享，所以大字、按钮、庆祝层的尺寸要照抄一份；
+   颜色一律走皮肤 token，换到樱粉 / 糖果皮肤时不能留深色孤岛。 */
 .lesson { text-align: center; }
-.chip {
-  display: inline-block;
-  padding: 6rpx 22rpx;
-  border-radius: 999rpx;
-  border: 1rpx solid var(--line);
-  background: var(--fill);
-  color: var(--muted);
-  font-size: 24rpx;
-}
-.big {
-  margin-top: 28rpx;
-  font-size: 72rpx;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text);
-  word-break: break-word;
-}
-.sentence {
-  margin-top: 16rpx;
-  font-size: 36rpx;
-  line-height: 1.6;
-  color: var(--text);
-  word-break: break-word;
-}
 
+/* .link / .center / .sm 是页面级样式（首页各写了一份），分包里要补齐，
+   否则「再听一遍」「先不练了」这些次级入口会退化成灰扑扑的普通文字。 */
+.link { color: var(--accent); font-size: 26rpx; }
+.center { text-align: center; }
+.sm { font-size: 24rpx; }
+
+/* 与 drill 的 .qword / .qstem / .qph 同尺寸 */
+.qword {
+  font-size: 100rpx; font-weight: 800; letter-spacing: 2rpx;
+  color: var(--text); word-break: break-all; text-align: center;
+}
+.qstem {
+  text-align: center; font-size: 34rpx; margin-top: 20rpx;
+  color: var(--text); line-height: 1.6; word-break: break-word;
+}
+.qph { text-align: center; color: var(--muted); font-size: 28rpx; margin-top: 8rpx; }
+
+/* 按住跟读：尺寸对齐 drill 的 .opt；抬手缓冲时切成 loading 态，
+   catch 手势 + catchtouchmove 保证按住期间页面不滚动。 */
 .hold-btn {
   margin-top: 28rpx;
-  padding: 30rpx 0;
+  padding: 30rpx 26rpx;
   border-radius: 20rpx;
   border: 2rpx solid var(--accent);
-  background: var(--accent-bg);
+  background: var(--surface2);
   color: var(--text);
-  font-size: 34rpx;
-  font-weight: 700;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.5;
   text-align: center;
   user-select: none;
 }
-.hold-btn.on {
-  background: var(--active);
-  border-color: var(--accent);
-}
+.hold-btn.on { background: var(--accent-bg); border-color: var(--accent); }
+.hold-btn.wait { background: var(--fill); color: var(--muted); border-color: var(--line); }
+.hold-btn.done { opacity: .55; }
 
-.opt {
-  margin-top: 16rpx;
-  padding: 22rpx 20rpx;
-  border-radius: 14rpx;
-  border: 1rpx solid var(--line);
-  background: var(--fill);
-  color: var(--text);
-  font-size: 30rpx;
-}
-.opt.right { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok-text); }
-.opt.wrong { background: var(--bad-bg); border-color: var(--bad-soft); color: var(--bad-text); }
-
+/* 反馈块：与 drill 的 .opt.right / .wrong 同款功能色 */
 .fb {
   padding: 20rpx;
-  border-radius: 14rpx;
+  border-radius: 20rpx;
   background: var(--surface2);
-  border: 1rpx solid var(--line);
+  border: 2rpx solid var(--line);
 }
 .fb-ok, .fb-perfect { background: var(--ok-bg); border-color: var(--ok-line); }
 .fb-bad { background: var(--bad-bg); border-color: var(--bad-soft); }
 .fb-title { font-size: 32rpx; font-weight: 700; color: var(--text); }
+
+/* 与 drill 完全同款的答对庆祝层：正确提示音响后停 1 秒自动进下一条 */
+.celebrate {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 16, 24, 0.45);
+  z-index: 90;
+  pointer-events: none;
+  animation: celebrate-fade 0.55s ease forwards;
+}
+.celebrate-pop {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2fd07a, #22a862);
+  box-shadow: 0 12rpx 48rpx rgba(47, 208, 122, 0.45);
+  color: #ffffff;
+  font-size: 110rpx;
+  font-weight: 700;
+  animation: celebrate-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+.celebrate-text {
+  margin-top: 24rpx;
+  color: #ffffff;
+  font-size: 40rpx;
+  font-weight: 600;
+  text-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.4);
+  animation: celebrate-rise 0.5s 0.1s ease both;
+}
+@keyframes celebrate-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes celebrate-rise {
+  0% { transform: translateY(20rpx); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes celebrate-fade {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0.9; }
+}
 
 .stat-row { display: flex; margin-top: 24rpx; }
 .stat { flex: 1; text-align: center; }

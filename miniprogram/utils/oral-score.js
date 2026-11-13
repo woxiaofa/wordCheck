@@ -85,6 +85,34 @@ function measure(frames, durationMs) {
   };
 }
 
+/**
+ * 裁掉松手后的尾部静音缓冲。
+ *
+ * 页面会在抬手后多录 ~1.2 秒（孩子常常话没落音就松手，尾音会被切掉）。
+ * 这段缓冲全是静音，若原样交给 measure()，会被算成「中间停了很久」，
+ * 把本来读完的一遍判成不合格。这里只从**末尾**整帧地裁静音，
+ * 中间的停顿一帧都不动，也就不会掩盖真正的断续。
+ *
+ * @param {Array} frames [{rms, ms}]
+ * @param {number} maxMs 最多裁掉多少毫秒（与页面缓冲时长一致）
+ * @returns {{frames: Array, removedMs: number}}
+ */
+function trimTailSilence(frames, maxMs) {
+  var list = Array.isArray(frames) ? frames.slice() : [];
+  var budget = Math.max(0, Number(maxMs) || 0);
+  var removedMs = 0;
+  while (list.length) {
+    var last = list[list.length - 1] || {};
+    var rms = Math.max(0, Number(last.rms) || 0);
+    if (rms >= SILENCE_RMS) break;                 // 末尾是有声帧，别把尾音裁掉
+    var ms = Math.max(0, Number(last.ms) || 0);
+    if (ms < 1 || removedMs + ms > budget) break; // 只整帧裁，不越预算
+    list.pop();
+    removedMs += ms;
+  }
+  return { frames: list, removedMs: removedMs };
+}
+
 function localEngine(input) {
   var ref = String(input.refText || '');
   var m = measure(input.frames, input.durationMs);
@@ -204,6 +232,7 @@ module.exports = {
   SILENCE_RMS: SILENCE_RMS,
   expectMs: expectMs,
   measure: measure,
+  trimTailSilence: trimTailSilence,
   localEngine: localEngine,
   normalizeRemote: normalizeRemote,
   register: register,

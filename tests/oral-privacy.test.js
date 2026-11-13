@@ -100,7 +100,7 @@ async function main() {
 
   ok('⑦ 跟读链路零上传：页面与模块都不含任何联网能力', function () {
     ['miniprogram/utils/oral.js', 'miniprogram/utils/oral-code.js',
-      'miniprogram/pkg-oral/pages/oral/oral.js'].forEach(function (f) {
+      'miniprogram/pkg-oral/pages/flow/flow.js'].forEach(function (f) {
       var s = read(f);
       ['wx.cloud', 'uploadFile', 'wx.request', 'callFunction'].forEach(function (k) {
         assert.strictEqual(s.indexOf(k), -1, f + ' 里出现了 ' + k);
@@ -115,27 +115,27 @@ async function main() {
     assert.ok(d.indexOf('不上传服务器') >= 0, '没写清不上传');
   });
 
-  ok('⑨ 首页与跟读页都写明「录音仅存本机、不上传」', function () {
+  ok('⑨ 首页与体验主流程页都写明「不上传」', function () {
     assert.ok(read('miniprogram/pages/index/index.wxml').indexOf('录音仅存本机、不上传') >= 0);
-    var w = read('miniprogram/pkg-oral/pages/oral/oral.wxml');
-    assert.ok(w.indexOf('不上传') >= 0);
-    assert.ok(w.indexOf('不会上传') >= 0);
+    var w = read('miniprogram/pkg-oral/pages/flow/flow.wxml');
+    assert.ok(w.indexOf('不上传') >= 0, '体验页要写明录音不出本机');
+    assert.ok(w.indexOf('不落盘') >= 0, '体验页要写明按住跟读不写录音文件');
   });
 
-  ok('⑩ 新页在独立分包、四件套齐全，且主包没被塞进第 6 个页', function () {
+  ok('⑩ 体验主流程页在独立分包、四件套齐全，主包没被塞进第 6 个页', function () {
     var j = JSON.parse(read('miniprogram/app.json'));
     var roots = (j.subpackages || []).map(function (s) { return s.root; });
     assert.ok(roots.indexOf('pkg-oral') >= 0, '缺 pkg-oral 分包');
     assert.ok(j.pages.every(function (p) { return p.indexOf('oral') < 0; }), 'oral 页不该进主包');
     ['js', 'json', 'wxml', 'wxss'].forEach(function (ext) {
-      assert.ok(fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/oral/oral.' + ext)),
-        '缺 oral.' + ext);
+      assert.ok(fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/flow/flow.' + ext)),
+        '缺 flow.' + ext);
     });
   });
 
-  ok('⑪ 新页兼容换肤：挂 {{skin}}、onShow 走 theme.syncPage(this)', function () {
-    var j = read('miniprogram/pkg-oral/pages/oral/oral.js');
-    var w = read('miniprogram/pkg-oral/pages/oral/oral.wxml');
+  ok('⑪ 体验页兼容换肤：挂 {{skin}}、onShow 走 theme.syncPage(this)', function () {
+    var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+    var w = read('miniprogram/pkg-oral/pages/flow/flow.wxml');
     assert.ok(j.indexOf('skin: theme.cls()') >= 0);
     assert.ok(j.indexOf('theme.syncPage(this)') >= 0);
     assert.ok(/<view\s+class="page[^"]*\{\{skin\}\}"/.test(w));

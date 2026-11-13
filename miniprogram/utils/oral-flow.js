@@ -3,7 +3,7 @@
  *
  * 四阶段是用户 2026-11-12 的原话落成的状态机：
  *   带读（词 → 短句 → 小段，逐条判定、合格才下一条）
- *   → 混排抽查（口语题不给示范音，与「认」题混在一起过一遍，错的再过）
+ *   → 口语抽查（不给示范音，自己读一遍，错的再过）
  *   → 现有背词（复用 pkg-media/pages/drill，认 → 写 → 巩固，一行不重造）
  *   → 一张报告（口语与书面并列 + 待练清单 + 只练没读流畅的）
  *
@@ -18,13 +18,11 @@
  * 只写文本（参考句、三档、书面统计），不写任何音频、不上传，符合既有隐私承诺。
  */
 
-var quiz = require('./quiz');
-
 var SESSION_KEY = 'oral_flow_session';
 var CHECK_MAX_ROUNDS = 2;      // 抽查最多过两轮：第一遍 + 错的再过一遍，不无限循环
 var memorySession = null;      // Node 测试桩 / storage 不可用时的兜底
 
-/* ------------------------------ 混排抽查 ------------------------------ */
+/* ------------------------------ 口语抽查 ------------------------------ */
 
 /** 确定性洗牌：同一 seed 出同一套题，便于复现与回归测试 */
 function seededShuffle(list, seed) {
@@ -57,50 +55,12 @@ function oralQuestion(item, i) {
   };
 }
 
-/** 词条对象：优先用词库里完整的（有 pos，干扰项更迷惑），没有就用体验课自带的中文 */
-function wordObject(item, pool) {
-  var hit = null;
-  (pool || []).forEach(function (w) {
-    if (w && String(w.word).toLowerCase() === String(item.word).toLowerCase()) hit = w;
-  });
-  if (hit) return hit;
-  return { word: item.word, def_cn: item.cn, pos: '', phonetic: item.phonetic || '' };
-}
-
-function meaningQuestion(item, pool, i) {
-  var w = wordObject(item, pool);
-  var ds = quiz.pickDistractors(w, pool, 2);
-  // 干扰项不够（词库太小）时用另外几个词的中文补，保证总是 3 选 1
-  if (ds.length < 2) {
-    (pool || []).forEach(function (x) {
-      if (ds.length >= 2 || !x || !x.def_cn || x.word === w.word) return;
-      if (ds.indexOf(x.def_cn) < 0 && x.def_cn !== w.def_cn) ds.push(x.def_cn);
-    });
-  }
-  while (ds.length < 2) ds.push('（以上都不对）' + ds.length);
-  return {
-    id: 'q' + i,
-    type: 'meaning',
-    label: '认',
-    refText: '',
-    display: w.word,
-    lines: [],
-    cn: '',
-    phonetic: w.phonetic || '',
-    word: w.word,
-    kind: 'word',
-    audio: '',
-    stem: w.word,
-    options: quiz.shuffleWithAnswer(w.def_cn, ds.slice(0, 2)),
-    answer: w.def_cn
-  };
-}
-
 /**
- * 混排抽查题：3 个词 + 1 个短句要"自己读"（不再给示范音），
- * 与 3 道「认」（看词选中文）混在一起过一遍。
+ * 抽查题（2026-11-13 用户拍板）：只考「自己读出来」，体验页不另造选择题。
+ * 书面的「认 / 写」全部交给现有 drill，避免两套选择题互相打架、UI 也两套。
+ * 4 个词 + 1 个代表短句，不给示范音；错的再过一轮。
  * @param {Array} items buildItems() 的带读条目
- * @param {Array} pool  当前词库，用来出干扰项
+ * @param {Array} pool  保留参数兼容调用方（不再用于出干扰项）
  * @param {number} seed 洗牌种子
  */
 function buildCheck(items, pool, seed) {
@@ -108,9 +68,8 @@ function buildCheck(items, pool, seed) {
   var words = list.filter(function (x) { return x.kind === 'word'; });
   var sentences = list.filter(function (x) { return x.kind === 'sentence'; });
   var qs = [];
-  words.slice(0, 3).forEach(function (x, i) { qs.push(oralQuestion(x, qs.length)); });
+  words.forEach(function (x) { qs.push(oralQuestion(x, qs.length)); });
   if (sentences.length) qs.push(oralQuestion(sentences[0], qs.length));
-  words.slice(0, 3).forEach(function (x) { qs.push(meaningQuestion(x, pool, qs.length)); });
   return seededShuffle(qs, seed);
 }
 

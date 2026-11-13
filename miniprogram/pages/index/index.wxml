@@ -7,7 +7,7 @@
     <view class="t1">每天 5 分钟，{{target}} 个词</view>
     <view class="muted mt-s">
       点下面的「开始背单词」就能完整体验一遍：先听发音、按住跟读单词和句子，
-      再抽查、认和拼，最后口语和书面一起出一张报告。
+      再自己读一遍抽查，接着认和拼，最后口语和书面一起出一张报告。
     </view>
     <button class="btn mt" bindtap="goStudy">开始背单词</button>
     <view class="link center mt-s" bindtap="toggleHowto">先看看它怎么运作</view>
@@ -41,9 +41,8 @@
       没有你用的教材？点上面自己建一个就行（粘贴或表格导入）。
       机构老师、家长想要定制词表或整班试用，点最下面的「给开发者留言」说一声。
     </view>
-    <!-- 跟读练习：录音只落本机，不联网。放在词库卡片里，因为跟读材料就来自这里 -->
-    <view class="link center mt-s oral-entry" bindtap="goOral">🎙 开口读 · 跟读练习</view>
-    <view class="muted center home-guide">「开始背单词」里已经带上跟读；想单独练就来这里。录音只存这台手机，不上传</view>
+    <!-- 2026-11-13 用户拍板：独立跟读页与其首页入口删除。
+         跟读只保留在「开始背单词」的体验主流程里，首页不再挂第二条练习线。 -->
   </view>
 
   <!-- 作业未完成时取代每日任务卡：孩子的注意力只该有一个入口，两份任务并排会互相打架 -->

@@ -1,17 +1,18 @@
 /**
- * 第 0 步「开口读」接入背词主流程的编排测试
+ * 「开口读」旧闸门已删除的回归测试
  *
  *   node tests/oral-gate.test.js
  *
- * 2026-11-12 更新：用户实锤「现在不太行」，口语从前置闸门改成贯穿全程的题型。
- * 主入口（首页 / 底栏）已改道 pkg-oral/pages/flow/flow，本文件现在锁的是：
- *   ① ?oral=1 旧闸门作为**兼容路径**仍在，且不带开关时 drill 一字不变
- *      （40+ 条 drill-flow 断言的前提，也保证班级作业等入口不受影响）
- *   ② 读了 / 跳过 / 录音失败，三条路都必须回到 recog，绝不卡死
- *   ③ 口语关不许写 activity_log / checkin —— 它不是另一项打卡作业
- *   ④ 新链路的入口与跨页交接：flow → drill?fromFlow=1 → flow?report=1
+ * 2026-11-12：口语从前置闸门改成贯穿全程的题型，主入口改道 flow。
+ * 2026-11-13：用户拍板「开口读那部分入口及内容删除」——
+ *   独立跟读页、首页胶囊入口、drill 的 ?oral=1 第 0 步闸门全部清掉。
+ *   本文件从「闸门编排测试」改成「旧闸门不许回来 + 跨页交接没断」的守护：
+ *   ① 无论带不带 URL 参数，drill 一律直接进原来的「认」（40+ 条 drill-flow 断言的前提）
+ *   ② 源码与页面里都不再有 gate / 开口读分支，也不再有独立 oral 页
+ *   ③ 首页与底栏仍指向体验主流程 flow
+ *   ④ flow → drill?fromFlow=1 → flow?report=1 的交接与合并报告不受影响
  *
- * 新流程各阶段的行为另见 tests/oral-flow.test.js（页面桩逐条自证）。
+ * 各阶段行为由 tests/oral-flow.test.js 用页面桩逐条自证。
  */
 
 var assert = require('assert');
@@ -50,8 +51,6 @@ global.wx = {
   createInnerAudioContext: function () {
     return { src: '', stop: function () {}, play: function () {} };
   }
-  // 故意不提供 getRecorderManager / getSetting / getPrivacySetting：
-  // 让录音走「不支持录音」的失败分支，专门验证兜底不卡死。
 };
 global.setTimeout = function (fn, ms) { timers.push({ id: ++tid, fn: fn, ms: ms || 0 }); return tid; };
 global.clearTimeout = function (id) { timers = timers.filter(function (t) { return t.id !== id; }); };
@@ -105,98 +104,77 @@ function tick() { return new Promise(function (r) { setImmediate(r); }); }
 /* ---------------------------------------------------------------- */
 
 (async function () {
-  console.log('\n第 0 步「开口读」流程编排测试');
+  console.log('\n「开口读」旧闸门删除后的回归测试');
 
-  await ok('① 带 ?oral=1：先停在口语关，还没出认的题', function () {
-    var p = fresh({ oral: '1' });
-    assert.strictEqual(p.data.state, 'oral', '应该先到第 0 步，实际 ' + p.data.state);
-    assert.strictEqual(p.data.q, null, '口语关不该同时出题');
-    assert.strictEqual(p.data.gateWords.length, 2, '本轮 2 个词都该列出来');
-    assert.ok(p.data.gateRefText.indexOf('train') >= 0 && p.data.gateRefText.indexOf('jump') >= 0,
-      '录音参照文本应是本轮词表');
-    assert.ok(p.data.stepText.indexOf('第 0 步') >= 0, '进度文案要标明第 0 步');
-  });
-
-  await ok('② 不带开关：仍是原来的第 1 步「认」（旧入口与 drill-flow 断言不受影响）', function () {
+  await ok('① 不带参数：仍是原来的第 1 步「认」', function () {
     var p = fresh({});
     assert.strictEqual(p.data.state, 'run');
     assert.strictEqual(p.data.phase, 'recog');
     assert.strictEqual(p.data.q.type, 'binary');
   });
 
-  await ok('③ 点「读好了」→ 回到原来的第 1 步「认」', function () {
+  await ok('② 就算带旧的 ?oral=1，也直接进「认」，不再停在开口读闸门', function () {
     var p = fresh({ oral: '1' });
-    p.onGateDone();
-    assert.strictEqual(p.data.state, 'run');
-    assert.strictEqual(p.data.phase, 'recog', '口语之后必须接认，不是写');
-    assert.strictEqual(p.data.q.type, 'binary', '第 1 题仍是听看二选一');
-  });
-
-  await ok('④ 点「这次先不读」→ 同样回到「认」，跳过不卡死', function () {
-    var p = fresh({ oral: '1' });
-    p.onGateSkip();
-    assert.strictEqual(p.data.state, 'run');
+    assert.notStrictEqual(p.data.state, 'oral', '旧闸门已经删了，不该再出现');
     assert.strictEqual(p.data.phase, 'recog');
-    assert.strictEqual(p._oralDone, true, '跳过后要记住本轮已过口语关');
+    assert.strictEqual(p.data.q.type, 'binary');
+    assert.strictEqual(p.data.gateWords, undefined, '闸门展示态字段应一并删除');
   });
 
-  await ok('⑤ 录音失败（不支持录音/拒绝授权）后仍能跳过进「认」', async function () {
-    var p = fresh({ oral: '1' });
-    p.onGateRecord();
-    await tick(); await tick(); await tick();
-    assert.strictEqual(p.data.gateRecording, false, '失败后按钮必须还回「录一遍」');
-    assert.ok(p.data.gateTip && p.data.gateTip.length > 0, '失败要给人话提示，不能静默');
-    p.onGateSkip();
-    assert.strictEqual(p.data.phase, 'recog', '授权失败绝不能把孩子卡在口语关');
+  await ok('③ 源码：drill 里没有 gate 方法、开关与展示态', function () {
+    var js = read('miniprogram/pkg-media/pages/drill/drill.js');
+    var w = read('miniprogram/pkg-media/pages/drill/drill.wxml');
+    ["options.oral === '1'", 'showOralGate', 'afterOral', 'onGateDone',
+      'onGateRecord', '_oralGate', 'gateWords'].forEach(function (k) {
+      assert.ok(js.indexOf(k) < 0, 'drill.js 仍留着 ' + k);
+    });
+    assert.ok(w.indexOf("state === 'oral'") < 0, 'drill.wxml 仍渲染闸门那一屏');
+    assert.ok(w.indexOf('先开口读一遍') < 0, '仍留着「开口读」文案');
+    assert.ok(js.indexOf("require('../../../utils/oral')") < 0,
+      'drill 不该再依赖录音模块');
   });
 
-  await ok('⑥ 口语关不写打卡：activity_log 不被污染', function () {
-    var p = fresh({ oral: '1' });
-    assert.strictEqual(store['activity_log'], undefined, '只是读一遍，不该算完成了一个词');
-    p.onGateDone();
-    assert.strictEqual(store['activity_log'], undefined, '进认之后仍未答题，也不该计数');
+  await ok('④ 取词分支统一过 begin()，「再来一轮」也不会被踢回口语关', function () {
+    var js = read('miniprogram/pkg-media/pages/drill/drill.js');
+    assert.ok(/\bbegin: function\b/.test(js), '缺编排入口');
+    var begins = (js.match(/\b(?:this|self)\.begin\(/g) || []).length;
+    assert.ok(begins >= 4, '4 条取词分支（作业/云端/断网/本机快照）都要过 begin，实际 ' + begins);
+    assert.ok(/onAgain[\s\S]{0,300}startRound\(left, 'recog'\)/.test(js));
+    var gateBlock = js.slice(js.indexOf('取词完毕的统一入口'), js.indexOf('/* ---------------- 轮次'));
+    assert.ok(!/setStorageSync\(\s*['"]activity_log['"]/.test(gateBlock),
+      '取词编排不许写 activity_log');
   });
 
-  await ok('⑦ 源码：主入口已改道体验主流程；?oral=1 只剩兼容开关', function () {
+  await ok('⑤ 取词前后都不写打卡：口语不是另一项作业', function () {
+    var p = fresh({});
+    assert.strictEqual(store['activity_log'], undefined, '还没答题，不该计数');
+    assert.strictEqual(p.data.state, 'run');
+  });
+
+  await ok('⑥ 源码：主入口与底栏都进体验主流程，旧闸门没有入口指向', function () {
     var idx = read('miniprogram/pages/index/index.js');
     var nav = read('miniprogram/components/footer-nav/index.js');
-    var drill = read('miniprogram/pkg-media/pages/drill/drill.js');
     assert.ok(/goStudy:[\s\S]{0,500}pkg-oral\/pages\/flow\/flow/.test(idx),
       '首页「开始背单词」没进体验主流程');
     assert.ok(nav.indexOf("path: '/pkg-oral/pages/flow/flow'") >= 0, '底栏「背词」没跟上');
     assert.ok(nav.indexOf("path.split('?')[0]") >= 0,
       'path 带 query 后，onGo 必须剥掉再比 route，否则会无限 redirect');
-    assert.ok(drill.indexOf("options.oral === '1'") >= 0, '旧闸门的兼容开关不该被顺手删掉');
+    assert.ok(idx.indexOf('oral=1') < 0 && nav.indexOf('oral=1') < 0,
+      '还有入口在拉旧闸门');
   });
 
-  await ok('⑧ 源码：drill 的取词分支统一走 begin()，onAgain 不重进口语关', function () {
-    var js = read('miniprogram/pkg-media/pages/drill/drill.js');
-    assert.ok(/\bbegin: function\b/.test(js) && /\bafterOral: function\b/.test(js), '缺编排入口');
-    var begins = (js.match(/\b(?:this|self)\.begin\(/g) || []).length;
-    assert.ok(begins >= 4, '4 条取词分支（作业/云端/断网/本机快照）都要过 begin，实际 ' + begins);
-    assert.ok(js.indexOf("options.oral === '1'") >= 0, '开关必须显式，不能默认全开');
-    assert.ok(/onAgain[\s\S]{0,300}startRound\(left, 'recog'\)/.test(js),
-      '「再来一轮」不该又把孩子踢回口语关');
-    // 只盯真正的写入语句：注释里「不写 activity_log」这句说明不算污染，
-    // 但 setStorageSync('activity_log', …) 一旦冒出来就必须红。
-    var gateBlock = js.slice(js.indexOf('第 0 步：开口读'), js.indexOf('/* ---------------- 轮次'));
-    assert.ok(!/setStorageSync\(\s*['"]activity_log['"]/.test(gateBlock),
-      '口语关代码不许写 activity_log');
+  await ok('⑦ 独立「开口读」页与首页胶囊入口都删干净了', function () {
+    var idxW = read('miniprogram/pages/index/index.wxml');
+    var idxJ = read('miniprogram/pages/index/index.js');
+    assert.ok(idxW.indexOf('goOral') < 0 && idxW.indexOf('开口读') < 0);
+    assert.ok(idxJ.indexOf('goOral') < 0);
+    var app = JSON.parse(read('miniprogram/app.json'));
+    var pkg = (app.subpackages || []).filter(function (s) { return s.root === 'pkg-oral'; })[0];
+    assert.ok(pkg && pkg.pages.indexOf('pages/oral/oral') < 0);
+    assert.ok(!fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/oral/oral.js')));
   });
 
-  await ok('⑨ 页面：口语关有完成与跳过两个出口，且样式全走 token', function () {
-    var w = read('miniprogram/pkg-media/pages/drill/drill.wxml');
-    var s = read('miniprogram/pkg-media/pages/drill/drill.wxss');
-    assert.ok(w.indexOf("state === 'oral'") >= 0, '缺口语关渲染分支');
-    assert.ok(w.indexOf('读好了，开始背') >= 0 && w.indexOf('这次先不读，直接开始') >= 0,
-      '两个出口缺一，孩子可能被卡死');
-    assert.ok(w.indexOf('onGateSpeak') >= 0 && w.indexOf('onGateRecord') >= 0, '缺听标准音 / 录音入口');
-    var gateCss = s.slice(s.indexOf('.gate-card'));
-    assert.ok(gateCss.indexOf('var(--') >= 0, '样式要走皮肤 token');
-    assert.ok(!/#[0-9a-fA-F]{3,6}/.test(gateCss), '口语关样式不许硬编码颜色（换肤会出现深色孤岛）');
-  });
-
-  await ok('⑩ 从 flow 拉起的书面阶段：交结果、回合并报告，不弹完成页也不上榜', function () {
+  await ok('⑧ 从 flow 拉起的书面阶段：交结果、回合并报告，不弹完成页也不上榜', function () {
     var urls = [];
     var scored = 0;
     var origRedirect = global.wx.redirectTo;
@@ -229,7 +207,7 @@ function tick() { return new Promise(function (r) { setImmediate(r); }); }
     }
   });
 
-  await ok('⑪ 体验主流程页四件套齐、零联网、写明能力边界', function () {
+  await ok('⑨ 体验主流程页四件套齐、零联网、写明能力边界', function () {
     ['js', 'json', 'wxml', 'wxss'].forEach(function (e) {
       assert.ok(fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/flow/flow.' + e)),
         '缺 flow.' + e);

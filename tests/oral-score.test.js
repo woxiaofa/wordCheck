@@ -136,4 +136,35 @@ ok('⑪ 源码红线：评分器零联网能力，密钥与上传都不在端上
   assert.ok(src.indexOf('完成度三档') >= 0, '能力边界必须写在源码里');
 });
 
+ok('⑫ 抬手缓冲的尾部静音被裁掉，中间的真实停顿一帧不动', function () {
+  var frames = [
+    { rms: 0.1, ms: 100 }, { rms: 0.1, ms: 100 },
+    { rms: 0, ms: 100 }, { rms: 0, ms: 100 },     // 中间停顿：必须保留
+    { rms: 0.1, ms: 100 }, { rms: 0.1, ms: 100 },
+    { rms: 0, ms: 100 }, { rms: 0, ms: 100 }, { rms: 0, ms: 100 },
+    { rms: 0, ms: 100 }, { rms: 0, ms: 100 }, { rms: 0, ms: 100 },
+    { rms: 0, ms: 100 }, { rms: 0, ms: 100 }, { rms: 0, ms: 100 },
+    { rms: 0, ms: 100 }, { rms: 0, ms: 100 }, { rms: 0, ms: 100 }
+  ];
+  var t = sc.trimTailSilence(frames, 1200);
+  assert.strictEqual(t.removedMs, 1200, '只裁页面缓冲的那 1.2 秒');
+  assert.strictEqual(t.frames.length, 6, '末尾 12 帧静音全裁掉');
+  assert.strictEqual(t.frames[2].rms, 0, '中间那两帧静音要留下');
+  var m = sc.measure(t.frames, 600);
+  assert.strictEqual(m.pauseMs, 200, '中间停顿仍要被算出来，不能被缓冲掩盖');
+  assert.ok(m.continuity > 0.6, '裁完不该再把读完的一遍算成断续');
+});
+
+ok('⑬ 裁尾音只裁静音、只整帧裁、预算用完就停', function () {
+  var a = sc.trimTailSilence([{ rms: 0, ms: 100 }, { rms: 0.1, ms: 100 }], 1200);
+  assert.strictEqual(a.frames.length, 2, '末尾是有声帧时一帧都不许裁');
+  assert.strictEqual(a.removedMs, 0);
+  var b = sc.trimTailSilence([{ rms: 0, ms: 500 }, { rms: 0, ms: 500 }], 300);
+  assert.strictEqual(b.removedMs, 0, '单帧超预算就整帧不裁');
+  assert.strictEqual(b.frames.length, 2);
+  assert.deepStrictEqual(sc.trimTailSilence([], 1200).frames, []);
+  var c = sc.trimTailSilence([{ rms: 0, ms: 100 }], 0);
+  assert.strictEqual(c.removedMs, 0, '预算为 0 时不裁');
+});
+
 console.log('oral-score: ' + n + ' 项通过');

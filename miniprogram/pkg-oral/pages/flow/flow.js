@@ -1,13 +1,19 @@
 /**
  * 「开始背单词」体验主流程 —— 口语贯穿式（2026-11-12 用户拍板）
  *
- * 与旧实现的本质区别：口语不是进来先读一遍的「前置闸门」，
- * 而是贯穿全程的一类题型。四阶段：
+ * 四阶段：
  *   ① 带读：词 → 短句 → 小段，每条"出现即主动发音"，按住跟读，
- *      三档反馈，合格才下一条；重读满 3 次也放行，但留痕进报告。
- *   ② 抽查：口语题不再给示范音，与「认」题混排过一遍；错的再过一轮。
+ *      三档反馈，合格才下一条；读满 3 次仍不合格给「可以跳过」出口。
+ *   ② 口语抽查：不给示范音，自己读一遍，错的再过一轮。
+ *      2026-11-13 用户拍板：**不在这里另造选择题**，书面「认 / 写」全交给现有 drill。
  *   ③ 背词：直接进现有 drill（认 → 写 → 巩固），一行都不重造。
  *   ④ 报告：口语与书面并到一张纸，列出待练条目，可只重练没读流畅的。
+ *
+ * 真机反馈修复（2026-11-13）：
+ *   · 按住按钮改 catch 系列手势 + 禁止按住时页面滚动，不再「按一下就闪一下」；
+ *   · 抬手后留 TAIL_MS 尾音缓冲，期间显示「在听你读完…」，评分前裁掉缓冲静音；
+ *   · 判定用 utils/sfx.js 的既有正确 / 错误提示音，与 drill 完全一致；
+ *   · 合格播正确音 + ✓ 庆祝层，约 1 秒自动进下一条（drill 同款节奏）。
  *
  * 诚实红线（必须一直挂在页面上）：
  *   本期评分器只测「有没有开口、读完没、连不连贯」，**不判断发音准不准**。
@@ -21,6 +27,7 @@
 var theme = require('../../../utils/theme');
 var oral = require('../../../utils/oral');
 var scorer = require('../../../utils/oral-score');
+var sfx = require('../../../utils/sfx');
 var flow = require('../../../utils/oral-flow');
 var lesson = require('../../../data/oral-lesson');
 var lessonAudio = require('../../../utils/lesson-audio');
@@ -28,11 +35,13 @@ var books = require('../../../utils/books');
 var privacy = require('../../../utils/privacy');
 
 var HONEST_TIP = '本机只看有没有读完、读得连不连贯，不判断发音准不准';
+var TAIL_MS = 1200;        // 抬手后多录的尾音缓冲：孩子常话没落音就松手
+var ADVANCE_MS = 1000;     // 与 drill 答对庆祝层一致的停留时长
 
 Page({
   data: {
     skin: theme.cls(),
-    stage: 'lead',              // lead | check | report
+    stage: 'lead',              // lead | check | drill | report
     stepText: '',
     progressPct: 0,
     tip: '',
@@ -45,16 +54,20 @@ Page({
     retry: 0,
     demoPlayed: false,
     holding: false,
+    settling: false,            // 抬手后的「在听你读完…」loading
+    celebrate: false,           // 与 drill 一致的 ✓ 庆祝层
+    canSkip: false,             // 读满 3 次 / 麦克风不可用才允许跳过
     feedback: null,             // { grade, verdict, issues, retry }
     passed: false,
 
-    /* ② 混排抽查 */
+    /* ② 口语抽查（不再有选择题） */
     q: null,
     qIdx: 0,
     qTotal: 0,
     qHolding: false,
+    qSettling: false,
+    qCelebrate: false,
     qFeedback: null,
-    qSelected: '',
     qPassed: false,
     checkRound: 1,
 
@@ -66,7 +79,7 @@ Page({
 
   onLoad: function (options) {
     this._active = true;
-    this._traces = [];          // 口语留痕，交给报告
+    this._traces = [];
     this._items = [];
     this._qList = [];
     this._wrong = [];
@@ -74,6 +87,7 @@ Page({
     this._checkWrongTotal = 0;
     this._practiceOnly = false;
     this._seed = (Date.now() % 100000) + 1;
+    this._clearTimers();
 
     // drill 完成后 redirect 回来，只带一个 report=1：会话从本机 storage 读，
     // 不依赖页面栈、不依赖模块内存，系统回收过也能出报告。
@@ -90,12 +104,14 @@ Page({
 
   onHide: function () {
     this._active = false;
+    this._clearTimers();
     oral.cancelRecord();
     lessonAudio.stop();
   },
 
   onUnload: function () {
     this._active = false;
+    this._clearTimers();
     oral.cancelRecord();
     lessonAudio.stop();
   },
@@ -116,6 +132,7 @@ Page({
    */
   startLead: function (items, opts) {
     var o = opts || {};
+    this._clearTimers();
     this._practiceOnly = !!o.practiceOnly;
     var keep = o.keepPerfect ? (this._traces || []).filter(function (t) {
       return t && t.grade === 'perfect';
@@ -131,6 +148,7 @@ Page({
   },
 
   showLeadItem: function () {
+    this._clearTimers();
     var item = this._items[this.data.idx];
     if (!item) { this.startCheck(); return; }
     var played = this.playDemo(item);
@@ -139,6 +157,9 @@ Page({
       retry: 0,
       demoPlayed: played,
       holding: false,
+      settling: false,
+      celebrate: false,
+      canSkip: false,
       feedback: null,
       passed: false,
       stepText: '第 1 步 带读 · ' + (this.data.idx + 1) + '/' + this._items.length + ' · ' + item.label,
@@ -162,11 +183,13 @@ Page({
 
   onHoldStart: function () {
     var self = this;
-    if (!this._active || this.data.holding || this.data.passed) return;
+    if (!this._active || this.data.holding || this.data.settling ||
+        this.data.passed || this.data.celebrate) return;
     var item = this.data.item;
     if (!item) return;
     lessonAudio.stop();                 // 别让示范音和录音叠在一起
-    this.setData({ holding: true, feedback: null, tip: '正在听你读…松手就好' });
+    this.setData({ holding: true, settling: false, feedback: null, canSkip: false,
+      tip: '按住别松手，读完再抬手' });
     oral.startHold({
       type: 'custom',
       ref_text: item.refText,
@@ -174,24 +197,39 @@ Page({
       code_id: '',
       source: 'local'
     }).then(function (out) {
-      if (self._active) self.onLeadScored(out);
+      if (!self._active) return;
+      if (self._tailTimer) { clearTimeout(self._tailTimer); self._tailTimer = null; }
+      self.onLeadScored(out);
     }).catch(function (err) {
       if (!self._active) return;
-      self.setData({ holding: false, tip: self.errorText(err) });
+      if (self._tailTimer) { clearTimeout(self._tailTimer); self._tailTimer = null; }
+      self.setData({ holding: false, settling: false, canSkip: true, tip: self.errorText(err) });
       if (err && /DENIED/i.test(err.message || '')) privacy.onDenied(err, 'microphone');
     });
   },
 
+  /** catchtouchmove 用：按住期间不让页面滚动把手势抢走 */
+  onHoldMove: function () {},
+
+  /**
+   * 抬手不立刻收尾：孩子常常话没落音就松手，尾音会被切掉。
+   * 多录 TAIL_MS 并显示 loading，评分时再裁掉这段静音（scorer.trimTailSilence）。
+   */
   onHoldEnd: function () {
-    if (!this.data.holding) return;
-    this.setData({ holding: false, tip: '正在看这一遍…' });
-    oral.stop().catch(function () { /* onError 已把状态复位 */ });
+    if (!this.data.holding || this.data.settling) return;
+    var self = this;
+    this.setData({ holding: false, settling: true, tip: '在听你读完…稍等一下' });
+    if (this._tailTimer) clearTimeout(this._tailTimer);
+    this._tailTimer = setTimeout(function () {
+      self._tailTimer = null;
+      oral.stop().catch(function () { /* onError 已把状态复位 */ });
+    }, TAIL_MS);
   },
 
   /** 不方便按住时：点一下开始、再点一下结束（模拟器 / 手抖都能用） */
   onTapHold: function () {
     if (this.data.holding) this.onHoldEnd();
-    else this.onHoldStart();
+    else if (!this.data.settling) this.onHoldStart();
   },
 
   /** 评分器统一入口：这一行将来接 SOE 时不用改，只换 scorer.use('soe') */
@@ -199,45 +237,67 @@ Page({
     var item = this.data.item;
     if (!item) return;
     var retry = this.data.retry;
+    var trimmed = scorer.trimTailSilence(out.frames, TAIL_MS);
     var result = scorer.score({
-      frames: out.frames,
-      durationMs: out.durationMs,
+      frames: trimmed.frames,
+      durationMs: Math.max(0, (out.durationMs || 0) - trimmed.removedMs),
       refText: item.refText,        // 用原始文本，别用录音层截断过的 meta
       retry: retry,
       listened: this.data.demoPlayed
     });
-    var pass = scorer.shouldPass(result, retry);
-    var forced = pass && result.grade === 'bad';
+    var passed = result.grade !== 'bad';
+    // 「3 遍不对提示可以跳过」：第 3 次判完给出口，但不自动放行，
+    // 孩子可以自己决定跳过，也可以继续读到过。
+    var canSkip = !passed && (retry + 1 >= scorer.MAX_RETRY);
 
-    if (pass) {
+    if (passed) {
+      sfx.playCorrect();
       this._traces.push(scorer.trace({
-        refText: item.refText,
-        kind: item.kind,
-        result: result,
-        retry: retry,
-        forced: forced
+        refText: item.refText, kind: item.kind, result: result, retry: retry, forced: false
       }));
       this.saveSession();
+      this.setData({
+        holding: false,
+        settling: false,
+        passed: true,
+        canSkip: false,
+        celebrate: true,
+        feedback: {
+          grade: result.grade,
+          verdict: result.verdict,
+          issues: result.issues || [],
+          retry: retry
+        },
+        tip: '这条过了，马上到下一个'
+      });
+      this._advance();              // 与 drill 答对一样，庆祝一下自动进下一条
+      return;
     }
 
+    sfx.playWrong();
     this.setData({
       holding: false,
-      passed: pass,
+      settling: false,
+      passed: false,
+      celebrate: false,
+      canSkip: canSkip,
       feedback: {
-        grade: result.grade,
-        verdict: forced ? '先往下走，报告里会记一笔' : result.verdict,
+        grade: 'bad',
+        verdict: canSkip ? '读了 3 遍还不太顺，可以跳过' : '再读一遍',
         issues: result.issues || [],
         retry: retry
       },
-      tip: pass ? (forced ? '读了几次还不太顺，先过，最后再练' : '这条过了，点「下一个」')
-        : '再读一遍（还能读 ' + Math.max(0, scorer.MAX_RETRY - retry) + ' 次）'
+      tip: canSkip ? '不用勉强，点「可以跳过」先往下走'
+        : '再读一遍（还能读 ' + Math.max(0, scorer.MAX_RETRY - retry - 1) + ' 次）',
+      retry: retry + 1
     });
-    if (!pass) this.setData({ retry: retry + 1 });
   },
 
+  /** 兜底出口：读满 3 次 / 麦克风不可用时可跳过，留痕进报告待练清单 */
   onSkipItem: function () {
     var item = this.data.item;
-    if (!item || this.data.passed) return;
+    if (!item || this.data.passed || this.data.settling) return;
+    if (this._tailTimer) { clearTimeout(this._tailTimer); this._tailTimer = null; }
     this._traces.push({
       refText: item.refText,
       kind: item.kind,
@@ -251,7 +311,10 @@ Page({
     this.saveSession();
     this.setData({
       holding: false,
+      settling: false,
       passed: true,
+      canSkip: false,
+      celebrate: false,
       feedback: { grade: 'bad', verdict: '先跳过，报告里会记下来', issues: [], retry: this.data.retry },
       tip: '跳过也会进待练清单'
     });
@@ -260,6 +323,7 @@ Page({
   onNext: function () {
     // 门槛在方法层再守一次：wxml 只给已过的人显示按钮，但方法不该假设调用方守规矩
     if (!this.data.passed) return;
+    if (this._advanceTimer) { clearTimeout(this._advanceTimer); this._advanceTimer = null; }
     var i = this.data.idx + 1;
     if (i < this._items.length) {
       this.setData({ idx: i });
@@ -269,7 +333,7 @@ Page({
     this.startCheck();
   },
 
-  /* ---------------- ② 混排抽查 ---------------- */
+  /* ---------------- ② 口语抽查 ---------------- */
 
   startCheck: function () {
     var pool = [];
@@ -283,57 +347,74 @@ Page({
   },
 
   showQuestion: function () {
+    if (this._qTailTimer) { clearTimeout(this._qTailTimer); this._qTailTimer = null; }
+    if (this._qAdvanceTimer) { clearTimeout(this._qAdvanceTimer); this._qAdvanceTimer = null; }
     var q = this._qList[this.data.qIdx];
     if (!q) { this.endCheckRound(); return; }
     // 抽查阶段刻意不播示范音：这一轮考的是"自己能不能读出来"
     this.setData({
       q: q,
       qHolding: false,
+      qSettling: false,
+      qCelebrate: false,
       qFeedback: null,
-      qSelected: '',
       qPassed: false,
       stepText: '第 2 步 抽查 · ' + (this.data.qIdx + 1) + '/' + this._qList.length +
         ' · ' + q.label + (this.data.checkRound > 1 ? '（再过一遍）' : ''),
       progressPct: Math.round(this.data.qIdx / this._qList.length * 100),
-      tip: q.type === 'oral' ? '这一遍不给示范音，自己读' : '看单词，选出中文意思'
+      tip: '这一遍不给示范音，按住读出声'
     });
   },
 
   onQHoldStart: function () {
     var self = this;
-    if (!this._active || this.data.qHolding || this.data.qPassed) return;
+    if (!this._active || this.data.qHolding || this.data.qSettling ||
+        this.data.qPassed || this.data.qCelebrate) return;
     var q = this.data.q;
     if (!q || q.type !== 'oral') return;
-    this.setData({ qHolding: true, qFeedback: null, tip: '正在听你读…松手就好' });
+    this.setData({ qHolding: true, qSettling: false, qFeedback: null,
+      tip: '按住别松手，读完再抬手' });
     oral.startHold({
       type: 'custom', ref_text: q.refText, ref_word: q.word || '', code_id: '', source: 'local'
     }).then(function (out) {
-      if (self._active) self.onQScored(out);
+      if (!self._active) return;
+      if (self._qTailTimer) { clearTimeout(self._qTailTimer); self._qTailTimer = null; }
+      self.onQScored(out);
     }).catch(function (err) {
       if (!self._active) return;
-      self.setData({ qHolding: false, tip: self.errorText(err) });
+      if (self._qTailTimer) { clearTimeout(self._qTailTimer); self._qTailTimer = null; }
+      self.setData({ qHolding: false, qSettling: false, qPassed: true, qFeedback: null,
+        tip: self.errorText(err) });
       if (err && /DENIED/i.test(err.message || '')) privacy.onDenied(err, 'microphone');
     });
   },
 
+  onQHoldMove: function () {},
+
   onQHoldEnd: function () {
-    if (!this.data.qHolding) return;
-    this.setData({ qHolding: false, tip: '正在看这一遍…' });
-    oral.stop().catch(function () { /* 状态已复位 */ });
+    if (!this.data.qHolding || this.data.qSettling) return;
+    var self = this;
+    this.setData({ qHolding: false, qSettling: true, tip: '在听你读完…稍等一下' });
+    if (this._qTailTimer) clearTimeout(this._qTailTimer);
+    this._qTailTimer = setTimeout(function () {
+      self._qTailTimer = null;
+      oral.stop().catch(function () { /* 状态已复位 */ });
+    }, TAIL_MS);
   },
 
   onQTapHold: function () {
     if (this.data.qHolding) this.onQHoldEnd();
-    else this.onQHoldStart();
+    else if (!this.data.qSettling) this.onQHoldStart();
   },
 
   onQScored: function (out) {
     var q = this.data.q;
     if (!q) return;
     // 抽查不给示范音 → listened:false，最多拿到「读完了」，不冒充流畅
+    var trimmed = scorer.trimTailSilence(out.frames, TAIL_MS);
     var result = scorer.score({
-      frames: out.frames,
-      durationMs: out.durationMs,
+      frames: trimmed.frames,
+      durationMs: Math.max(0, (out.durationMs || 0) - trimmed.removedMs),
       refText: q.refText,
       retry: 0,
       listened: false
@@ -344,57 +425,25 @@ Page({
     }));
     if (!ok) this._wrong.push(q);
     this.saveSession();
+    if (ok) sfx.playCorrect(); else sfx.playWrong();
     this.setData({
       qHolding: false,
+      qSettling: false,
       qPassed: true,
+      qCelebrate: ok,
       qFeedback: {
         grade: result.grade,
-        verdict: ok ? '读出来了' : '再读一遍（报告里会记下来）',
+        verdict: ok ? '读出来了' : '没关系，最后会再过一遍',
         issues: result.issues || []
       },
       tip: ok ? '这条过了' : '没关系的，最后会再过一遍'
     });
-  },
-
-  onQOption: function (e) {
-    var q = this.data.q;
-    if (!q || q.type !== 'meaning' || this.data.qPassed) return;
-    var v = e.currentTarget.dataset.value;
-    var ok = v === q.answer;
-    if (!ok) this._wrong.push(q);
-    this.setData({
-      qSelected: v,
-      qPassed: true,
-      qFeedback: {
-        grade: ok ? 'ok' : 'bad',
-        verdict: ok ? '答对了' : '再记一下：' + q.answer,
-        issues: []
-      },
-      tip: ok ? '这条过了' : '错词最后会再过一遍'
-    });
-  },
-
-  onQSkip: function () {
-    var q = this.data.q;
-    if (!q || this.data.qPassed) return;
-    this._wrong.push(q);
-    if (q.type === 'oral') {
-      this._traces.push({
-        refText: q.refText, kind: q.kind, grade: 'bad', retry: 0,
-        forced: true, engine: 'local', honest: true, issues: ['这次先跳过']
-      });
-      this.saveSession();
-    }
-    this.setData({
-      qPassed: true,
-      qHolding: false,
-      qFeedback: { grade: 'bad', verdict: '先跳过，报告里会记下来', issues: [] },
-      tip: '跳过也会进待练清单'
-    });
+    this._advanceQ();
   },
 
   onQNext: function () {
     if (!this.data.qPassed) return;
+    if (this._qAdvanceTimer) { clearTimeout(this._qAdvanceTimer); this._qAdvanceTimer = null; }
     var i = this.data.qIdx + 1;
     if (i < this._qList.length) {
       this.setData({ qIdx: i });
@@ -423,6 +472,7 @@ Page({
 
   /** ③ 直接上现有背词：drill 会在 finish 时把书面结果交回本页的报告 */
   goDrill: function () {
+    this._clearTimers();
     // 先切到过渡态再跳：分包加载有几百毫秒，别让孩子对着上一题的白屏发愣
     this.setData({ stage: 'drill', stepText: '第 3 步 背词', progressPct: 100 });
     wx.redirectTo({ url: '/pkg-media/pages/drill/drill?fromFlow=1' });
@@ -431,6 +481,7 @@ Page({
   /* ---------------- ④ 报告 ---------------- */
 
   showReport: function () {
+    this._clearTimers();
     var s = flow.load() || {};
     this._traces = (s.traces || []).slice();
     this.setData({
@@ -456,15 +507,43 @@ Page({
   },
 
   onRestartAll: function () {
+    this._clearTimers();
     flow.clear();
     this.startLead();
   },
 
   onHome: function () {
+    this._clearTimers();
     wx.redirectTo({ url: '/pages/index/index' });
   },
 
   /* ---------------- 内部 ---------------- */
+
+  _clearTimers: function () {
+    var self = this;
+    ['_tailTimer', '_qTailTimer', '_advanceTimer', '_qAdvanceTimer'].forEach(function (k) {
+      if (self[k]) { clearTimeout(self[k]); self[k] = null; }
+    });
+  },
+
+  /** 合格后的自动进条：与 drill 答对庆祝层停 1 秒再跳词同款节奏 */
+  _advance: function () {
+    var self = this;
+    if (this._advanceTimer) { clearTimeout(this._advanceTimer); this._advanceTimer = null; }
+    this._advanceTimer = setTimeout(function () {
+      self._advanceTimer = null;
+      if (self._active) self.onNext();
+    }, ADVANCE_MS);
+  },
+
+  _advanceQ: function () {
+    var self = this;
+    if (this._qAdvanceTimer) { clearTimeout(this._qAdvanceTimer); this._qAdvanceTimer = null; }
+    this._qAdvanceTimer = setTimeout(function () {
+      self._qAdvanceTimer = null;
+      if (self._active) self.onQNext();
+    }, ADVANCE_MS);
+  },
 
   saveSession: function () {
     var s = flow.load() || {};

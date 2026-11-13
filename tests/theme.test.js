@@ -40,7 +40,7 @@ var PAGES = [
   'pages/class/class', 'pages/report/report',
   'pkg-media/pages/drill/drill', 'pkg-media/pages/study/study',
   'pkg-media/pages/import/import', 'pkg-media/pages/organize/organize',
-  'pkg-oral/pages/oral/oral', 'pkg-oral/pages/flow/flow'
+  'pkg-oral/pages/flow/flow'   // 2026-11-13 独立「开口读」页已删
 ];
 
 function walk(dir, ext, out) {
@@ -416,7 +416,7 @@ var appJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
 ok('⑥a app.json 已注册设置页', appJson.pages.indexOf('pages/settings/settings') >= 0);
 
 var navSrc = fs.readFileSync(path.join(ROOT, 'components', 'footer-nav', 'index.js'), 'utf8');
-// path 允许带 query（背词 tab 用 ?oral=1 开启第 0 步口语关）。
+// path 允许带 query；底栏「背词」现在指向体验主流程 flow，不再有第 0 步口语关。
 // 判断「是不是同一个页面」必须剥掉 query，否则带参路径会被误判成另一页；
 // 守护本身不放宽：仍要求三个 tab、仍逐个核对 .js 真实存在。
 var navPaths = (navSrc.match(/path: '([^']+)'/g) || []).map(function (x) {

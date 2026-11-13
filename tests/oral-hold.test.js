@@ -167,6 +167,45 @@ async function main() {
     ok('⑥ 源码红线：零联网、零上传、不碰打卡与 SRS', function () {});
   }
 
+  /* ⑦ 真机「按一下就闪一下」的根因回归：授权是异步的，抬手早于 recorder.start()
+     时不能挂死 Promise，也不能让页面停在 holding 态。 */
+  {
+    var oral6 = fresh();
+    var authQ = null;
+    global.wx.getSetting = function (q) { authQ = q; };  // 模拟授权弹窗一直没回来
+    var p6 = oral6.startHold({ ref_text: 'sun' });
+    await tick();
+    assert.ok(authQ, '授权查询没发起');
+    assert.strictEqual(oral6.getState(), 'RECORDING', '起录要同步占住状态');
+    assert.strictEqual(global.wx.__o.lastOptions, undefined, '授权没回来前不该 start');
+
+    await oral6.stop();                                  // 孩子已经抬手
+    var settled6 = false;
+    p6.then(function () { settled6 = true; });
+    await tick();
+    assert.strictEqual(settled6, false, '没真正起录时不该提前给结果');
+    assert.strictEqual(oral6.getState(), 'RECORDING', '状态不能提前放开，否则会串进下一次按住');
+
+    authQ.success({ authSetting: { 'scope.record': true } });
+    await tick(); await tick();
+    assert.strictEqual(global.wx.__o.lastOptions.format, 'PCM', '授权通过后 start 要真的跑起来');
+    var out6 = await p6;                                // 起录后自动补 stop，Promise 必须收敛
+    assert.ok(out6 && Array.isArray(out6.frames), '没拿到帧序列');
+    assert.strictEqual(oral6.getState(), 'IDLE', '收尾后状态要还回去');
+    ok('⑦ 抬手早于起录：不挂死、不串台，授权通过后自动收尾', function () {});
+  }
+
+  /* ⑧ 源码守护：竞态标志与待停队列不许被顺手删掉 */
+  {
+    var fs6 = require('fs');
+    var src6 = fs6.readFileSync(require.resolve('../miniprogram/utils/oral.js'), 'utf8');
+    ['holdStarted', 'holdPendingStop', 'holdPendingStop = true', 'if (holdPendingStop)']
+      .forEach(function (k) {
+        assert.ok(src6.indexOf(k) >= 0, '录音层缺竞态防护 ' + k);
+      });
+    ok('⑧ 源码：起录完成标志与待停队列都在', function () {});
+  }
+
   console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
     (fail ? '，失败 ' + fail + ' 项' : ''));
   if (fail) process.exitCode = 1;

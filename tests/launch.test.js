@@ -277,7 +277,7 @@ ok('⑰ 跟读链路承诺「不上传」，代码里就不得有任何联网能
   ['miniprogram/utils/oral.js', 'miniprogram/utils/oral-code.js',
     'miniprogram/utils/oral-score.js', 'miniprogram/utils/oral-flow.js',
     'miniprogram/utils/lesson-audio.js', 'miniprogram/data/oral-lesson.js',
-    'miniprogram/pkg-oral/pages/oral/oral.js',
+    'miniprogram/utils/sfx.js',
     'miniprogram/pkg-oral/pages/flow/flow.js'].forEach(function (f) {
     var s = read(f);
     ['wx.cloud', 'uploadFile', 'wx.request', 'callFunction'].forEach(function (k) {
@@ -303,16 +303,29 @@ ok('⑳ 首页未成年人提示补了「录音仅存本机、不上传」', fun
   assert.ok(read('miniprogram/pages/index/index.wxml').indexOf('录音仅存本机、不上传') >= 0);
 });
 
-ok('㉑ 跟读页四件套齐全，换肤与反馈入口都在', function () {
-  ['js', 'json', 'wxml', 'wxss'].forEach(function (e) {
-    var f = 'miniprogram/pkg-oral/pages/oral/oral.' + e;
-    assert.ok(fs.existsSync(path.join(ROOT, f)), '缺 ' + f);
+/* 2026-11-13 用户拍板：「开口读」那部分的入口及内容删除。
+   独立跟读页、首页胶囊入口、drill 旧第 0 步闸门都是同一批旧实现，
+   留着任何一处都会冒出第二条练习线。设守护防以后照旧稿加回来。 */
+ok('㉑ 独立「开口读」页与首页入口已删，drill 不再有第 0 步闸门', function () {
+  var idxW = read('miniprogram/pages/index/index.wxml');
+  var idxJ = read('miniprogram/pages/index/index.js');
+  assert.ok(idxW.indexOf('goOral') < 0 && idxW.indexOf('开口读') < 0,
+    '首页仍挂着独立「开口读」入口');
+  assert.ok(idxJ.indexOf('goOral') < 0 && idxJ.indexOf('pages/oral/oral') < 0,
+    '首页 js 仍会跳去独立跟读页');
+
+  var app = JSON.parse(read('miniprogram/app.json'));
+  var oralPkg = (app.subpackages || []).filter(function (s) { return s.root === 'pkg-oral'; })[0];
+  assert.ok(oralPkg && oralPkg.pages.indexOf('pages/oral/oral') < 0, '独立页仍登记在分包里');
+  assert.ok(!fs.existsSync(path.join(ROOT, 'miniprogram/pkg-oral/pages/oral/oral.js')),
+    '独立页文件没删干净');
+
+  var d = read('miniprogram/pkg-media/pages/drill/drill.js');
+  var dw = read('miniprogram/pkg-media/pages/drill/drill.wxml');
+  ["options.oral === '1'", 'showOralGate', 'afterOral', 'onGateDone'].forEach(function (k) {
+    assert.ok(d.indexOf(k) < 0, 'drill 仍留着旧闸门 ' + k);
   });
-  var j = read('miniprogram/pkg-oral/pages/oral/oral.js');
-  var w = read('miniprogram/pkg-oral/pages/oral/oral.wxml');
-  assert.ok(j.indexOf('theme.syncPage(this)') >= 0, 'onShow 没重算皮肤');
-  assert.ok(/<view\s+class="page[^"]*\{\{skin\}\}"/.test(w), '根节点没挂皮肤类');
-  assert.ok(w.indexOf('open-type="contact"') >= 0, '缺反馈入口');
+  assert.ok(dw.indexOf("state === 'oral'") < 0, 'drill 仍渲染旧闸门那一屏');
 });
 
 /* check 链是硬编码字符串：新增测试文件不会自动被跑到，
@@ -395,6 +408,28 @@ ok('㉕ 「开始背单词」进体验主流程，四阶段闭环与合并报告
   assert.ok(w.indexOf('honestTip') >= 0, '页面必须写明「不判断发音准不准」');
   assert.ok(w.indexOf('先不练了，回首页') >= 0 && w.indexOf("stage !== 'report'") >= 0,
     'redirectTo 进来的练习页中途必须有退出入口，否则真机没有返回箭头会困住孩子');
+});
+
+/* ---------- ㉖ 2026-11-13 真机反馈的修复 ----------
+ * 「按住按钮按一下就闪一下」+「抬手太急尾音被切」+「要和以前的提示音/UI 一致」。
+ * 行为由 oral-flow / oral-hold / oral-score 的页面桩真跑，这里只锁上线不该丢的接线。 */
+ok('㉖ 长按修复与既有提示音、体验页 UI 都在链上', function () {
+  var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+  var w = read('miniprogram/pkg-oral/pages/flow/flow.wxml');
+  assert.ok(j.indexOf("require('../../../utils/sfx')") >= 0 &&
+    j.indexOf('sfx.playCorrect') >= 0 && j.indexOf('sfx.playWrong') >= 0,
+    '没有复用 drill 的正确 / 错误提示音');
+  assert.ok(j.indexOf('TAIL_MS = 1200') >= 0 && j.indexOf('trimTailSilence') >= 0,
+    '抬手尾音缓冲与裁静音缺一');
+  assert.ok(w.indexOf('在听你读完') >= 0, '缺缓冲期 loading');
+  assert.ok(w.indexOf('可以跳过这条') >= 0, '读满 3 遍没给跳过出口');
+  assert.ok(w.indexOf('catchtouchstart') >= 0 && w.indexOf('catchtouchmove') >= 0 &&
+    w.indexOf('bindtouchstart') < 0,
+    '按住手势没用 catch 系列，真机仍会被页面滚动抢走');
+  assert.ok(w.indexOf('onQOption') < 0 && w.indexOf('q.options') < 0,
+    '体验页又冒出自己造的选择题');
+  assert.ok(read('miniprogram/utils/oral.js').indexOf('holdPendingStop') >= 0,
+    '录音层缺起录竞态防护');
 });
 
 console.log('\n通过：' + pass + ' 项' + (fail ? '，失败 ' + fail + ' 项' : ' ✓'));
