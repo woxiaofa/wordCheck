@@ -153,7 +153,7 @@
           <view wx:for="{{searchHits}}" wx:key="*this" class="search-hit"
                 data-word="{{item}}" bindtap="addWord">+ {{item}}</view>
         </view>
-        <view class="preview-note">改动范围、起点或词数会重新生成词单；点词可删、搜索可加。拍照拍单词表自动加词，下个版本再上</view>
+        <view class="preview-note">改动范围、起点或词数会重新生成词单；点词可删、搜索可加</view>
       </view>
       <view class="form-row">
         <text class="form-label">截止</text>
