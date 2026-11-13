@@ -39,6 +39,10 @@
 .hold-btn.wait { background: var(--fill); color: var(--muted); border-color: var(--line); }
 .hold-btn.done { opacity: .55; }
 
+/* 「下一个」往下挪：按住跟读的按钮就在上面，松手时手指还停在附近，
+   按钮贴太近会被误触（真机反馈「按一下、出现按钮、再按才走」的观感来源之一）。 */
+.next-block { margin-top: 56rpx; }
+
 /* 反馈块：与 drill 的 .opt.right / .wrong 同款功能色 */
 .fb {
   padding: 20rpx;

@@ -36,10 +36,20 @@ var BASE_MS = 320;          // 起手/收尾的余量
 var MIN_EXPECT_MS = 600;
 var MAX_EXPECT_MS = 20000;
 var SILENCE_RMS = 0.012;    // 低于此能量视为静音（16bit PCM 归一化后的经验值）
-var MIN_VOICED_MS = 220;    // 短于这个基本等于没开口
-var CONTINUITY_OK = 0.45;   // 有效发声占比低于这个算断续
-var CONTINUITY_PERFECT = 0.72;
-var MAX_PAUSE_MS = 900;     // 单次停顿超过这个不算流畅
+
+/**
+ * 2026-11-13 真机反馈「有些词怎么读都过不去，放慢一个字一个字蹦着读反而容易过」。
+ * 根因是旧版拿「期望时长」当尺子：读得快一点就判「太短」，中间喘口气就判「断续」。
+ * 本机只能测完成度，**没有资格要求孩子按某个语速读**，所以：
+ *   · 不合格只剩两种——基本没出声、只读了一点点；
+ *   · 停顿不再判错（慢慢读、换气都算读完），只影响能不能拿「很流畅」；
+ *   · 读太长也不判错（孩子重复读、清嗓子都不该罚）。
+ */
+var MIN_VOICED_MS = 180;    // 短于这个基本等于没开口
+var MIN_COVER_RATIO = 0.15; // 有效发声不足期望时长的 15%
+var MIN_COVER_MS = 350;     // 且不低于这个绝对下限，两者取小的当门槛
+var PERFECT_CONTINUITY = 0.7;
+var PERFECT_MAX_PAUSE = 600;
 
 function words(text) {
   return String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -55,28 +65,59 @@ function expectMs(refText) {
 /**
  * 帧能量 → 完成度指标。frames 由录音层的 onFrameRecorded 采样后传入。
  * 只累加能量，不做任何频谱/识别 —— 这是能力边界，不是偷懒。
+ *
+ * continuity 只统计「第一次出声 → 最后一次出声」这一段：
+ * 按住之前的那半秒、抬手之后的那点尾巴都不该算进分母，
+ * 否则孩子读得再完整，也会被前摇后摇拖成「不连贯」。
  */
 function measure(frames, durationMs) {
-  var voicedMs = 0;
-  var pauseMs = 0;
-  var run = 0;
-  var total = 0;
   var list = Array.isArray(frames) ? frames : [];
-  for (var i = 0; i < list.length; i++) {
+  var voicedMs = 0;
+  var total = 0;
+  var t = 0;
+  var firstAt = -1;
+  var lastEnd = 0;
+  var i;
+
+  for (i = 0; i < list.length; i++) {
     var f = list[i] || {};
     var ms = Math.max(0, Number(f.ms) || 0);
     var rms = Math.max(0, Number(f.rms) || 0);
     total += ms;
-    if (rms >= SILENCE_RMS) {
+    if (ms > 0 && rms >= SILENCE_RMS) {
       voicedMs += ms;
-      if (run > pauseMs) pauseMs = run;
-      run = 0;
-    } else {
-      run += ms;
+      if (firstAt < 0) firstAt = t;
+      lastEnd = t + ms;
     }
+    t += ms;
   }
-  if (run > pauseMs) pauseMs = run;
-  var span = Math.max(total, Number(durationMs) || 0);
+
+  // 停顿只算开口区间内部的空档：开头吸气、末尾抬手都不算断续
+  var pauseMs = 0;
+  if (firstAt >= 0 && lastEnd > firstAt) {
+    var run = 0;
+    t = 0;
+    for (i = 0; i < list.length; i++) {
+      var ff = list[i] || {};
+      var ms2 = Math.max(0, Number(ff.ms) || 0);
+      var rms2 = Math.max(0, Number(ff.rms) || 0);
+      var s = t;
+      var e = t + ms2;
+      t = e;
+      if (e <= firstAt || s >= lastEnd) continue;
+      if (rms2 >= SILENCE_RMS) {
+        if (run > pauseMs) pauseMs = run;
+        run = 0;
+      } else {
+        run += ms2;
+      }
+    }
+    if (run > pauseMs) pauseMs = run;
+  }
+
+  var region = firstAt >= 0 ? Math.max(0, lastEnd - firstAt) : 0;
+  // 一帧都没采到时长是 0 时，退回录音总时长，别把「读完」判成「没读」
+  var span = region > 0 ? region : Math.max(total, Number(durationMs) || 0);
   return {
     voicedMs: Math.round(voicedMs),
     pauseMs: Math.round(pauseMs),
@@ -113,31 +154,51 @@ function trimTailSilence(frames, maxMs) {
   return { frames: list, removedMs: removedMs };
 }
 
+/**
+ * 本地完成度引擎：**只判「有没有开口、读没读完」**，不判发音。
+ *
+ * 设计原则（2026-11-13 真机反馈后收紧）：宁可放过，不可误伤。
+ * 孩子读错音、语速快、中间换气，本机都听不出来，也就没资格判不合格 ——
+ * 只有「几乎没声音」和「只读了开头一小截」才拦，其余一律放行。
+ */
 function localEngine(input) {
   var ref = String(input.refText || '');
-  var m = measure(input.frames, input.durationMs);
+  var list = Array.isArray(input.frames) ? input.frames : [];
   var expect = expectMs(ref);
+  var dur = Math.max(0, Number(input.durationMs) || 0);
   var issues = [];
+
+  /* 一帧都没采到：部分机型 PCM 帧回调不触发。
+     这时只能看「这次录了多久」，不能因此把孩子永久卡在一条上。 */
+  if (!list.length) {
+    var durOk = dur >= 450;
+    return {
+      grade: durOk ? 'ok' : 'bad',
+      scores: { voicedMs: 0, pauseMs: 0, spanMs: Math.round(dur), continuity: 0 },
+      issues: durOk ? ['这条没听清细节，先按读完算'] : ['没听到声音，靠近一点再读'],
+      engine: 'local',
+      verdict: durOk ? VERDICT.ok : VERDICT.bad,
+      honest: true,
+      expectMs: expect,
+      sampled: false
+    };
+  }
+
+  var m = measure(list, dur);
   var grade = 'ok';
+  var minVoiced = Math.min(expect * MIN_COVER_RATIO, MIN_COVER_MS);
 
   if (m.voicedMs < MIN_VOICED_MS) {
     grade = 'bad';
     issues.push('没听到声音，靠近一点再读');
-  } else if (m.voicedMs < expect * 0.45) {
+  } else if (m.voicedMs < minVoiced) {
     grade = 'bad';
-    issues.push('读得太短了，把整句读完');
-  } else if (m.continuity < CONTINUITY_OK || m.pauseMs > MAX_PAUSE_MS * 1.5) {
-    grade = 'bad';
-    issues.push('中间停得有点久，连起来再读一遍');
-  } else if (m.voicedMs > expect * 6) {
-    grade = 'bad';
-    issues.push('录得有点长，重新读一遍就好');
+    issues.push('读得太短了，把整句读完再松手');
   }
 
-  if (grade === 'ok' && m.continuity >= CONTINUITY_PERFECT &&
-      m.pauseMs <= MAX_PAUSE_MS &&
-      m.voicedMs >= expect * 0.7 && m.voicedMs <= expect * 2.6 &&
-      Number(input.retry || 0) === 0 && input.listened !== false) {
+  if (grade === 'ok' && input.listened !== false && Number(input.retry || 0) === 0 &&
+      m.continuity >= PERFECT_CONTINUITY && m.pauseMs <= PERFECT_MAX_PAUSE &&
+      m.voicedMs >= expect * 0.45 && m.voicedMs <= expect * 2.2) {
     grade = 'perfect';
   }
 
@@ -148,7 +209,8 @@ function localEngine(input) {
     engine: 'local',
     verdict: VERDICT[grade],
     honest: true,
-    expectMs: expect
+    expectMs: expect,
+    sampled: true
   };
 }
 

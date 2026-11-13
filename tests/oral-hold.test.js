@@ -206,6 +206,50 @@ async function main() {
     ok('⑧ 源码：起录完成标志与待停队列都在', function () {});
   }
 
+  /* ⑨ 真机「息屏 / 切后台回来按了没反应」的根因：onStop 不再回调，
+     state 卡在 RECORDING，之后每次按住都被 BUSY 挡掉。
+     cancelRecord / reset 必须能把状态强制拉回 IDLE，且授权迟到回来也不许偷偷起录。 */
+  {
+    var oral7 = fresh();
+    var lateAuth = null;
+    global.wx.getSetting = function (q) { lateAuth = q; };   // 授权弹窗一直挂着
+    var p7 = oral7.startHold({ ref_text: 'dog' });
+    await tick();
+    assert.strictEqual(oral7.getState(), 'RECORDING');
+
+    oral7.cancelRecord();                                  // 相当于 onHide / 息屏
+    var e7 = null;
+    try { await p7; } catch (e) { e7 = e; }
+    assert.ok(e7 && e7.message === 'CANCELED', '放弃的那一轮要 reject，页面才能把 holding 还回去');
+    assert.strictEqual(oral7.getState(), 'IDLE', '必须强制回 IDLE，否则之后一直被 BUSY 挡住');
+
+    lateAuth.success({ authSetting: { 'scope.record': true } });
+    await tick(); await tick();
+    assert.strictEqual(global.wx.__o.lastOptions, undefined,
+      '已复位之后授权才回来，绝不能偷偷 start（麦克风会一直开着）');
+
+    // 复位后立刻能重新按住 —— 这就是「回来还能用」的关键
+    global.wx.getSetting = function (q) { q.success({ authSetting: { 'scope.record': true } }); };
+    var p7b = oral7.startHold({ ref_text: 'dog' });
+    await tick();
+    global.wx.__handlers.onFrame({ frameBuffer: pcm(2000) });
+    oral7.stop();
+    var out7 = await p7b;
+    assert.strictEqual(out7.frames.length, 1);
+    ok('⑨ 切后台/息屏后状态可强制复位，授权迟到不会偷偷起录', function () {});
+  }
+
+  /* ⑩ 源码守护：复位入口不许被顺手删掉（页面 onShow 靠它救「按了没反应」） */
+  {
+    var fs7 = require('fs');
+    var src7 = fs7.readFileSync(require.resolve('../miniprogram/utils/oral.js'), 'utf8');
+    assert.ok(src7.indexOf('function reset(') >= 0, '录音层缺 reset');
+    assert.ok(src7.indexOf("if (!holdMode || state !== 'RECORDING') return;") >= 0,
+      '授权回来要先确认状态没被复位');
+    assert.ok(src7.indexOf('reset: reset') >= 0, 'reset 要导出给页面用');
+    ok('⑩ 源码：强制复位存在且已导出', function () {});
+  }
+
   console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +
     (fail ? '，失败 ' + fail + ' 项' : ''));
   if (fail) process.exitCode = 1;

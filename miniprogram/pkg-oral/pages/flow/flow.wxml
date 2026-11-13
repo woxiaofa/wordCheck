@@ -33,26 +33,28 @@
             catchtouchcancel="onHoldEnd" catchtouchmove="onHoldMove">
         {{holding ? '松手就好' : (passed ? '这一条读过了' : '按住跟读')}}
       </view>
-      <view class="link center mt-s" bindtap="onTapHold">
-        {{holding ? '点这里结束' : '不方便按住？点一下开始，再点结束'}}
-      </view>
 
       <view wx:if="{{feedback}}" class="fb fb-{{feedback.grade}} mt">
         <view class="fb-title">{{feedback.verdict}}</view>
         <view wx:for="{{feedback.issues}}" wx:for-item="iss" wx:key="*this" class="muted sm">{{iss}}</view>
       </view>
 
-      <button wx:if="{{passed}}" class="btn ok mt" bindtap="onNext">
-        {{idx + 1 >= total ? '带读完，去抽查' : '下一个'}}
-      </button>
+      <!-- 读够 3 遍才自动跳，没到 3 遍停在这儿等孩子点一下；按钮往下放，别贴着手 -->
+      <view wx:if="{{passed}}" class="next-block">
+        <button wx:if="{{!autoNext}}" class="btn ok" bindtap="onNext">
+          {{idx + 1 >= total ? '带读完，去抽查' : '下一个'}}
+        </button>
+        <view wx:else class="muted sm center">马上到下一个…</view>
+      </view>
       <button wx:elif="{{canSkip}}" class="btn warn mt" bindtap="onSkipItem">可以跳过这条</button>
-      <view wx:else class="link center mt-s" bindtap="onSkipItem">这条先跳过</view>
+      <view wx:elif="{{!settling}}" class="link center mt-s" bindtap="onSkipItem">这条先跳过</view>
 
       <view class="honest mt-s">{{honestTip}}</view>
       <view class="honest">按住跟读只在本机听、不落盘、不上传</view>
     </view>
 
-    <!-- 与 drill 答对完全同款的 ✓ 庆祝层：正确提示音响后停 1 秒自动进下一条 -->
+    <!-- 与 drill 答对同款的 ✓ 庆祝层：闪一下自己收起（CELEBRATE_MS），
+         读够 3 遍时读完 1 秒自动跳，没到 3 遍停下等孩子点「下一个」 -->
     <view wx:if="{{celebrate}}" class="celebrate">
       <view class="celebrate-pop">✓</view>
       <view class="celebrate-text">读得好！</view>
@@ -75,9 +77,6 @@
             catchtouchstart="onQHoldStart" catchtouchend="onQHoldEnd"
             catchtouchcancel="onQHoldEnd" catchtouchmove="onQHoldMove">
         {{qHolding ? '松手就好' : (qPassed ? '这一条读过了' : '按住读出声')}}
-      </view>
-      <view class="link center mt-s" bindtap="onQTapHold">
-        {{qHolding ? '点这里结束' : '不方便按住？点一下开始，再点结束'}}
       </view>
 
       <view wx:if="{{qFeedback}}" class="fb fb-{{qFeedback.grade}} mt">

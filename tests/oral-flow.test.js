@@ -76,25 +76,35 @@ function flushTimers(ms) {
 }
 
 /** 按住跟读：Promise 只在「缓冲到点、oral.stop()」时 resolve，和真机一致 */
+var oralState = 'IDLE';
+var resetCalls = 0;
 var oralMock = {
   MAX_RETRY: 3,
   speak: function (w) { demoPlayed.push({ kind: 'word', word: w }); return true; },
   hasLocal: function () { return true; },
   startHold: function (meta) {
     holdMeta = meta;
+    oralState = 'RECORDING';
     return new Promise(function (resolve) { pendingRelease = resolve; });
   },
   stop: function () {
     stopCalls++;
+    oralState = 'IDLE';
     var r = pendingRelease;
     pendingRelease = null;
     if (r) r(holdOut || { frames: [], durationMs: 0, refText: '' });
     return Promise.resolve(true);
   },
+  reset: function () {
+    resetCalls++;
+    oralState = 'IDLE';
+    pendingRelease = null;
+    return true;
+  },
   cancelRecord: function () { return Promise.resolve(true); },
   stopPlay: function () {},
   errorText: function () { return '这条没录成，再试一次'; },
-  getState: function () { return 'IDLE'; }
+  getState: function () { return oralState; }
 };
 var audioMock = {
   play: function (src) { demoPlayed.push({ kind: 'audio', src: src }); return true; },
@@ -106,7 +116,12 @@ var sfxMock = {
 };
 var WORDS = require('../miniprogram/data/words.js');
 var booksMock = { getWords: function () { return WORDS; }, getKey: function () { return 'waiyan4a'; } };
-var privacyMock = { onDenied: function () { denied++; } };
+var privacyMock = {
+  onDenied: function () { denied++; },
+  ensureRecord: function () { micEnsures++; return micAuth; }
+};
+var micEnsures = 0;
+var micAuth = null;   // Promise；由用例按需设置
 
 var MOD = {
   oral: path.join(ROOT, 'miniprogram/utils/oral.js'),
@@ -168,6 +183,8 @@ function fresh(options) {
   toasts.length = 0; urls.length = 0; demoPlayed.length = 0; sfxCalls.length = 0;
   timers = []; stopCalls = 0; holdOut = null; holdMeta = null;
   denied = 0; pendingRelease = null;
+  oralState = 'IDLE'; resetCalls = 0;
+  micEnsures = 0; micAuth = Promise.resolve(true);
   var p = makePage(def);
   p.onLoad(options || {});
   return p;
@@ -398,7 +415,7 @@ async function answerQuestion(p, bad) {
     assert.strictEqual(holdMeta.ref_text, 'clean', '录音层要拿到参考文本');
   });
 
-  await ok('⑫ 合格播既有正确音 + ✓ 庆祝，1 秒后自动进下一条', async function () {
+  await ok('⑫ 合格播既有正确音 + ✓ 庆祝；没到 3 遍停下来问，读够 3 遍才自动跳', async function () {
     var p = fresh();
     sfxCalls.length = 0;
     await holdOnce(p, goodOut());
@@ -406,9 +423,13 @@ async function answerQuestion(p, bad) {
     assert.strictEqual(p.data.passed, true);
     assert.deepStrictEqual(sfxCalls, ['correct'], '合格要播既有正确提示音');
     assert.strictEqual(p.data.celebrate, true);
+    assert.ok(flushTimers(1200) > 0, '✓ 层要自己收起');
+    assert.strictEqual(p.data.celebrate, false, '全屏遮罩不能一直压着「下一个」按钮');
     assert.strictEqual(p.data.canSkip, false);
+    assert.strictEqual(p.data.autoNext, false, '第 1 遍就过，先停一下问一句');
+    assert.strictEqual(flushTimers(1000), 0, '没到 3 遍不该自动跳走');
     assert.strictEqual(p.data.idx, 0, '判定完先停一下庆祝，不立刻跳');
-    assert.ok(flushTimers(1000) > 0, '没排自动进条');
+    p.onNext();
     assert.strictEqual(p.data.idx, 1);
     assert.strictEqual(p.data.item.display, 'desk');
     assert.strictEqual(p.data.celebrate, false, '切条目后庆祝层要收掉');
@@ -416,6 +437,16 @@ async function answerQuestion(p, bad) {
     assert.strictEqual(p.data.passed, true);
     assert.strictEqual(p._traces[1].forced, true);
     assert.strictEqual(p._traces[1].issues[0], '这次先跳过');
+
+    // 同一个词读到第 3 遍才过：不再多问，1 秒后自己跳
+    var q = fresh();
+    await holdOnce(q, badOut());
+    await holdOnce(q, badOut());
+    await holdOnce(q, goodOut());
+    assert.strictEqual(q._traces[0].retry, 2, '前两遍没过，第 3 遍才过');
+    assert.strictEqual(q.data.autoNext, true, '读够 3 遍不该再让孩子多点一下');
+    assert.ok(flushTimers(1000) > 0, '读够 3 遍要自动进下一条');
+    assert.strictEqual(q.data.idx, 1);
   });
 
   await ok('⑬ 麦克风被拒：给明确提示、能立刻跳过，不留死状态', async function () {
@@ -632,6 +663,68 @@ async function answerQuestion(p, bad) {
     assert.ok(j.indexOf('sfx.playCorrect') >= 0 && j.indexOf('sfx.playWrong') >= 0);
     assert.ok(j.indexOf('TAIL_MS = 1200') >= 0 && j.indexOf('trimTailSilence') >= 0);
     assert.ok(w.indexOf('不落盘') >= 0 && w.indexOf('不上传') >= 0, '隐私说明要留在页面上');
+  });
+
+  await ok('㉖ 息屏 / 切后台回来：状态复位，按住还能用（原先 _active 再也不回来）', async function () {
+    var p = fresh();
+    await holdOnce(p, goodOut());
+    p.onNext();
+    p.onHide();                       // 手机息屏
+    oralState = 'RECORDING';          // 最坏情况：录音状态没等到 onStop
+    p.onShow();                       // 点亮屏幕
+    assert.strictEqual(p._active, true, 'onShow 必须把 active 还回去，否则所有手势被方法层挡掉');
+    assert.strictEqual(p.data.holding, false);
+    assert.strictEqual(p.data.settling, false);
+    assert.ok(resetCalls >= 1, '残留的 RECORDING 要强制复位，不然每次按住都被 BUSY 拒绝');
+    await holdOnce(p, goodOut());
+    assert.strictEqual(p.data.passed, true, '回来之后按钮必须还能按');
+  });
+
+  await ok('㉗ 抬手缓冲里点跳过也要立刻生效，不许按了没反应', async function () {
+    var p = fresh();
+    p.onHoldStart();
+    p.onHoldEnd();
+    assert.strictEqual(p.data.settling, true);
+    p.onSkipItem();                       // 旧版在这里被 settling 直接 return，看起来就是死键
+    assert.strictEqual(p.data.passed, true);
+    assert.strictEqual(p.data.settling, false);
+    assert.strictEqual(p._traces.length, 1);
+    assert.strictEqual(p._traces[0].forced, true);
+    await tick(); await tick();
+    assert.strictEqual(p._traces.length, 1, '跳过后迟到的判定不能再记一条');
+    assert.strictEqual(p.data.idx, 0, '仍然停在当前条目，等孩子点下一个');
+  });
+
+  await ok('㉘ 第一次进小程序先授权、这一下不进入录音，也不会把按钮挂死', async function () {
+    var p = fresh();
+    p._micReady = false;                 // syncMicReady 查到还没授权
+    p.onHoldStart();
+    assert.strictEqual(p.data.holding, false, '授权那一下不该进入录音（弹窗会吃掉 touchend）');
+    assert.strictEqual(micEnsures, 0, '按住时先不弹窗，等抬手（微信要求 tap 触发隐私弹窗）');
+    p.onHoldEnd();                        // 抬手才触发授权
+    assert.strictEqual(micEnsures, 1, '要走统一授权入口');
+    assert.strictEqual(pendingRelease, null, '没起录，就不会有悬空的 Promise');
+    await tick(); await tick();
+    assert.strictEqual(p._micReady, true);
+    assert.ok(p.data.tip.indexOf('按住按钮读') >= 0, '要告诉孩子现在可以按住读了');
+    await holdOnce(p, goodOut());         // 授权后立刻能按住
+    assert.strictEqual(p.data.passed, true);
+  });
+
+  await ok('㉙ 不再有「点一下开始、再点结束」的假开关', function () {
+    var w = read('miniprogram/pkg-oral/pages/flow/flow.wxml');
+    var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+    ['点一下开始', '点这里结束', 'onTapHold', 'onQTapHold'].forEach(function (k) {
+      assert.ok(w.indexOf(k) < 0 && j.indexOf(k) < 0, '又把这个假开关加回来了：' + k);
+    });
+  });
+
+  await ok('㉚ 源码：onShow 恢复 active、残留录音强制复位，跳过不被缓冲挡住', function () {
+    var j = read('miniprogram/pkg-oral/pages/flow/flow.js');
+    assert.ok(/onShow:[\s\S]{0,600}this\._active = true/.test(j), 'onShow 没恢复 active');
+    assert.ok(/onShow:[\s\S]{0,900}oral\.reset\(\)/.test(j), 'onShow 没强制复位录音状态');
+    assert.ok(j.indexOf("this._micReady === false") >= 0, '起录前没确认麦克风可用');
+    assert.ok(j.indexOf('this._holdGen') >= 0, '缺「迟到判定作废」的代际标记');
   });
 
   console.log('\n' + (fail === 0 ? '全部通过' : '有失败项') + '：' + pass + ' 项 ✓' +

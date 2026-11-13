@@ -392,6 +392,9 @@ function startHold(meta) {
     holdMeta = normalizeMeta(meta);
     holdCb = function (err, out) { if (err) reject(err); else resolve(out); };
     privacy.ensureRecord().then(function () {
+      // 授权期间页面可能已经切后台 / 息屏，被 reset() 强制收回过：
+      // 这时绝不能再 start()，否则麦克风会在无人持有时一直开着。
+      if (!holdMode || state !== 'RECORDING') return;
       var r = rec();
       if (!r) { rollback(new Error('NO_RECORDER')); return; }
       try {
@@ -431,9 +434,36 @@ function stop() {
   return Promise.resolve(true);
 }
 
+/**
+ * 强制把状态机拉回 IDLE。
+ *
+ * 只给「页面切后台 / 手机息屏 / 用户中途放弃」这类**没有正常回调**的场景用：
+ * 这些情况下 onStop 可能永远不来，状态卡在 RECORDING 后，
+ * 之后每一次按住都会被 BUSY 挡掉 —— 真机上就是「按了完全没反应」。
+ * 按住跟读的 Promise 会被 reject（CANCELED），让页面把 holding 还回去。
+ */
+function reset(err) {
+  clearAutoTimer();
+  var cb = holdCb;
+  var wasHold = holdMode;
+  var scb = stopCb;
+  state = 'IDLE';
+  stopCb = null;
+  pendingMeta = null;
+  resetHold();
+  var e = err || new Error('CANCELED');
+  if (wasHold && cb) cb(e);
+  else if (!wasHold && scb) scb(null, e);   // 普通录音也要让调用方的 Promise 收敛
+  return true;
+}
+
 /** 页面 onHide / onUnload 调它：录着就收尾保存，播着就停 */
 function cancelRecord() {
-  if (state === 'RECORDING') return stop();
+  if (state === 'RECORDING') {
+    // 按住通道没有可回放的提交物，直接丢弃并复位，别留一个悬空的 Promise
+    if (holdMode) { reset(new Error('CANCELED')); return Promise.resolve(true); }
+    return stop();
+  }
   stopPlay();
   return Promise.resolve(true);
 }
@@ -509,6 +539,7 @@ function summary() {
 var ERR_TEXT = {
   BUSY: '正在录音或保存，先等一下',
   NOT_RECORDING: '现在没有在录音',
+  CANCELED: '刚才的录音被打断了，再按住读一遍',
   NO_RECORDER: '这台设备不支持录音',
   MIC_DENIED: '需要打开麦克风授权才能录音',
   PRIVACY_DENIED: '需要你先同意隐私指引',
@@ -544,6 +575,7 @@ module.exports = {
   chips: chips,
   start: start,
   stop: stop,
+  reset: reset,
   cancelRecord: cancelRecord,
   play: play,
   stopPlay: stopPlay,

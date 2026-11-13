@@ -32,12 +32,19 @@ ok('① 期望时长随参考文本词数增长，且有上下限', function () 
   assert.ok(sc.expectMs(new Array(200).join('word ')) <= 20000);
 });
 
-ok('② measure 只累加能量，静音段不计入 voicedMs', function () {
+ok('② measure 只累加能量：前摇和尾声不算进连贯度的分母', function () {
   var m = sc.measure(frames(10, 5, 100), 1500);
   assert.strictEqual(m.voicedMs, 1000);
-  assert.strictEqual(m.pauseMs, 500);
-  assert.strictEqual(m.spanMs, 1500);
-  assert.ok(Math.abs(m.continuity - 0.67) < 0.01);
+  assert.strictEqual(m.pauseMs, 0, '开口之前 / 收尾之后的静音不算停顿');
+  assert.strictEqual(m.spanMs, 1000, '只统计「第一次出声 → 最后一次出声」');
+  assert.strictEqual(m.continuity, 1);
+
+  // 中间的静音才是真停顿
+  var mid = sc.measure([{ rms: 0.1, ms: 300 }, { rms: 0, ms: 400 }, { rms: 0.1, ms: 300 }], 1000);
+  assert.strictEqual(mid.voicedMs, 600);
+  assert.strictEqual(mid.pauseMs, 400);
+  assert.strictEqual(mid.spanMs, 1000);
+  assert.strictEqual(mid.continuity, 0.6);
 });
 
 ok('③ 没开口 / 声音太短 → 不合格', function () {
@@ -58,17 +65,40 @@ ok('④ 完整读完 → 合格；一口气读完 → 完美', function () {
   assert.strictEqual(smooth.grade, 'perfect');
 });
 
-ok('⑤ 中间长停顿会掉到不合格，且不冒充「发音不准」', function () {
+ok('⑤ 慢慢读、中间换气都不判错，只是拿不到「很流畅」', function () {
   var expect = sc.expectMs('apple');
   var f = frames(Math.round(expect / 100), 0, 100)
     .concat(frames(0, 20, 100))
     .concat(frames(Math.round(expect / 100), 0, 100));
   var r = sc.score({ frames: f, durationMs: f.length * 100, refText: 'apple', retry: 0 });
-  assert.strictEqual(r.grade, 'bad');
+  assert.notStrictEqual(r.grade, 'bad', '停顿不能判不合格：本机听不出读得对不对，凭什么罚换气');
+  assert.notStrictEqual(r.grade, 'perfect', '停这么久不该算流畅');
   assert.strictEqual(r.honest, true, '本地引擎必须标记 honest');
   ['发音正确', '得分', '评分', '评测'].forEach(function (k) {
     assert.ok(r.verdict.indexOf(k) < 0, '三档文案不该出现 ' + k);
   });
+});
+
+ok('⑤b 读得快不该被判「太短」：不再拿期望时长当尺子', function () {
+  // apple 期望 700ms，旧阈值是 0.45×700＝315ms；孩子读得快一点（300ms）就被冤判
+  var quick = sc.score({
+    frames: frames(3, 0, 100), durationMs: 300, refText: 'apple', retry: 0
+  });
+  assert.notStrictEqual(quick.grade, 'bad', '300ms 读完 apple 属于正常语速，不该拦');
+  // 只读了一小截（100ms）才算没读完
+  var clipped = sc.score({
+    frames: frames(1, 0, 100), durationMs: 100, refText: 'we searched the whole room', retry: 0
+  });
+  assert.strictEqual(clipped.grade, 'bad');
+});
+
+ok('⑤c 一帧都没采到（部分机型不支持 PCM 帧）时，按录了多久兜底，不许永久卡死', function () {
+  var long = sc.score({ frames: [], durationMs: 900, refText: 'apple' });
+  assert.strictEqual(long.grade, 'ok', '采不到帧就把孩子卡死是最差的结果');
+  assert.strictEqual(long.sampled, false, '要如实标记没采样，别假装判过');
+  var empty = sc.score({ frames: [], durationMs: 120, refText: 'apple' });
+  assert.strictEqual(empty.grade, 'bad');
+  assert.ok(empty.issues[0].indexOf('没听到声音') >= 0);
 });
 
 ok('⑥ 三档文案是完成度口径，不是发音准确度', function () {
