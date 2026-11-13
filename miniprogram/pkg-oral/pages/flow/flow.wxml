@@ -10,7 +10,7 @@
     <view wx:if="{{stage !== 'report'}}" class="link center mt-s" bindtap="onHome">先不练了，回首页</view>
   </view>
 
-  <!-- ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读，合格才下一条 -->
+  <!-- ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读；合格自动进下一条 -->
   <block wx:if="{{stage === 'lead' && item}}">
     <view class="card lesson">
       <view class="muted center">{{item.label}}</view>
@@ -39,22 +39,18 @@
         <view wx:for="{{feedback.issues}}" wx:for-item="iss" wx:key="*this" class="muted sm">{{iss}}</view>
       </view>
 
-      <!-- 读够 3 遍才自动跳，没到 3 遍停在这儿等孩子点一下；按钮往下放，别贴着手 -->
-      <view wx:if="{{passed}}" class="next-block">
-        <button wx:if="{{!autoNext}}" class="btn ok" bindtap="onNext">
-          {{idx + 1 >= total ? '带读完，去抽查' : '下一个'}}
-        </button>
-        <view wx:else class="muted sm center">马上到下一个…</view>
+      <!-- 合格自动进下一条（最后一条读完自动进抽查），所以这里只在「没读对」时给出口。
+           按钮再往下放一点，别贴着手，免得刚松手就误触；不写任何关于判定的备注文案。 -->
+      <view wx:if="{{canNext}}" class="next-block">
+        <button class="btn warn" bindtap="onSkipItem">下一个</button>
       </view>
-      <button wx:elif="{{canSkip}}" class="btn warn mt" bindtap="onSkipItem">可以跳过这条</button>
-      <view wx:elif="{{!settling}}" class="link center mt-s" bindtap="onSkipItem">这条先跳过</view>
 
       <view class="honest mt-s">{{honestTip}}</view>
       <view class="honest">按住跟读只在本机听、不落盘、不上传</view>
     </view>
 
     <!-- 与 drill 答对同款的 ✓ 庆祝层：闪一下自己收起（CELEBRATE_MS），
-         读够 3 遍时读完 1 秒自动跳，没到 3 遍停下等孩子点「下一个」 -->
+         收完正好接上 1 秒后的自动进条（最后一条则自动进抽查） -->
     <view wx:if="{{celebrate}}" class="celebrate">
       <view class="celebrate-pop">✓</view>
       <view class="celebrate-text">读得好！</view>

@@ -2,9 +2,9 @@
  * 体验主流程（口语贯穿式）自检 —— node tests/oral-flow.test.js
  *
  * 2026-11-13 真机反馈后逐条用**页面桩真跑**，不做「只看源码字符串」的假自证：
- *   ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读，三档反馈，
- *      合格播既有正确提示音 + ✓ 庆祝 + 1 秒自动进下一条；
- *      不合格播错误提示音「再读一遍」，读满 3 遍给「可以跳过」出口（不自动放行）。
+ *   ① 带读：词 → 短句 → 小段，出现即主动发音，按住跟读，三档反馈；
+ *      合格播既有正确提示音 + ✓ 庆祝 + 1 秒自动进下一条（最后一条自动进抽查），
+ *      不合格播错误提示音「再读一遍」，停住并给「下一个」按钮，走不走由孩子决定。
  *   ② 抬手后留 1.2 秒尾音缓冲：期间 loading、不结束录音，判定前裁掉缓冲静音。
  *   ③ 口语抽查：不给示范音，只考「自己读出来」，**体验页不另造选择题**，
  *      书面「认 / 写」全部交给现有 drill；错的再过一轮。
@@ -390,7 +390,7 @@ async function answerQuestion(p, bad) {
     assert.ok(demoPlayed[n - 1].src.indexOf('/pkg-oral/assets/lesson/') === 0);
   });
 
-  await ok('⑪ 不合格播错误音不放行；读满 3 遍提示「可以跳过」，不自动放行', async function () {
+  await ok('⑪ 不合格播错误音、不自动走；给「下一个」按钮，想接着读就再按住', async function () {
     var p = fresh();
     sfxCalls.length = 0;
     for (var i = 0; i < 3; i++) {
@@ -398,24 +398,24 @@ async function answerQuestion(p, bad) {
       assert.strictEqual(p.data.passed, false, '第 ' + (i + 1) + ' 次不该放行');
       assert.strictEqual(p.data.retry, i + 1);
       assert.strictEqual(p.data.holding, false, '松手后按钮要还回去');
+      assert.strictEqual(p.data.canNext, true, '没读对就要有「下一个」出口');
+      assert.strictEqual(p.data.tip, '', '判定后不写跟档位绑定的备注');
       var idxBefore = p.data.idx;
       p.onNext();
-      assert.strictEqual(p.data.idx, idxBefore, '不合格时「下一个」必须在方法层也拦住');
+      assert.strictEqual(p.data.idx, idxBefore, '不合格时 onNext 必须在方法层也拦住');
+      assert.strictEqual(flushTimers(1000), 0, '不合格绝不能自动跳走');
     }
-    assert.strictEqual(p.data.passed, false, '3 遍不对不该自动放行');
-    assert.strictEqual(p.data.canSkip, true, '要提示可以跳过');
-    assert.ok(p.data.feedback.verdict.indexOf('可以跳过') >= 0);
     assert.deepStrictEqual(sfxCalls, ['wrong', 'wrong', 'wrong'], '错误要播既有错误提示音');
     assert.strictEqual(p._traces.length, 0, '没过之前不写留痕');
     p.onSkipItem();
-    assert.strictEqual(p.data.passed, true, '跳过也能走，不许卡死');
+    assert.strictEqual(p.data.passed, true, '按「下一个」能走，不许卡死');
     assert.strictEqual(p._traces.length, 1);
-    assert.strictEqual(p._traces[0].forced, true, '跳过要进报告待练清单');
+    assert.strictEqual(p._traces[0].forced, true, '没读对就走，要进报告待练清单');
     assert.strictEqual(p._traces[0].grade, 'bad');
     assert.strictEqual(holdMeta.ref_text, 'clean', '录音层要拿到参考文本');
   });
 
-  await ok('⑫ 合格播既有正确音 + ✓ 庆祝；没到 3 遍停下来问，读够 3 遍才自动跳', async function () {
+  await ok('⑫ 合格播既有正确音 + ✓ 庆祝，1 秒后自动进下一条，不用点按钮', async function () {
     var p = fresh();
     sfxCalls.length = 0;
     await holdOnce(p, goodOut());
@@ -423,30 +423,26 @@ async function answerQuestion(p, bad) {
     assert.strictEqual(p.data.passed, true);
     assert.deepStrictEqual(sfxCalls, ['correct'], '合格要播既有正确提示音');
     assert.strictEqual(p.data.celebrate, true);
-    assert.ok(flushTimers(1200) > 0, '✓ 层要自己收起');
-    assert.strictEqual(p.data.celebrate, false, '全屏遮罩不能一直压着「下一个」按钮');
-    assert.strictEqual(p.data.canSkip, false);
-    assert.strictEqual(p.data.autoNext, false, '第 1 遍就过，先停一下问一句');
-    assert.strictEqual(flushTimers(1000), 0, '没到 3 遍不该自动跳走');
+    assert.strictEqual(p.data.canNext, false, '合格就不该再给「下一个」按钮');
+    assert.strictEqual(p.data.tip, '', '过了也不写「点下面的下一个」这类备注');
     assert.strictEqual(p.data.idx, 0, '判定完先停一下庆祝，不立刻跳');
-    p.onNext();
+    assert.ok(flushTimers(1200) > 0, '✓ 层要自己收起');
+    assert.strictEqual(p.data.celebrate, false, '全屏遮罩不能一直压着按钮');
+    assert.ok(flushTimers(1000) > 0, '合格要自动进下一条');
     assert.strictEqual(p.data.idx, 1);
     assert.strictEqual(p.data.item.display, 'desk');
-    assert.strictEqual(p.data.celebrate, false, '切条目后庆祝层要收掉');
-    p.onSkipItem();
-    assert.strictEqual(p.data.passed, true);
-    assert.strictEqual(p._traces[1].forced, true);
-    assert.strictEqual(p._traces[1].issues[0], '这次先跳过');
+  });
 
-    // 同一个词读到第 3 遍才过：不再多问，1 秒后自己跳
-    var q = fresh();
-    await holdOnce(q, badOut());
-    await holdOnce(q, badOut());
-    await holdOnce(q, goodOut());
-    assert.strictEqual(q._traces[0].retry, 2, '前两遍没过，第 3 遍才过');
-    assert.strictEqual(q.data.autoNext, true, '读够 3 遍不该再让孩子多点一下');
-    assert.ok(flushTimers(1000) > 0, '读够 3 遍要自动进下一条');
-    assert.strictEqual(q.data.idx, 1);
+  await ok('⑫b 带读最后一条合格后自动进抽查，不用点按钮', async function () {
+    var p = fresh();
+    for (var i = 0; i < 9; i++) {
+      await holdOnce(p, goodOutFor(p.data.item.refText));
+      if (i < 8) { p.onNext(); continue; }
+      assert.ok(flushTimers(1000) > 0, '最后一条合格也要自己往下走');
+    }
+    assert.strictEqual(p.data.stage, 'check', '应该自己进抽查');
+    assert.ok(p.data.q, '抽查题要出出来');
+    assert.strictEqual(p.data.qTotal, 5);
   });
 
   await ok('⑬ 麦克风被拒：给明确提示、能立刻跳过，不留死状态', async function () {
@@ -458,7 +454,7 @@ async function answerQuestion(p, bad) {
       await tick(); await tick();
       assert.strictEqual(p.data.holding, false);
       assert.strictEqual(p.data.settling, false);
-      assert.strictEqual(p.data.canSkip, true, '没麦克风也要给出跳过出口');
+      assert.strictEqual(p.data.canNext, true, '没麦克风也要给出「下一个」出口');
       assert.ok(p.data.tip.indexOf('麦克风') >= 0, '要给一句人话提示');
       assert.strictEqual(denied, 1, '要引导去授权设置');
       p.onSkipItem();
@@ -727,12 +723,12 @@ async function answerQuestion(p, bad) {
     assert.ok(j.indexOf('this._holdGen') >= 0, '缺「迟到判定作废」的代际标记');
   });
 
-  await ok('㉛ 切后台打断自动进条的计时器，回来要自己接上，不许卡在「马上到下一个…」', async function () {
+  await ok('㉛ 切后台打断自动进条后，回来要自己接上，不许停在「这条过了」不跳', async function () {
     var p = fresh();
     await holdOnce(p, badOut());
     await holdOnce(p, badOut());
     await holdOnce(p, goodOut());
-    assert.strictEqual(p.data.autoNext, true);
+    assert.strictEqual(p.data.passed, true);
     p.onHide();                       // 1 秒计时器被 _clearTimers 清掉
     p.onShow();
     assert.ok(flushTimers(1000) > 0, '回来要重新排上自动进条');

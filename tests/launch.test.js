@@ -422,7 +422,9 @@ ok('㉖ 长按修复与既有提示音、体验页 UI 都在链上', function ()
   assert.ok(j.indexOf('TAIL_MS = 1200') >= 0 && j.indexOf('trimTailSilence') >= 0,
     '抬手尾音缓冲与裁静音缺一');
   assert.ok(w.indexOf('在听你读完') >= 0, '缺缓冲期 loading');
-  assert.ok(w.indexOf('可以跳过这条') >= 0, '读满 3 遍没给跳过出口');
+  assert.ok(w.indexOf('>下一个<') >= 0, '没读对时缺「下一个」出口');
+  assert.ok(w.indexOf('马上到下一个') < 0 && w.indexOf('可以跳过') < 0,
+    '按钮附近又冒出跟判定档位绑定的备注，换 SOE 后会自相矛盾');
   assert.ok(w.indexOf('catchtouchstart') >= 0 && w.indexOf('catchtouchmove') >= 0 &&
     w.indexOf('bindtouchstart') < 0,
     '按住手势没用 catch 系列，真机仍会被页面滚动抢走');

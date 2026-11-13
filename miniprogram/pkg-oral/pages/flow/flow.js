@@ -3,7 +3,8 @@
  *
  * 四阶段：
  *   ① 带读：词 → 短句 → 小段，每条"出现即主动发音"，按住跟读，
- *      三档反馈，合格才下一条；读满 3 次仍不合格给「可以跳过」出口。
+ *      三档反馈；**合格自动进下一条**（最后一条读完自动进抽查），
+ *      不合格就停住，给一个「下一个」按钮，想接着读直接再按住。
  *   ② 口语抽查：不给示范音，自己读一遍，错的再过一轮。
  *      2026-11-13 用户拍板：**不在这里另造选择题**，书面「认 / 写」全交给现有 drill。
  *   ③ 背词：直接进现有 drill（认 → 写 → 巩固），一行都不重造。
@@ -22,7 +23,8 @@
  *   · 息屏 / 切后台回来「按了没反应」：录音状态机可能停在 RECORDING，
  *     onShow 调 oral.reset() 强制回 IDLE；
  *   · 跳过按不动：抬手缓冲期间原来会被方法层直接 return，现在是「取消缓冲并跳过」；
- *   · 下一词位置下移；读够 3 遍才直接进下一条，没到 3 遍先给按钮问一句。
+ *   · 下一词位置下移；合格自动进下一条，不再让孩子为「过没过」多点一次；
+ *   · 页面文案不绑判定档位（不写「读了几遍 / 可以跳过」这类话），换 SOE 不用回头改。
  *
  * 诚实红线（必须一直挂在页面上）：
  *   本期评分器只测「有没有开口、读完没、连不连贯」，**不判断发音准不准**。
@@ -66,8 +68,7 @@ Page({
     holding: false,
     settling: false,            // 抬手后的「在听你读完…」loading
     celebrate: false,           // 与 drill 一致的 ✓ 庆祝层
-    autoNext: false,            // 读够 3 遍才自动进下一条，否则等孩子点
-    canSkip: false,             // 读满 3 次 / 麦克风不可用才允许跳过
+    canNext: false,             // 错了 / 麦克风不可用：给「下一个」出口，走不走由孩子决定
     feedback: null,             // { grade, verdict, issues, retry }
     passed: false,
 
@@ -134,8 +135,8 @@ Page({
       this.setData({ qHolding: false, qSettling: false, tip: '刚才被打断了，再按住读一遍' });
     }
     // 自动进条的 1 秒计时器刚被 _clearTimers 清掉了：回来后要自己接上，
-    // 否则页面停在「马上到下一个…」却永远不跳，又是一个死键。
-    if (this.data.passed && this.data.autoNext) this._advance();
+    // 否则页面停在「这条过了」却永远不跳，又是一个死键。
+    if (this.data.passed) this._advance();
     if (this.data.qPassed) this._advanceQ();
   },
 
@@ -217,11 +218,11 @@ Page({
       if (!self._active) return;
       var msg = (err && err.message) || '';
       if (msg === 'MIC_DENIED') {
-        self.setData({ canSkip: true, tip: '没拿到麦克风权限，点「去设置」打开后就能读了' });
+        self.setData({ canNext: true, tip: '没拿到麦克风权限，点「去设置」打开后就能读了' });
         self.openMicSetting();
         return;
       }
-      self.setData({ canSkip: true, tip: '要先同意隐私指引，再按住读一遍' });
+      self.setData({ canNext: true, tip: '要先同意隐私指引，再按住读一遍' });
       privacy.onDenied(err, 'microphone');
     });
   },
@@ -273,8 +274,7 @@ Page({
       holding: false,
       settling: false,
       celebrate: false,
-      autoNext: false,
-      canSkip: false,
+      canNext: false,
       feedback: null,
       passed: false,
       stepText: '第 1 步 带读 · ' + (this.data.idx + 1) + '/' + this._items.length + ' · ' + item.label,
@@ -318,7 +318,7 @@ Page({
     var gen = (this._holdGen = (this._holdGen || 0) + 1);
     lessonAudio.stop();                 // 别让示范音和录音叠在一起
     this.setData({ holding: true, settling: false, feedback: null,
-      canSkip: false, autoNext: false, tip: '按住别松手，读完再抬手' });
+      canNext: false, tip: '按住别松手，读完再抬手' });
     oral.startHold({
       type: 'custom',
       ref_text: item.refText,
@@ -336,7 +336,7 @@ Page({
         self.setData({ holding: false, settling: false, tip: '刚才被打断了，再按住读一遍' });
         return;
       }
-      self.setData({ holding: false, settling: false, canSkip: true, tip: self.errorText(err) });
+      self.setData({ holding: false, settling: false, canNext: true, tip: self.errorText(err) });
       if (err && /DENIED/i.test(err.message || '')) privacy.onDenied(err, 'microphone');
     });
   },
@@ -380,9 +380,6 @@ Page({
       listened: this.data.demoPlayed
     });
     var passed = result.grade !== 'bad';
-    // 「3 遍不对提示可以跳过」：第 3 次判完给出口，但不自动放行，
-    // 孩子可以自己决定跳过，也可以继续读到过。
-    var canSkip = !passed && attempts >= scorer.MAX_RETRY;
 
     if (passed) {
       sfx.playCorrect();
@@ -390,50 +387,48 @@ Page({
         refText: item.refText, kind: item.kind, result: result, retry: retry, forced: false
       }));
       this.saveSession();
-      // 2026-11-13 用户拍板：读够 3 遍才「直接下一个」；
-      // 没到 3 遍先给按钮问一句，免得孩子手还停在按钮附近就被跳走。
-      var autoNext = attempts >= scorer.MAX_RETRY;
+      // 2026-11-13 用户拍板：合格就自动进下一条，带读完最后一条自动进抽查，都不用点按钮。
+      // 这里刻意不写任何「这条过了，点下面的…」之类跟判定档位绑定的提示语：
+      // 将来换上 SOE 真评分，文案也不会自相矛盾、不用回头改。
       this.setData({
         holding: false,
         settling: false,
         passed: true,
-        canSkip: false,
+        canNext: false,
         celebrate: true,
-        autoNext: autoNext,
         feedback: {
           grade: result.grade,
           verdict: result.verdict,
           issues: result.issues || [],
           retry: retry
         },
-        tip: autoNext ? '这条过了，马上到下一个' : '这条过了，点下面的「下一个」继续'
+        tip: ''
       });
       this._flashCelebrate(false);
-      if (autoNext) this._advance();
+      this._advance();
       return;
     }
 
+    // 不合格：不自动走，只给一个「下一个」出口；孩子想接着读就直接再按住。
     sfx.playWrong();
     this.setData({
       holding: false,
       settling: false,
       passed: false,
       celebrate: false,
-      autoNext: false,
-      canSkip: canSkip,
+      canNext: true,
       feedback: {
         grade: 'bad',
-        verdict: canSkip ? '读了 3 遍还不太顺，可以跳过' : '再读一遍',
+        verdict: result.verdict,
         issues: result.issues || [],
         retry: retry
       },
-      tip: canSkip ? '不用勉强，点「可以跳过」先往下走'
-        : '再读一遍（还能读 ' + Math.max(0, scorer.MAX_RETRY - attempts) + ' 次）',
+      tip: '',
       retry: attempts
     });
   },
 
-  /** 兜底出口：读满 3 次 / 麦克风不可用时可跳过，留痕进报告待练清单 */
+  /** 「下一个」出口：没读对也能往下走（留痕进报告待练清单），绝不卡死 */
   onSkipItem: function () {
     var item = this.data.item;
     if (!item || this.data.passed) return;
@@ -456,11 +451,10 @@ Page({
       holding: false,
       settling: false,
       passed: true,
-      canSkip: false,
+      canNext: false,
       celebrate: false,
-      autoNext: false,
-      feedback: { grade: 'bad', verdict: '先跳过，报告里会记下来', issues: [], retry: this.data.retry },
-      tip: '跳过也会进待练清单'
+      feedback: { grade: 'bad', verdict: '这条先记下，之后还能再练', issues: [], retry: this.data.retry },
+      tip: ''
     });
   },
 
