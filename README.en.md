@@ -8,7 +8,7 @@
 [![Tests](https://img.shields.io/badge/tests-50%20files%20%2F%20676%20assertions-brightgreen)](#testing-no-devtools-no-dependencies)
 [![Platform](https://img.shields.io/badge/platform-WeChat%20Mini%20Program-green)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
 [![Backend](https://img.shields.io/badge/backend-WeChat%20CloudBase-orange)](https://developers.weixin.qq.com/miniprogram/dev/wxcloud/basis/getting-started.html)
-[![Status](https://img.shields.io/badge/status-unmaintained-red)](#why-i-stopped-two-structural-deadlocks)
+[![Status](https://img.shields.io/badge/status-unmaintained-red)](#why-i-stopped-structural-deadlocks-and-a-lack-of-resources)
 
 [简体中文](README.md) | English
 
@@ -21,14 +21,14 @@
 > The mini program was released and used in the real world (production release plus many
 > trial-version iterations). The code is feature-complete and `npm run check` is fully green.
 > But an indie developer building a K12 textbook-synced vocabulary app runs into two
-> **structural deadlocks** (see [Why I stopped](#why-i-stopped-two-structural-deadlocks));
+> **structural deadlocks** (see [Why I stopped](#why-i-stopped-structural-deadlocks-and-a-lack-of-resources));
 > continuing could never pay off, so the project is open-sourced and parked.
 >
 > - Want to run it → [Quick start](#getting-started-10-minutes); the code runs out of the box
 > - Want to continue it → the roadmaps are already written: [SOE scoring integration](docs/SOE对接方案.md)
 >   and [next-generation class assignments](docs/班级作业改版方案.md) (both in Chinese)
 > - Want to contribute → **[vocabulary PRs](#contributing-a-wordlist-the-most-welcome-pr) are what this project needs most**
-> - Want to avoid the same traps → read [Why I stopped](#why-i-stopped-two-structural-deadlocks) first
+> - Want to avoid the same traps → read [Why I stopped](#why-i-stopped-structural-deadlocks-and-a-lack-of-resources) first
 
 The core of the product is not the word list — it is the closed loop
 **assign → study → get spot-checked → results visible to a third party**:
@@ -37,19 +37,39 @@ No more collecting notebooks and checking word by word.
 
 ## Features
 
+> Reflects the current mini-program code (2026-11). The main path is the **four-stage oral flow**
+> behind the "背词 / Study" tab, listed below in run order. Removed / no-longer-main interactions
+> are noted at the end.
+
 | Module | Notes |
 | --- | --- |
-| Flashcard | Whole-card swipe-up gesture, tap or 8-second auto reveal, three-level self rating |
-| Spelling keyboard | Three difficulty tiers that auto-progress: correct letters only → confusable letters (b/d, i/l/r/u…) → full keyboard |
-| SRS review | Forgetting-curve tiers drive "what to study today"; wrong words flow back into today's queue automatically |
-| **Oral read-aloud** | Guided flow: level-by-level demonstration → oral spot check (no demo audio) → written drilling → merged report; replayable until everything is perfect |
-| Scoring engine | On-device completion scoring in three tiers (**honest mode: does NOT judge pronunciation accuracy**); the scorer is pluggable — a real SOE engine is one `register()` call away (see the [plan](docs/SOE对接方案.md), in Chinese) |
-| Word audio | Batch-generated offline with Piper (MIT); 454 words covered; missing audio degrades gracefully |
+| **① Guided read-aloud** | Word → short sentence → mini-paragraph; each item speaks on appearance, hold-to-read; passing **auto-advances**, failing offers a "Next" button, last item flows into the spot check |
+| **② Oral spot check** | No demo audio — read it yourself; items that fail get one more round (max 2). No multiple-choice invented at this layer |
+| **③ Recognize → Write → Consolidate** | Recognize = audio + word + phonetic, pick the right Chinese meaning (with an honest "I don't know" exit; 5s hint / 10s timeout); Write = audio + phonetic + meaning, on-screen keyboard spelling, timed by letter count (~2–3 s/letter), wrong answers drop back to easiest keyboard; missed words repeat until perfect (max 5 rounds) |
+| **④ Merged report** | Oral + written on one sheet, with a practice list — re-drill only the items you didn't read fluently, no re-run of the written part |
+| Scoring engine | On-device three-tier check of "did you speak, finish, and stay coherent" (**honest mode: does NOT judge pronunciation accuracy**); pluggable via `scorer.register/use` — SOE is one registration call away (see "What's still missing" below and the [plan](docs/SOE对接方案.md), in Chinese) |
+| SRS review | Forgetting-curve tiers drive "what to study today"; wrong words resurface on day 1 / 3 / 7 with a different question type |
+| Word audio | Batch-generated offline with Piper (MIT); 454 words covered; missing audio degrades gracefully; oral lessons use per-sentence audio |
+| Per-word timing | Real `durationMs` reported per word (including detail view and read-aloud dwell), so the study digest's "time spent" is not made up |
 | **Classes (coach side)** | Join by invite code, assign by textbook unit or custom word list, split one assignment across N days automatically (daily 08:00 timer, idempotent), per-student status at a glance, one-tap nudge copy, daily digest subscription |
-| Reports | Dedicated report page; save an A4-portrait long screenshot to the album and share to parents; oral + written results merged |
+| Leaderboard / feedback | "Fastest today / this week / this month" buckets; home-screen customer-service entry (opens a WeChat support chat on device) |
+| Report screenshot | Dedicated report page; save an A4-portrait long screenshot to the album and share to parents |
 | Compliance | Privacy authorization guard, **every UGC entry point passes WeChat content-safety APIs** (msgSecCheck / imgSecCheck), minor-protection notices |
-| Themes | 5 skins (night / sakura / honey / mint / sky), fully tokenized via CSS variables |
+| Themes | 6 skins (night / sakura / **candy** / honey / mint / sky), fully tokenized via CSS variables, unlockable by completing tasks |
 | Ads / payments | Not enabled (`utils/ads.js` reserved, `AD_UNITS` empty) |
+
+**Removed / no longer on the main path** (code remains, but not a user path):
+- **Whole-card swipe-up + tap/8-second auto reveal + three-level self rating**: the old "study" flashcard flow. Since 2026-10-07 the main flow switched to objective "recognize → write" scoring; the old page is a fallback, the swipe component survives but is not in the main path.
+- **Standalone quiz page (exam-style, submit-at-end)**: retired — the "去抽查" home entry and the nav tab were removed; code remains for the legacy study flow and tests.
+
+### What's still missing to actually continue (roads are paved; what's missing is resources, not plans)
+
+| Gap | Status / where |
+| --- | --- |
+| **Real pronunciation scoring (SOE)** | Today's "fluent or not" is on-device energy scoring — **it does not judge accuracy**. The full Tencent Cloud SOE route (signed API, billing, children's voice compliance, code hooks) is in [`docs/SOE对接方案.md`](docs/SOE对接方案.md): SecretKey stays server-side, the client gets a one-shot signature; swapping engines leaves the main flow untouched. **The one hard capability still missing from the oral loop** |
+| **Wordlist coverage** | Textbook editions × grades × terms is the cold-start deadlock (below). Batch import + OCR exist (OCR output must be human-verified), plus self-built lists; what's most needed is the exact textbook list — [wordlist PRs](#contributing-a-wordlist-the-most-welcome-pr) are most welcome |
+| **Institution / channel distribution** | The class-assignment loop works (assign → study → spot-checked → visible to parents); next-gen redesign in [`docs/班级作业改版方案.md`](docs/班级作业改版方案.md); but "product works" → "an institution pilots it with a whole class" never happened |
+| **Operations / promotion** | Teacher-facing video scripts and a real review-rejection write-up are in [`docs/开发与运营路线.md`](docs/开发与运营路线.md) and [`docs/审核整改-2026-11-16.md`](docs/审核整改-2026-11-16.md); what's missing is the people and budget to keep making content and running channels |
 
 ## Architecture
 
@@ -167,7 +187,7 @@ Other PRs (bug fixes, doc corrections, new cloud-function tests) are welcome too
 For large UI redesigns please open an issue first — the project is unmaintained, so merges
 keep the hard rule "don't break the existing test suite".
 
-## Why I stopped: two structural deadlocks
+## Why I stopped: structural deadlocks and a lack of resources
 
 Written down so the next indie developer doesn't step on the same rakes.
 
@@ -191,10 +211,22 @@ Recording one list takes hours and serves only the users of that exact book.
 The result: **acquisition depends on teachers, revenue on parents, retention on word lists** —
 all three legs need investment before break-even, and an indie developer can't fund that.
 
-These deadlocks hold for any indie developer building K12 textbook-synced content; it is not
-an execution problem. If you plan to continue, the only viable starting point is holding
-**both** "one word list" and "one teacher willing to pilot a whole class" — missing either,
-don't start. The roadmaps for what comes next are already written:
+**Deadlock 3 (the fundamental one) · no resources, no operations**
+The first two are product-structure problems; what actually made me stop is **resources and
+distribution**. This is a one-person, spare-time project: no budget for channels, no team for
+marketing — **I never got the product into institutions** (one institution = stable classes and
+renewals), and **never built short-video / community operations** (the teacher-facing video
+scripts are written, but the shooting, ad spend and account operations never ran). However
+complete the code is, a product nobody reaches is worth zero; the first two deadlocks ask
+"can this product work", this one asks "does anyone know it exists". The code, roadmaps and
+scripts are all in this repo — the only thing an indie developer can't afford is **getting the
+thing in front of the people who need it**.
+
+All three hold for any indie developer building K12 textbook-synced content; it is not an
+execution problem or a question of cleverness. If someone (especially an institution or a
+team with channels) wants to continue, the only viable starting point is holding **all three**:
+"one textbook word list + one teacher willing to pilot a whole class + a channel that reaches
+parents continuously" — missing any one, don't start. The roadmaps for what comes next are already written:
 [next-generation class assignments](docs/班级作业改版方案.md) and
 [SOE scoring integration](docs/SOE对接方案.md) (both in Chinese).
 
