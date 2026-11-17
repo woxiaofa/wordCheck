@@ -1,0 +1,43 @@
+name: Bug 反馈
+description: 报告一个可以复现的问题
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 现象 + 期望行为。如果有报错信息（Console / 云函数日志），原样贴上来。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开首页
+        2. 点「开始背单词」
+        3. ……
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: 出现环境
+      options:
+        - 真机（iOS 微信）
+        - 真机（Android 微信）
+        - 微信开发者工具
+        - 云函数日志
+        - 本地测试 / npm run check
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: 版本与机型
+      placeholder: 机型 / 微信版本 / 基础库版本（如 iPhone 15 · 微信 8.x · 基础库 3.x）
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图或补充
+      description: 截图对 UI 问题几乎是必需的。

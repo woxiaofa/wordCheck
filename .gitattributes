@@ -1,0 +1,16 @@
+# 归一化换行与二进制标记
+# 仓库内文本统一 LF；跨平台协作与 CI（Linux）下行为一致。
+* text=auto eol=lf
+
+# 二进制资源不做任何转换
+*.mp3  binary
+*.wav  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ttf  binary
+*.otf  binary
+*.ttc  binary
+*.woff binary
+*.woff2 binary

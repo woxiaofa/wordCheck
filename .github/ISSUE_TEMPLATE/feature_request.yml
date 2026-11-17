@@ -1,0 +1,22 @@
+name: 功能建议
+description: 提议一个新功能或改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: 「我每次……的时候都要……」比「加一个 XX 按钮」更有用。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的做法
+  - type: checkboxes
+    id: notes
+    attributes:
+      label: 备注
+      options:
+        - label: 我读过 docs/设计约定.md，这个建议不与六条硬约定冲突
+        - label: 这是词库贡献（我会改走 CSV PR 流程，见 README「贡献词库」一节）

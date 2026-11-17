@@ -1,0 +1,16 @@
+name: 检查
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: npm run check（共享模块漂移 + 项目自检 + 绑定/语法 + 全部测试）
+        run: npm run check

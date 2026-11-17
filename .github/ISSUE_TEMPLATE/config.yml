@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 交流讨论
+    url: https://github.com/woxiaofa/wordCheck/discussions
+    about: 不确定是不是 bug、想讨论改版方向，请到 Discussions。
