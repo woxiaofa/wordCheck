@@ -156,6 +156,57 @@
   .res-item .u{color:var(--bad);text-decoration:line-through}
   .res-item .c{color:var(--ok);font-weight:600}
   canvas#reportCard{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+  /* ===== 贯穿式四阶段主流程（对齐小程序 pkg-oral/pages/flow） ===== */
+  .flow-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px}
+  .flow-steps i{font-style:normal;text-align:center;font-size:11.5px;color:var(--dim);padding:7px 2px;
+    border-bottom:2px solid var(--line);white-space:nowrap;transition:color .2s,border-color .2s}
+  .flow-steps i.on{color:var(--accent);border-color:var(--accent);font-weight:700}
+  .flow-steps i.done{color:var(--ok);border-color:var(--ok)}
+  .fl-hint{background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.3);border-radius:10px;
+    padding:8px 11px;font-size:12px;color:#c1b8ff;line-height:1.5;margin-bottom:12px}
+  .fl-pane{display:none}
+  .fl-pane.on{display:block}
+  .fl-stage{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 18px;
+    box-shadow:var(--shadow);min-height:250px;display:flex;flex-direction:column;margin-bottom:14px}
+  .fl-kind{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:1px}
+  .fl-display{font-size:30px;font-weight:700;margin:14px 0 6px;word-break:break-word;line-height:1.35}
+  .fl-display.small{font-size:20px;line-height:1.6}
+  .fl-phon{color:var(--dim);font-size:14px}
+  .fl-cn{font-size:15px;color:var(--fg);margin-top:12px;line-height:1.6}
+  .fl-lines{font-size:16px;line-height:1.9;margin:10px 0}
+  .fl-lines div{padding-left:14px;position:relative}
+  .fl-lines div:before{content:'';position:absolute;left:0;top:13px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .fl-spacer{flex:1;min-height:14px}
+  .fl-listen{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--card2);
+    border:1px solid var(--line);color:var(--accent);border-radius:12px;padding:9px 16px;font-size:14px;
+    font-weight:600;cursor:pointer;margin:8px 0}
+  .hold-btn{width:100%;padding:17px;border:none;border-radius:15px;font-size:16px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;touch-action:none;user-select:none;
+    -webkit-user-select:none;transition:transform .1s,filter .15s}
+  .hold-btn.holding{background:linear-gradient(135deg,#ffb020,#e08b00);transform:scale(.985)}
+  .hold-btn:disabled{filter:grayscale(.6) brightness(.7);cursor:default}
+  .hold-sub{text-align:center;font-size:12px;color:var(--dim);margin-top:8px}
+  .fl-fb{border-radius:12px;padding:11px 13px;font-size:13.5px;margin-top:10px;line-height:1.5}
+  .fl-fb.ok{background:rgba(47,208,122,.14);border:1px solid var(--ok);color:#8ff0bd}
+  .fl-fb.bad{background:rgba(255,92,114,.14);border:1px solid var(--bad);color:#ffb3bd}
+  .fl-fb b{display:block;margin-bottom:2px}
+  .fl-celebrate{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;
+    background:rgba(47,208,122,.94);font-size:80px;font-weight:700;color:#fff;pointer-events:none}
+  .fl-celebrate.on{display:flex}
+  .fl-act{display:flex;gap:9px;margin-top:4px}
+  .fl-act .btn{flex:1}
+  .fl-opt{background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:9px;
+    cursor:pointer;font-size:15px;transition:border-color .15s,background .15s}
+  .fl-opt.sel{border-color:var(--accent);background:rgba(62,166,255,.14)}
+  .fl-slots{font-family:Consolas,"Courier New",monospace;font-size:30px;letter-spacing:6px;text-align:center;
+    margin:16px 0;min-height:40px;word-break:break-all}
+  .fl-slots i{color:var(--dim);font-style:normal}
+  .fl-empty{text-align:center;color:var(--ok);font-weight:600;padding:22px 0}
+  .fl-practice{border:1px dashed var(--warn);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:13px;background:rgba(255,176,32,.07)}
+  .fl-practice b{color:var(--warn)}
+  .fl-stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+  .fl-stat:last-child{border-bottom:none}
+  .fl-stat b{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -205,9 +256,10 @@
         </div>
       </div>
       <div class="grid2" style="margin-top:14px" id="studyBtns">
-        <button class="btn" id="goStudy">开始学习</button>
+        <button class="btn" id="goStudy">开始今天的练习</button>
         <button class="btn ghost" id="goQuiz">去抽查</button>
       </div>
+      <div class="muted" style="margin-top:8px;text-align:center">口语 → 听力选择 → 拼写 → 报告，四步一口气走完（对齐小程序，「读」只测有没有读完，不判发音准不准）</div>
       <button class="btn ghost sm" id="fmtDemo" style="margin-top:10px;width:100%">模拟：跨过 10 分钟，让“忘记”的词现在到期</button>
     </div>
 
@@ -309,6 +361,56 @@
       <button class="btn ghost" id="rsHome" style="margin-top:10px">先歇一下</button>
     </div>
   </section>
+
+  <!-- ============ 贯穿式四阶段主流程（对齐真实小程序） ============ -->
+  <section class="screen" id="s-flow">
+    <div class="flow-steps" id="flowSteps">
+      <i data-step="lead" class="on">① 口语带读</i>
+      <i data-step="check">② 口语抽查</i>
+      <i data-step="spell">③ 认 / 写</i>
+      <i data-step="report">④ 报告</i>
+    </div>
+    <div class="progress"><i id="flProgress"></i></div>
+    <div class="qmeta"><span id="flMeta">第 1 步 · 带读</span><span id="flCount">1 / 9</span></div>
+    <div class="fl-hint" id="flHonest">本机只看有没有开口、读完没、连不连贯，<b>不判断发音准不准</b>。Demo 用「按住时长」模拟判定；真机由音频能量 + SOE 评分替换，这里不接麦克风。</div>
+
+    <div class="fl-pane on" id="flLeadPane">
+      <div class="fl-stage">
+        <div class="fl-kind" id="flKind">词 · 带读</div>
+        <div id="flBody"></div>
+        <div class="fl-spacer"></div>
+        <div id="flFeed"></div>
+      </div>
+      <button class="hold-btn" id="flHold">🎤 按住跟着读，读完松手</button>
+      <div class="hold-sub" id="flHoldSub">先听一遍示范，再按住读。读得顺会自动进下一条。</div>
+      <div class="fl-act" id="flLeadAct" style="margin-top:12px">
+        <button class="btn ghost sm" id="flReplay">🔊 再听一遍</button>
+        <button class="btn ghost sm" id="flSkip">这条先跳过</button>
+      </div>
+    </div>
+
+    <div class="fl-pane" id="flQuizPane">
+      <div class="fl-stage">
+        <div class="fl-kind" id="flQKind">口语抽查 · 读</div>
+        <div id="flQBody"></div>
+        <div class="fl-spacer"></div>
+        <div id="flQFeed"></div>
+      </div>
+      <button class="hold-btn" id="flQHold">🎤 不给示范音，按住自己读</button>
+      <div class="hold-sub" id="flQHoldSub">这一遍考「自己能不能读出来」，错了最后会再过一遍。</div>
+      <button class="btn ghost sm" id="flQSkip" style="margin-top:10px;width:100%">这条先跳过</button>
+    </div>
+
+    <div class="fl-pane" id="flDrillPane">
+      <div class="qmeta"><span id="flDrillStep">第 3 步 · 认</span><span id="flPhaseCnt">1 / 4</span></div>
+      <div class="qbox" id="flDrillBox"></div>
+      <div class="fl-fb" id="flDrillFeed" style="display:none"></div>
+    </div>
+
+    <div class="fl-pane" id="flReportPane"></div>
+  </section>
+
+  <div class="fl-celebrate" id="flCelebrate">✓</div>
 
   <!-- ============ 抽查 ============ -->
   <section class="screen" id="s-quiz">
@@ -446,7 +548,7 @@
 
 <nav>
   <button class="on" data-go="s-home"><b>◎</b>今日</button>
-  <button data-go="s-study"><b>▶</b>学习</button>
+  <button data-go="s-flow"><b>▶</b>练习</button>
   <button data-go="s-quiz"><b>✎</b>抽查</button>
   <button data-go="s-stats"><b>▤</b>数据</button>
   <button data-go="s-coach"><b>☰</b>教练</button>
@@ -454,7 +556,7 @@
 </div><!-- /coachWrap -->
 
 <div class="toast" id="toast"></div>
-<div class="demo-badge">词库：40 个示例词 · 数据存本地</div>
+<div class="demo-badge">主线：口语课 4 词 · 独立词库 40 词 · 数据存本地</div>
 
 <script>
 /* =========================================================================
@@ -724,6 +826,7 @@ function show(id){
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === id));
   window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
   const titles = {'s-home':['今日任务','学员端 · 遗忘曲线复习 + 抽查督促'],
+                's-flow':['开始今天的练习','口语 → 听力选择 → 拼写 → 报告'],
                 's-study':['学习','先回忆，再翻面'],
                 's-result':['本轮结算',''],
                 's-quiz':['抽查','交卷后统一判分'],
@@ -736,6 +839,7 @@ document.querySelectorAll('nav button').forEach(b => b.addEventListener('click',
   const target = b.dataset.go;
   if (target !== 's-coach' && !$('coachWrap').hidden) setRole('student');   // 点学员端 tab 自动切回学员身份
   if (target === 's-quiz') prepQuizIntro();
+  if (target === 's-flow' && (!flow || flow.stage === 'report')) flStart();
   show(target);
 }));
 
@@ -1055,7 +1159,7 @@ $('fbVague').addEventListener('click', () => onFeedback('vague'));
 $('fbKnown').addEventListener('click', () => onFeedback('known'));
 $('rsHome').addEventListener('click', () => { renderHome(); show('s-home'); });
 $('rsQuiz').addEventListener('click', () => { prepQuizIntro(); show('s-quiz'); });
-$('goStudy').addEventListener('click', startStudy);
+// goStudy 已改为贯穿流程入口，绑定见下方 ⑧
 
 /* ---------- ⑥ 抽查流程：交卷制 ---------- */
 let quiz = null;
@@ -1233,6 +1337,425 @@ function submitQuiz(){
   $('quizRun').style.display = 'none'; $('quizResult').style.display = 'block';
   window.scrollTo(0,0);
 }
+
+
+
+/* =========================================================================
+   ⑧ 贯穿式四阶段主流程（对齐真实小程序 pkg-oral/pages/flow + drill）
+   ① 口语带读（词→短句→小段，出现即发音、读完自动进下一条）
+   ② 口语抽查（不给示范音，错的再过一轮，最多 2 轮）
+   ③ 认（听力二选一）+ 写（看中文拼写，自绘键盘）
+   ④ 报告（口语三档 + 认写统计 + 待练清单，可只重练没读流畅的）
+   诚实红线：本机只测「有没有开口、读完没、连不连贯」，不判发音准不准。
+   Demo 用按住时长模拟音频能量；真机换 scorer + SOE，UI 文案不用改。
+   ========================================================================= */
+const FLOW_WORDS = [
+  {w:'clean', p:'/kliːn/', d:'清理；使干净', s:'I clean my room every day.', sc:'我每天打扫我的房间。'},
+  {w:'desk',  p:'/desk/',  d:'书桌；办公桌', s:'My desk is tidy now.', sc:'我的书桌现在很整齐。'},
+  {w:'tidy',  p:'/ˈtaɪdi/',d:'整理，收拾',   s:'I tidy my desk.', sc:'我收拾我的书桌。'},
+  {w:'house', p:'/haʊs/',  d:'房屋',         s:'We clean the house together.', sc:'我们一起打扫房子。'}
+];
+const FLOW_SEG = {lines:['I tidy my desk.','Then I clean my room.','Our house is clean now.'],
+  cn:'我收拾书桌。然后打扫房间。我们的房子现在干净了。'};
+
+let flow = null;
+const flT = {};   // 计时器集合
+function flClearTimers(){ Object.keys(flT).forEach(k => { if (flT[k]){ clearTimeout(flT[k]); flT[k] = null; } }); }
+function flCelebrate(){
+  const el = $('flCelebrate');
+  el.classList.add('on');
+  clearTimeout(flT.cel);
+  flT.cel = setTimeout(() => el.classList.remove('on'), 1100);   // 只闪一下，别压住「下一个」
+}
+function flSetStep(step){
+  const map = {lead:'lead', check:'check', spell:'spell', report:'report'};
+  document.querySelectorAll('#flowSteps i').forEach(i => {
+    const cur = i.dataset.step === step;
+    const order = ['lead','check','spell','report'];
+    i.classList.toggle('on', cur);
+    i.classList.toggle('done', order.indexOf(i.dataset.step) < order.indexOf(map[step]));
+  });
+}
+function flPane(id){
+  ['LeadPane','QuizPane','DrillPane','ReportPane'].forEach(x => $('fl'+x).classList.toggle('on', 'fl'+x === id));
+}
+function flBuildItems(){
+  const out = [];
+  FLOW_WORDS.forEach((w,i) => out.push({id:'w'+i, kind:'word', label:'词', refText:w.w, display:w.w,
+    phonetic:w.p, cn:w.d, lines:[]}));
+  FLOW_WORDS.forEach((w,i) => out.push({id:'s'+i, kind:'sentence', label:'短句', refText:w.s, display:w.s,
+    phonetic:'', cn:w.sc, lines:[]}));
+  out.push({id:'p0', kind:'segment', label:'小段', refText:FLOW_SEG.lines.join(' '),
+    display:FLOW_SEG.lines.join(' '), phonetic:'', cn:FLOW_SEG.cn, lines:FLOW_SEG.lines.slice()});
+  return out;
+}
+function flSpeak(text){
+  if (text && !say(text, 0.82)) toast('此浏览器不支持语音合成，看着读一遍就好');
+}
+function flStart(onlyRefs, keepDrill){
+  flClearTimers();
+  const all = flBuildItems();
+  const refs = onlyRefs && onlyRefs.length ? onlyRefs : null;
+  const seed = (Date.now() % 100000) + 1;
+  let s = seed;
+  const pick = arr => arr.slice().sort(() => ((s = (s*1103515245+12345)&0x7fffffff)/0x7fffffff) - 0.5);
+  flow = {
+    items: refs ? all.filter(x => refs.indexOf(x.refText) >= 0) : all,
+    idx: 0, retry: 0, passed: false, celebrate: false, grade: null,
+    checkList: [], qIdx: 0, qTotal: 0, qRound: 1, qPassed: false, qRetry: 0,
+    drillPhase: 'recog', dIdx: 0, dQs: [], dKnown: 0, dForgot: 0, dRoundWrong: [], dInput: '',
+    traces: [], checkTotal: 0, checkWrong: 0, checkRounds: 0,
+    drillResult: keepDrill || null, practiceOnly: !!refs, pick: pick
+  };
+  if (!flow.items.length){ toast('没有要重练的条目了'); return; }
+  show('s-flow');
+  flLead();
+}
+/* ---------- ① 带读 ---------- */
+function flLead(){
+  flow.stage = 'lead';
+  flSetStep('lead'); flPane('flLeadPane');
+  $('flHonest').innerHTML = '本机只看有没有开口、读完没、连不连贯，<b>不判断发音准不准</b>。Demo 用「按住时长」模拟判定；真机由音频能量 + SOE 评分替换，这里不接麦克风。';
+  const it = flow.items[flow.idx];
+  if (!it){ flCheck(); return; }
+  flow.passed = false; flow.grade = null; flow.retry = 0;
+  $('flMeta').textContent = '第 1 步 · 带读 · ' + it.label;
+  $('flCount').textContent = (flow.idx+1) + ' / ' + flow.items.length;
+  $('flProgress').style.width = Math.round(flow.idx / flow.items.length * 100) + '%';
+  $('flKind').textContent = it.label + ' · 带读';
+  let body = '';
+  if (it.kind === 'segment'){
+    body = '<div class="fl-lines">' + it.lines.map(l => '<div>'+l+'</div>').join('') + '</div>'
+      + '<div class="fl-cn">' + it.cn + '</div>';
+  } else if (it.kind === 'word'){
+    body = '<div class="fl-display">' + it.display + '</div><div class="fl-phon">' + it.phonetic + '</div>'
+      + '<div class="fl-cn">' + it.cn + '</div>';
+  } else {
+    body = '<div class="fl-display small">' + it.display + '</div><div class="fl-cn">' + it.cn + '</div>';
+  }
+  $('flBody').innerHTML = body;
+  $('flFeed').innerHTML = '';
+  const btn = $('flHold');
+  btn.disabled = false; btn.textContent = '🎤 按住跟着读，读完松手';
+  $('flHoldSub').textContent = '出现即发音 —— 先听一遍，再按住读。读得顺会自动进下一条。';
+  $('flLeadAct').style.display = '';
+  flSpeak(it.refText);   // 出现即主动发音（word 走词级音，句/段走离线 mp3；Demo 用 TTS）
+}
+function flGrade(ms){ return ms < 450 ? 'bad' : (ms < 1100 ? 'ok' : 'perfect'); }
+function flLeadScored(ms){
+  const it = flow.items[flow.idx];
+  if (!it || flow.passed) return;
+  const g = flGrade(ms);
+  flow.grade = g;
+  if (g !== 'bad'){
+    flow.passed = true;
+    flow.traces.push({refText:it.refText, kind:it.kind, grade:g, forced:false, honest:true});
+    $('flFeed').innerHTML = '<div class="fl-fb ok"><b>✓ ' + (g==='perfect'?'读得很顺':'读完了') + '</b>自动进下一条</div>';
+    $('flHold').disabled = true;
+    $('flLeadAct').style.display = 'none';
+    flCelebrate();
+    flT.adv = setTimeout(() => flLeadNext(), 1000);
+  } else {
+    flow.retry += 1;
+    $('flFeed').innerHTML = '<div class="fl-fb bad"><b>这条先记下</b>没关系，可以再按住读一遍，也可以点「下一个」——最后会再过一遍。</div>';
+    $('flHoldSub').textContent = '刚才太短了，按住多读一会儿再松手。';
+  }
+}
+function flLeadNext(){
+  clearTimeout(flT.adv);
+  const i = flow.idx + 1;
+  if (i < flow.items.length){ flow.idx = i; flLead(); }
+  else { flCheck(); }
+}
+function flSkipLead(){
+  clearTimeout(flT.adv);
+  const it = flow.items[flow.idx];
+  if (!it || flow.passed) return;
+  flow.passed = true;
+  flow.traces.push({refText:it.refText, kind:it.kind, grade:'bad', forced:true, honest:true});
+  flLeadNext();
+}
+/* ---------- ② 口语抽查：不给示范音，错的再过一轮 ---------- */
+function flCheck(){
+  flow.stage = 'check';
+  flSetStep('check'); flPane('flQuizPane');
+  $('flHonest').innerHTML = '这一遍<b>不给示范音</b>，考「自己能不能读出来」。本机只测读完没、连不连贯，<b>不判发音准不准</b>。';
+  if (flow.qRound === 1){
+    const words = flow.items.filter(x => x.kind === 'word');
+    const sent = flow.items.filter(x => x.kind === 'sentence');
+    flow.checkList = words.slice();
+    if (sent.length) flow.checkList.push(sent[0]);
+    flow.checkList = flow.pick(flow.checkList);
+    flow.checkTotal = flow.checkList.length;
+    flow.checkWrong = 0;
+  }
+  flow.qIdx = 0; flow.qPassed = false; flow.qRetry = 0;
+  $('flQKind').textContent = '口语抽查 · 读' + (flow.qRound > 1 ? '（再过一遍）' : '');
+  flShowQ();
+}
+function flShowQ(){
+  const q = flow.checkList[flow.qIdx];
+  if (!q){ flEndCheck(); return; }
+  flow.qPassed = false;
+  $('flMeta').textContent = '第 2 步 · 抽查 · ' + (flow.qIdx+1) + '/' + flow.checkList.length;
+  $('flCount').textContent = (flow.qIdx+1) + ' / ' + flow.checkList.length;
+  $('flProgress').style.width = Math.round(50 + flow.qIdx / flow.checkList.length * 20) + '%';
+  $('flQKind').textContent = '口语抽查 · ' + q.label + (flow.qRound > 1 ? '（再过一遍）' : '');
+  $('flQBody').innerHTML = '<div class="fl-display ' + (q.kind==='word'?'':'small') + '">' + q.display + '</div>'
+    + (q.phonetic ? '<div class="fl-phon">'+q.phonetic+'</div>' : '')
+    + '<div class="fl-cn">' + q.cn + '</div>';
+  $('flQFeed').innerHTML = '';
+  $('flQHold').disabled = false;
+  $('flQHoldSub').textContent = '这一遍不给示范音，按住读出声。没过也没关系，最后会再过一遍。';
+  $('flQSkip').style.display = '';
+}
+function flQScored(ms){
+  const q = flow.checkList[flow.qIdx];
+  if (!q || flow.qPassed) return;
+  const ok = ms >= 450;   // 抽查 listened:false → 最多拿「读完了」，不冒充流畅
+  flow.qPassed = true;
+  flow.traces.push({refText:q.refText, kind:q.kind, grade: ok?'ok':'bad', forced:false, honest:true});
+  if (!ok) flow.checkWrong += 1;
+  $('flQFeed').innerHTML = '<div class="fl-fb ' + (ok?'ok':'bad') + '"><b>' + (ok?'✓ 读出来了':'这条没过') + '</b>'
+    + (ok?'':'没关系，最后会再过一遍') + '</div>';
+  $('flQHold').disabled = true;
+  $('flQSkip').style.display = 'none';
+  if (ok) flCelebrate();
+  flT.qadv = setTimeout(() => flQNext(), 1000);
+}
+function flQNext(){
+  clearTimeout(flT.qadv);
+  const i = flow.qIdx + 1;
+  if (i < flow.checkList.length){ flow.qIdx = i; flShowQ(); }
+  else flEndCheck();
+}
+function flQSkip(){
+  clearTimeout(flT.qadv);
+  const q = flow.checkList[flow.qIdx];
+  if (!q || flow.qPassed) return;
+  flow.qPassed = true; flow.checkWrong += 1;
+  flow.traces.push({refText:q.refText, kind:q.kind, grade:'bad', forced:true, honest:true});
+  flQNext();
+}
+function flEndCheck(){
+  flow.checkRounds = flow.qRound;
+  // 只重放这一轮没过的，不重出整轮（对齐 flow.buildRetry）
+  const wrong = flow.checkList.filter((q,i) => {
+    // 最后一次这条的 trace 是 bad 才算没过
+    const ts = flow.traces.filter(t => t.refText === q.refText);
+    return ts.length && ts[ts.length-1].grade === 'bad';
+  });
+  if (wrong.length && flow.qRound < 2){
+    flow.checkList = flow.pick(wrong);
+    flow.qRound += 1;
+    toast('刚才没过的再过一遍');
+    flCheck();
+    return;
+  }
+  if (flow.practiceOnly){ flReport(); return; }   // 只重练口语：沿用上次书面结果
+  flStartDrill('recog');
+}
+/* ---------- ③ 认（听力二选一）+ 写（看中文拼写） ---------- */
+function flStartDrill(phase){
+  flow.stage = 'spell';
+  flow.drillPhase = phase;
+  flSetStep('spell'); flPane('flDrillPane');
+  $('flHonest').innerHTML = '这一步是<b>可判分的客观题</b>：先「认」（听发音 + 单词，选中文意思），再「写」（听发音 + 中文，拼出英文）。不会就点【不会】，别瞎蒙。';
+  const list = phase === 'recog' ? FLOW_WORDS : (flow.dRoundWrong.length ? flow.dRoundWrong : FLOW_WORDS);
+  flow.dQs = list.slice(); flow.dIdx = 0;
+  if (phase === 'recog'){ flow.dKnown = 0; flow.dForgot = 0; flow.dRoundWrong = []; }
+  flShowDrill();
+}
+function flShowDrill(){
+  const q = flow.dQs[flow.dIdx];
+  if (!q){ flEndDrillPhase(); return; }
+  const isRecog = flow.drillPhase === 'recog';
+  $('flMeta').textContent = '第 3 步 · ' + (isRecog?'认':'写');
+  $('flCount').textContent = (flow.dIdx+1) + ' / ' + flow.dQs.length;
+  $('flProgress').style.width = Math.round(70 + (flow.dIdx / Math.max(1,flow.dQs.length)) * 25) + '%';
+  $('flDrillStep').textContent = '第 3 步 · ' + (isRecog ? '认（听音选义）' : '写（听音拼写）');
+  $('flPhaseCnt').textContent = (flow.dIdx+1) + ' / ' + flow.dQs.length;
+  $('flDrillFeed').style.display = 'none';
+  const box = $('flDrillBox');
+  if (isRecog){
+    const others = FLOW_WORDS.filter(x => x.w !== q.w);
+    const opts = flow.pick([q.d, others[0].d]);
+    box.innerHTML = '<div class="qtitle">听发音，看看这个词是什么意思</div>'
+      + '<button class="fl-listen" data-fl="say">🔊 再听一遍</button>'
+      + '<div class="qword">' + q.w + '</div><div style="text-align:center" class="muted">' + q.p + '</div>'
+      + '<div id="flOpts" style="margin-top:14px">' + opts.map(o => '<div class="fl-opt" data-opt="'+o+'">'+o+'</div>').join('') + '</div>'
+      + '<button class="btn ghost sm" data-fl="dont" style="margin-top:6px;width:100%">不会 · 直接看答案</button>';
+    box.querySelectorAll('[data-opt]').forEach(el => el.addEventListener('click', () => flJudgeRecog(el.dataset.opt === q.d, flDrillBox, q)));
+  } else {
+    flow.dInput = '';
+    const hint = q.w[0] + ' '.repeat(Math.max(0,q.w.length-1)).replace(/ /g,'_ ');
+    box.innerHTML = '<div class="qtitle">听发音，把这个单词拼出来</div>'
+      + '<button class="fl-listen" data-fl="say">🔊 再听一遍</button>'
+      + '<div style="text-align:center" class="muted">' + q.p + ' · ' + q.d + '</div>'
+      + '<div class="fl-slots" id="flSlots"></div><div class="kb" id="flKb"></div>';
+    flPaintSlots(q.w); flPaintKb();
+  }
+  box.querySelector('[data-fl="say"]').addEventListener('click', () => flSpeak(q.w));
+  const dont = box.querySelector('[data-fl="dont"]');
+  if (dont) dont.addEventListener('click', () => flJudgeRecog(false, box, q, true));
+  flSpeak(q.w);
+}
+function flPaintSlots(word){
+  const cur = flow.dInput;
+  let html = '';
+  for (let i=0;i<word.length;i++) html += (i < cur.length ? (cur[i]||'·') : '<i>_</i>');
+  $('flSlots').innerHTML = html + '<span class="muted" style="font-size:12px;letter-spacing:0;margin-left:8px">共 '+word.length+' 个字母</span>';
+}
+function flPaintKb(){
+  const kb = $('flKb'); kb.innerHTML = '';
+  'abcdefghijklmnopqrstuvwxyz'.split('').forEach(ch => {
+    const b = document.createElement('button'); b.textContent = ch;
+    b.addEventListener('click', () => { if (flow.dInput.length < 20){ flow.dInput += ch; flPaintSlots(flow.dQs[flow.dIdx].w); } });
+    kb.appendChild(b);
+  });
+  [['⌫ 退格',()=>{ flow.dInput = flow.dInput.slice(0,-1); flPaintSlots(flow.dQs[flow.dIdx].w); }],
+   ['清空',()=>{ flow.dInput = ''; flPaintSlots(flow.dQs[flow.dIdx].w); }],
+   ['确定',()=>flSubmitSpell()]].forEach(([t,fn]) => {
+    const b = document.createElement('button'); b.className = 'wide'; b.textContent = t;
+    b.addEventListener('click', fn); kb.appendChild(b);
+  });
+}
+function flSubmitSpell(){
+  const q = flow.dQs[flow.dIdx];
+  flJudgeRecog(flow.dInput.toLowerCase().trim() === q.w.toLowerCase(), $('flDrillBox'), q);
+}
+function flJudgeRecog(ok, boxEl, q, honest){
+  const isRecog = flow.drillPhase === 'recog';
+  if (ok){ flow.dKnown += 1; flow.dRoundWrong = flow.dRoundWrong.filter(x => x.w !== q.w); }
+  else {
+    flow.dForgot += 1;
+    if (!flow.dRoundWrong.some(x => x.w === q.w)) flow.dRoundWrong.push(q);
+  }
+  const fb = $('flDrillFeed');
+  fb.style.display = 'block';
+  fb.className = 'fl-fb ' + (ok?'ok':'bad');
+  fb.innerHTML = '<b>' + (ok?'✓ 答对了':'✗ '+(honest?'你点了「不会」':'没拼对')) + '</b>'
+    + (ok ? '进入下一个' : '正确：' + q.w + ' · ' + q.d + '（这个词等下还会再考你）');
+  boxEl.querySelectorAll('.fl-opt,[data-fl]').forEach(el => {
+    if (el.dataset.opt === q.d) el.classList.add('sel');
+  });
+  if (ok) flCelebrate();
+  clearTimeout(flT.dadv);
+  flT.dadv = setTimeout(() => { const i = flow.dIdx+1; if (i < flow.dQs.length){ flow.dIdx = i; flShowDrill(); } else flEndDrillPhase(); }, ok?900:1500);
+}
+function flEndDrillPhase(){
+  if (flow.drillPhase === 'recog'){ flStartDrill('spell'); return; }
+  // 写错的再巩固一轮（最多再加一轮，不把孩子锁死）
+  if (flow.dRoundWrong.length && !flow.dLooped){
+    flow.dLooped = true;
+    flow.dQs = flow.dRoundWrong.slice(); flow.dIdx = 0;
+    toast('没拼对的词再过一遍');
+    flShowDrill();
+    return;
+  }
+  flow.drillResult = {total:FLOW_WORDS.length, mastered:Math.max(0,FLOW_WORDS.length-flow.dRoundWrong.length),
+    known:flow.dKnown, forgot:flow.dForgot};
+  flReport();
+}
+/* ---------- ④ 报告：口语 + 书面并到一张纸 ---------- */
+function flReport(){
+  flow.stage = 'report';
+  flSetStep('report'); flPane('flReportPane');
+  $('flHonest').innerHTML = '口语和书面并到一张纸。<b>想精益求精，就只练下面没读流畅的</b>，不必整轮重来。';
+  $('flProgress').style.width = '100%';
+  $('flCount').textContent = '完成';
+  $('flMeta').textContent = '完成 · 口语和书面一起看';
+  const t = flow.traces;
+  const perfect = t.filter(x=>x.grade==='perfect').length;
+  const ok = t.filter(x=>x.grade==='ok').length;
+  const bad = t.filter(x=>x.grade==='bad').length;
+  const forced = t.filter(x=>x.forced).length;
+  const allDone = bad === 0 && flow.checkWrong === 0 && (!flow.drillResult || flow.drillResult.forgot === 0);
+  // 待练清单：只挑没到 perfect 的，按 refText 去重
+  const seen = {}, practice = [];
+  t.forEach(x => { if (!seen[x.refText] && x.grade !== 'perfect'){ seen[x.refText]=1; practice.push(x); } });
+  let html = '<div class="card" style="text-align:center">'
+    + '<div style="font-size:42px">' + (allDone?'🏆':(bad<=2?'👍':'💪')) + '</div>'
+    + '<div style="font-size:20px;font-weight:700;margin:6px 0">' + (allDone?'这一轮全过了':'这一轮完成') + '</div>'
+    + '<div class="muted">' + (allDone?'口语和书面都拿下了':'下面列的是还要再练的') + '</div></div>'
+    + '<div class="card"><b>① 口语</b>'
+    + flStat('读得流畅', perfect + ' 条') + flStat('读完了', ok + ' 条')
+    + flStat('没过 / 跳过', bad + ' 条' + (forced?'（含跳过 '+forced+'）':''))
+    + '</div>'
+    + '<div class="card"><b>② 口语抽查</b>'
+    + flStat('共读', flow.checkTotal + ' 条') + flStat('没过', flow.checkWrong + ' 条')
+    + flStat('轮次', flow.checkRounds + ' 轮') + '</div>'
+    + '<div class="card"><b>③ 认 / 写</b>'
+    + flStat('答对', (flow.drillResult?flow.drillResult.known:0) + ' 题')
+    + flStat('不会 / 拼错', (flow.drillResult?flow.drillResult.forgot:0) + ' 题') + '</div>'
+    + '<div class="card"><b>待练清单</b><div class="muted" style="margin:4px 0 8px">这些是没读流畅的，点「只练这些」不会重跑书面部分。</div>';
+  if (!practice.length){ html += '<div class="fl-empty">都读流畅啦，可以再来一轮 ✨</div>'; }
+  else {
+    html += practice.map(x => '<div class="fl-practice"><b>'+x.refText+'</b>'
+      + '<div class="muted">' + (x.forced?'读了几次还不太顺':(x.grade==='bad'?'这条再读一遍':'已经读完，还能更流畅')) + '</div></div>').join('');
+  }
+  html += '</div>'
+    + '<button class="btn" id="flPractice">' + (practice.length?'只练没读流畅的 ('+practice.length+')':'再读一遍全部') + '</button>'
+    + '<button class="btn ghost" id="flAgain" style="margin-top:10px">完整再来一轮</button>'
+    + '<button class="btn ghost" id="flHome" style="margin-top:10px;margin-bottom:20px">回到今日任务</button>';
+  $('flReportPane').innerHTML = html;
+  $('flPractice').addEventListener('click', () => flStart(practice.length ? practice.map(x=>x.refText) : null, flow.drillResult));
+  $('flAgain').addEventListener('click', () => flStart());
+  $('flHome').addEventListener('click', () => { renderHome(); renderStats(); show('s-home'); });
+  if (allDone) confetti();   // 只有全过才撒花，别让纸屑压住待练清单的文案
+}
+function flStat(label, value){ return '<div class="fl-stat"><span>'+label+'</span><b>'+value+'</b></div>'; }
+
+/* ---------- 按住跟读：pointerdown 计时，pointerup 判定（真机换音频能量） ---------- */
+(function bindHold(btnId, scorer){
+  const btn = $(btnId);
+  let t0 = 0, holding = false, gen = 0;
+  const down = e => {
+    if (btn.disabled) return;
+    e.preventDefault();
+    try{ if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId); }catch(err){}
+    holding = true; t0 = Date.now(); gen++;
+    btn.classList.add('holding');
+    btn.textContent = '🎙 正在听你读…松手结束';
+  };
+  const up = e => {
+    if (!holding) return;
+    holding = false; btn.classList.remove('holding');
+    btn.textContent = btnId === 'flHold' ? '🎤 按住跟着读，读完松手' : '🎤 按住自己读，读完松手';
+    const ms = Date.now() - t0;
+    scorer(ms);
+  };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', () => { holding=false; btn.classList.remove('holding'); });
+})('flHold', flLeadScored);
+(function bindHoldQ(){
+  const btn = $('flQHold');
+  let t0=0, holding=false;
+  btn.addEventListener('pointerdown', e => {
+    if (btn.disabled) return;
+    e.preventDefault();
+    try{ if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId); }catch(err){}
+    holding=true; t0=Date.now(); btn.classList.add('holding');
+    btn.textContent='🎙 正在听你读…松手结束';
+  });
+  btn.addEventListener('pointerup', () => {
+    if (!holding) return;
+    holding=false; btn.classList.remove('holding');
+    btn.textContent='🎤 不给示范音，按住自己读';
+    flQScored(Date.now()-t0);
+  });
+  btn.addEventListener('pointercancel', () => { holding=false; btn.classList.remove('holding'); });
+})();
+
+$('goStudy').addEventListener('click', () => flStart());
+$('flReplay').addEventListener('click', () => {
+  const it = flow && flow.items[flow.idx];
+  if (it) flSpeak(it.refText);
+});
+$('flSkip').addEventListener('click', flSkipLead);
+$('flQSkip').addEventListener('click', flQSkip);
+
 
 /* ---------- ⑦ 数据看板与错词本 ---------- */
 function renderStats(){
@@ -1588,7 +2111,7 @@ function drawClassReport(){
   const wrap = $('coachWrap');
   if (!wrap) problems.push('缺少 #coachWrap 容器');
   else if (wrap.parentElement !== document.body) problems.push('#coachWrap 不是 body 的直接子元素（可能有标签漏闭合）');
-  ['s-home','s-study','s-result','s-quiz','s-stats','s-coach'].forEach(id => { if (!$(id)) problems.push('缺少屏幕容器 #' + id); });
+  ['s-home','s-flow','s-study','s-result','s-quiz','s-stats','s-coach'].forEach(id => { if (!$(id)) problems.push('缺少屏幕容器 #' + id); });
   if (wrap && wrap.hidden) problems.push('学员端容器处于隐藏状态');
   if (problems.length){
     const box = document.createElement('div');
