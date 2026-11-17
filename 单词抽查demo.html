@@ -115,14 +115,14 @@
   .badge.hi{background:rgba(255,92,114,.18);color:#ff8a9b;border:1px solid rgba(255,92,114,.4)}
   .badge.lo{background:rgba(255,176,32,.16);color:#ffc861;border:1px solid rgba(255,176,32,.35)}
   /* 底部导航 */
+  /* 底部导航对齐真实小程序 footer-nav：3 tab 今日 / 背词 / 设置，低频动作收进设置页 */
   nav{position:fixed;bottom:0;left:0;right:0;z-index:30;max-width:520px;margin:0 auto;
     background:rgba(20,28,38,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);
-    display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+    display:grid;grid-template-columns:repeat(3,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
   nav button{background:none;border:none;color:var(--dim);font-size:11.5px;padding:6px 2px;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;gap:3px}
   nav button b{font-size:19px;font-weight:400;line-height:1}
   nav button.on{color:var(--accent)}
-  nav{grid-template-columns:repeat(5,1fr)}
   /* 教练端 */
   select{background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:10px;font-family:inherit}
   input[type=range]{accent-color:#3ea6ff}
@@ -552,14 +552,48 @@
       <div class="note">教练端的价值不是"多一个后台"，而是<strong>把人工监督变成系统监督 + 人工兜底</strong>：系统自动判分、自动汇总、自动生成周报，教练只做两件事——讲全班都错的词、催没交作业的人。这两件事才是家长付钱买的东西。</div>
     </div>
   </section>
+  <!-- ============ 设置（对齐真实小程序 pages/settings） ============ -->
+  <section class="screen" id="s-settings">
+    <div class="card">
+      <div class="row between"><b>界面皮肤</b><span class="muted">真机完成任务可解锁</span></div>
+      <div class="muted" style="margin-top:4px">小程序里白天用浅色不刺眼，完成任务还能接着解锁新皮肤。本 Demo 固定深色演示主题，换肤交互在真机体验。</div>
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        <span class="chip">🌙 夜色（当前）</span><span class="chip">☀️ 浅色 · 真机</span><span class="chip">🍬 糖果 · 真机</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>反馈</b>
+      <div class="muted" style="margin-top:4px">真机这里直接进微信客服会话，不用记邮箱、不用跳出微信。Demo 里跳过。</div>
+    </div>
+
+    <div class="card">
+      <b>学习与班级</b>
+      <div class="muted" style="margin-top:4px">数据与班级是低频管理动作，和皮肤一起收进设置页；底部只留「今日 / 背词 / 设置」三个高频入口。</div>
+      <div class="row between" style="margin-top:12px;padding:12px 0;border-top:1px solid var(--line)">
+        <div><b>数据</b><div class="muted">掌握率 · 错词本 · 复习间隔</div></div>
+        <button class="btn ghost sm" id="setData">查看 →</button>
+      </div>
+      <div class="row between" style="padding:12px 0;border-top:1px solid var(--line)">
+        <div><b>班级</b><div class="muted">布置任务 · 看进度 · 催作业（教练端）</div></div>
+        <button class="btn ghost sm" id="setClass">进入 →</button>
+      </div>
+      <div class="row between" style="padding:12px 0;border-top:1px solid var(--line)">
+        <div><b>旧版抽查</b><div class="muted">翻卡 + 混排抽查，主线已并入背词</div></div>
+        <button class="btn ghost sm" id="setQuiz">打开 →</button>
+      </div>
+    </div>
+
+    <div class="card flat" style="margin-bottom:20px">
+      <div class="note">对齐真实小程序：底部不再有独立的「抽查 / 数据 / 教练」tab——抽查已并入背词流程（认 → 写 → 巩固），数据与班级是低频动作，收进这里。高频的「今日 / 背词」留在手指够得着的地方。</div>
+    </div>
+  </section>
 </main>
 
 <nav>
   <button class="on" data-go="s-home"><b>◎</b>今日</button>
-  <button data-go="s-flow"><b>▶</b>练习</button>
-  <button data-go="s-quiz"><b>✎</b>抽查</button>
-  <button data-go="s-stats"><b>▤</b>数据</button>
-  <button data-go="s-coach"><b>☰</b>教练</button>
+  <button data-go="s-flow"><b>▶</b>背词</button>
+  <button data-go="s-settings"><b>⚙</b>设置</button>
 </nav>
 </div><!-- /coachWrap -->
 
@@ -831,10 +865,15 @@ function toast(msg){
 function show(id){
   if (id !== 's-study') setStudying(false);   // 离开学习页就停掉自动揭晓计时
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === id));
+  // 子页面归属到「设置」tab（数据/班级/旧抽查都从设置进入），高亮跟着走
+  const tabOf = {'s-home':'s-home','s-flow':'s-flow','s-settings':'s-settings',
+                 's-stats':'s-settings','s-coach':'s-settings','s-quiz':'s-settings',
+                 's-study':'s-flow','s-result':'s-flow'};
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === (tabOf[id] || id)));
   window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
   const titles = {'s-home':['今日任务','学员端 · 遗忘曲线复习 + 抽查督促'],
                 's-flow':['开始今天的练习','口语 → 听力选择 → 拼写 → 报告'],
+                's-settings':['设置','界面皮肤 · 反馈 · 学习与班级'],
                 's-study':['学习','先回忆，再翻面'],
                 's-result':['本轮结算',''],
                 's-quiz':['抽查','交卷后统一判分'],
@@ -845,11 +884,14 @@ function show(id){
 }
 document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
   const target = b.dataset.go;
-  if (target !== 's-coach' && !$('coachWrap').hidden) setRole('student');   // 点学员端 tab 自动切回学员身份
-  if (target === 's-quiz') prepQuizIntro();
+  if (!$('hdrCoach').hidden) setRole('student');   // 教练端点底部 tab → 回学员端（用 header 判断，避免误隐藏容器）
   if (target === 's-flow' && (!flow || flow.stage === 'report')) flStart();
   show(target);
 }));
+// 设置页入口
+$('setData').addEventListener('click', () => show('s-stats'));
+$('setClass').addEventListener('click', () => setRole('coach'));
+$('setQuiz').addEventListener('click', () => { prepQuizIntro(); show('s-quiz'); });
 
 /* 语音合成（听写用；不支持时降级为提示） */
 function say(text, rate){
@@ -2016,7 +2058,8 @@ function renderCoach(){
 }
 function setRole(role){
   const isCoach = role === 'coach';
-  $('coachWrap').hidden = !isCoach;
+  // coachWrap 是包裹 header/main/nav 的全局容器，任何角色都必须可见；
+  // 原来这里写 $('coachWrap').hidden = !isCoach 会在「切回学员端」时把整个 app 藏掉（白屏），已移除。
   $('hdrStu').hidden = isCoach;
   $('hdrCoach').hidden = !isCoach;
   if (isCoach){ show('s-coach'); renderCoach(); }
@@ -2119,7 +2162,7 @@ function drawClassReport(){
   const wrap = $('coachWrap');
   if (!wrap) problems.push('缺少 #coachWrap 容器');
   else if (wrap.parentElement !== document.body) problems.push('#coachWrap 不是 body 的直接子元素（可能有标签漏闭合）');
-  ['s-home','s-flow','s-study','s-result','s-quiz','s-stats','s-coach'].forEach(id => { if (!$(id)) problems.push('缺少屏幕容器 #' + id); });
+  ['s-home','s-flow','s-settings','s-study','s-result','s-quiz','s-stats','s-coach'].forEach(id => { if (!$(id)) problems.push('缺少屏幕容器 #' + id); });
   if (wrap && wrap.hidden) problems.push('学员端容器处于隐藏状态');
   if (problems.length){
     const box = document.createElement('div');
