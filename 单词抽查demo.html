@@ -190,9 +190,17 @@
   .fl-fb.ok{background:rgba(47,208,122,.14);border:1px solid var(--ok);color:#8ff0bd}
   .fl-fb.bad{background:rgba(255,92,114,.14);border:1px solid var(--bad);color:#ffb3bd}
   .fl-fb b{display:block;margin-bottom:2px}
-  .fl-celebrate{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;
-    background:rgba(47,208,122,.94);font-size:80px;font-weight:700;color:#fff;pointer-events:none}
+  /* 答对提示：中央小对勾徽章，不再铺满全屏，也不遮挡题目/按钮 */
+  .fl-celebrate{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:75;display:none;
+    align-items:center;justify-content:center;width:88px;height:88px;border-radius:50%;
+    background:radial-gradient(circle at 34% 28%,#7ff0b4,#22c978 72%);
+    font-size:48px;font-weight:700;color:#fff;pointer-events:none;
+    box-shadow:0 12px 30px rgba(47,208,122,.5),inset 0 3px 8px rgba(255,255,255,.5);
+    animation:flPop .45s cubic-bezier(.2,1.4,.5,1)}
   .fl-celebrate.on{display:flex}
+  @keyframes flPop{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}
+    60%{transform:translate(-50%,-50%) scale(1.12);opacity:1}
+    100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
   .fl-act{display:flex;gap:9px;margin-top:4px}
   .fl-act .btn{flex:1}
   .fl-opt{background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:9px;
