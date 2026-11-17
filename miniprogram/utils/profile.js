@@ -74,11 +74,17 @@ function upload(filePath, cb) {
   }
 }
 
-/** 同步到云端（失败不影响本地展示） */
+/** 同步到云端（失败不影响本地展示；昵称/头像被内容安全拦下时要让孩子知道） */
 function push(p) {
   if (!p.nickname && !p.avatar) return;
   api.saveProfile({ nickname: p.nickname, avatar: p.avatar })
     .catch(function (err) {
+      // 2026-11-16 提审整改：服务端接了 msgSecCheck，违规昵称/头像会被挡回。
+      // 本地已经改成新值，但云端留着旧值 —— 不提示的话，孩子看到的就是
+      // 「自己这边改好了，同学那边还是旧名字」，还以为坏了。
+      if (err && err.code === 'SEC_BLOCK' && typeof wx !== 'undefined' && wx.showToast) {
+        wx.showToast({ title: (err.message || '内容不合规') + '，云端还是原来的', icon: 'none', duration: 3000 });
+      }
       console.warn('[profile] 资料同步云端失败（本地仍可用）：',
         (err && (err.errMsg || err.message)) || err);
     });

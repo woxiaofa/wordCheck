@@ -22,6 +22,9 @@ const { getLocalDate, getLocalDayStart } = require('./time');
 const { openLine } = require('./links');
 const { queryStates, STATE_COLL, ensureCollection } = require('./state-store');
 const wrongLib = require('./wrong');
+// 2026-11-16 提审被拒（拒绝情形 3.2）：班级名 / 自定义词单 / 作业备注是
+// 「在小程序内发布」的 UGC，入库前必须过内容安全 API（security.msgSecCheck）。
+const seccheck = require('./seccheck');
 
 const COLL = {
   users: 'users',
@@ -127,6 +130,10 @@ async function onCreateClass(openid, { name, clientReqId }) {
   if (!clientReqId) return fail('BAD_PARAM', '缺少 clientReqId（幂等要求）');
   name = typeof name === 'string' ? name.trim().slice(0, LIMITS.NAME_MAX) : '';
   if (!name) return fail('BAD_PARAM', '班级名称不能为空');
+
+  // 内容安全：班级名会展示给全班学生（2026-11-16 审核硬要求）
+  const secName = await seccheck.checkText(cloud, openid, name, seccheck.SCENE.COMMENT);
+  if (secName.blocked) return fail('SEC_BLOCK', '班级名称包含平台不允许的内容，请修改后再建');
 
   const user = await getUser(openid);
   if (!user) return fail('NO_USER', '用户不存在，请先 login');
@@ -272,6 +279,12 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     customWords = cleaned;
   }
 
+  // 内容安全（2026-11-16 审核硬要求）：自定义词单与作业备注会展示给全班学生
+  if (customWords) {
+    const secWords = await seccheck.checkText(cloud, openid, customWords, seccheck.SCENE.COMMENT);
+    if (secWords.blocked) return fail('SEC_BLOCK', '词单里包含平台不允许的内容，请检查自定义词单');
+  }
+
   count = customWords ? customWords.length : parseInt(count, 10);
   if (!(count >= LIMITS.ASSIGN_COUNT_MIN && count <= LIMITS.ASSIGN_COUNT_MAX)) {
     return fail('BAD_PARAM', '词数需在 ' + LIMITS.ASSIGN_COUNT_MIN + '~' + LIMITS.ASSIGN_COUNT_MAX + ' 之间');
@@ -283,6 +296,11 @@ async function onAssign(openid, { tag, count, deadline, note, clientReqId, perso
     deadline = '';
   }
   note = typeof note === 'string' ? note.trim().slice(0, LIMITS.NOTE_MAX) : '';
+
+  if (note) {
+    const secNote = await seccheck.checkText(cloud, openid, note, seccheck.SCENE.COMMENT);
+    if (secNote.blocked) return fail('SEC_BLOCK', '作业备注包含平台不允许的内容，请修改');
+  }
 
   const now = Date.now();
   const personal = personalized === true;

@@ -14,6 +14,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 
+// 2026-11-16 提审被拒（拒绝情形 3.2）：昵称 / 头像会展示给班级其他成员，
+// 落库前必须过内容安全（security.msgSecCheck / imgSecCheck）。
+const seccheck = require('./seccheck');
+
 const COLL = {
   users: 'users'
 };
@@ -77,9 +81,15 @@ async function onProfile(openid, { nickname, avatar }) {
 
   const patch = {};
   if (typeof nickname === 'string' && nickname.trim()) {
+    // 内容安全（2026-11-16 审核硬要求）：昵称在榜单 / 学员列表 / 简报里展示给他人
+    const sec = await seccheck.checkText(cloud, openid, nickname, seccheck.SCENE.PROFILE);
+    if (sec.blocked) return fail('SEC_BLOCK', '昵称包含平台不允许的内容，请换一个');
     patch.nickname = nickname.trim().slice(0, 20);
   }
   if (typeof avatar === 'string') {
+    // 头像：云存储 fileID 才展示给他人（本地临时路径只有自己能看到），检图片内容
+    const secImg = await seccheck.checkImage(cloud, openid, avatar);
+    if (secImg.blocked) return fail('SEC_BLOCK', '头像图片包含平台不允许的内容，请换一张');
     patch.avatar = avatar.slice(0, 500);
   }
   if (!Object.keys(patch).length) return fail('BAD_PARAM', '没有可更新的字段');
